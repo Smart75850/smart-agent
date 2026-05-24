@@ -46,21 +46,73 @@ _USER_JS = """\
 
 
 async def douyin_search(keyword: str) -> str:
-    """搜索抖音視頻，需登入先有完整內容。回傳 JSON 字串。"""
     logger.info(f"抖音搜索: keyword={keyword}")
-    url = f"https://www.douyin.com/search/{keyword}"
-    result = await browser.evaluate(url, _SEARCH_JS)
-    logger.info(f"抖音搜索完成: {len(result)} 條結果")
-    return json.dumps(result, ensure_ascii=False)
+    api_url = f"https://www.douyin.com/aweme/v1/web/search/item/?keyword={keyword}&search_source=normal_search&is_filter_search=0&publish_time=30"
+    try:
+        from src.utils.sign_client import sign, SignSrvUnavailable
+        signed = sign(api_url)
+        headers = {
+            "User-Agent": signed["user_agent"],
+            "Cookie": "",
+        }
+        cookie_parts = []
+        if signed.get("ttwid"):
+            cookie_parts.append(f"ttwid={signed['ttwid']}")
+        if signed.get("ms_token"):
+            cookie_parts.append(f"msToken={signed['ms_token']}")
+        if cookie_parts:
+            headers["Cookie"] = "; ".join(cookie_parts)
+        import requests as req
+        resp = req.get(signed["signed_url"], headers=headers, timeout=10)
+        data = resp.json()
+        if data.get("status_code") != 0:
+            raise Exception(f"API 返回错误: {data}")
+        logger.info(f"抖音搜索完成(SignSrv): {len(data.get('data', []))} 條結果")
+        return json.dumps(data, ensure_ascii=False)
+    except (Exception, SignSrvUnavailable) as e:
+        if isinstance(e, SignSrvUnavailable):
+            logger.warning(f"SignSrv 不可用，降级到 CDP 浏览器模式: {e}")
+        else:
+            logger.warning(f"SignSrv 模式失败，降级到 CDP 浏览器模式: {e}")
+        url = f"https://www.douyin.com/search/{keyword}"
+        result = await browser.evaluate(url, _SEARCH_JS)
+        logger.info(f"抖音搜索完成(CDP降级): {len(result)} 條結果")
+        return json.dumps(result, ensure_ascii=False)
 
 
 async def douyin_user_videos(user_id: str) -> str:
-    """獲取抖音用戶視頻列表，需登入先有內容。回傳 JSON 字串。"""
     logger.info(f"抖音用戶視頻: user_id={user_id}")
-    url = f"https://www.douyin.com/user/{user_id}"
-    result = await browser.evaluate(url, _USER_JS)
-    logger.info(f"抖音用戶視頻完成: {len(result)} 條結果")
-    return json.dumps(result, ensure_ascii=False)
+    api_url = f"https://www.douyin.com/aweme/v1/web/user/profile/other/?sec_user_id={user_id}&publish_video_strategy_type=2"
+    try:
+        from src.utils.sign_client import sign, SignSrvUnavailable
+        signed = sign(api_url)
+        headers = {
+            "User-Agent": signed["user_agent"],
+            "Cookie": "",
+        }
+        cookie_parts = []
+        if signed.get("ttwid"):
+            cookie_parts.append(f"ttwid={signed['ttwid']}")
+        if signed.get("ms_token"):
+            cookie_parts.append(f"msToken={signed['ms_token']}")
+        if cookie_parts:
+            headers["Cookie"] = "; ".join(cookie_parts)
+        import requests as req
+        resp = req.get(signed["signed_url"], headers=headers, timeout=10)
+        data = resp.json()
+        if data.get("status_code") != 0:
+            raise Exception(f"API 返回错误: {data}")
+        logger.info(f"抖音用戶視頻完成(SignSrv): {len(data.get('data', []))} 條結果")
+        return json.dumps(data, ensure_ascii=False)
+    except (Exception, SignSrvUnavailable) as e:
+        if isinstance(e, SignSrvUnavailable):
+            logger.warning(f"SignSrv 不可用，降级到 CDP 浏览器模式: {e}")
+        else:
+            logger.warning(f"SignSrv 模式失败，降级到 CDP 浏览器模式: {e}")
+        url = f"https://www.douyin.com/user/{user_id}"
+        result = await browser.evaluate(url, _USER_JS)
+        logger.info(f"抖音用戶視頻完成(CDP降级): {len(result)} 條結果")
+        return json.dumps(result, ensure_ascii=False)
 
 
 async def douyin_comment(video_id: str) -> str:
