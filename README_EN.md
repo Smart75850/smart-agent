@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()
 [![License](https://img.shields.io/badge/License-NonCommercial-blue)]()
-[![CI](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/Platform-Bilibili%20|%20RED%20|%20Douyin%20|%20Zhihu%20|%20Kuaishou-orange)]()
 
 Multi-platform content collection framework — pure crawler, structured data output.

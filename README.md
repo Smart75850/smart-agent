@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()
 [![License](https://img.shields.io/badge/License-NonCommercial-blue)]()
-[![CI](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Smart75850/smart-agent/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/Platform-B站%20|%20小紅書%20|%20抖音%20|%20知乎%20|%20快手-orange)]()
 
 多平台內容採集框架 — 純爬蟲，輸出結構化數據
