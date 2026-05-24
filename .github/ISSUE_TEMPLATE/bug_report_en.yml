@@ -1,0 +1,57 @@
+name: Bug Report (English)
+description: Report a bug or issue
+title: "[Bug] "
+labels: [bug]
+
+body:
+  - type: input
+    id: platform
+    attributes:
+      label: Target Platform
+      description: Which platform is affected? (bilibili / xiaohongshu / douyin / zhihu / kuaishou)
+      placeholder: bilibili
+    validations:
+      required: true
+
+  - type: input
+    id: operation
+    attributes:
+      label: Operation Type
+      description: search / hot / detail / comment / user
+      placeholder: search
+    validations:
+      required: true
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Browser Engine
+      options:
+        - playwright
+        - cdp
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect?
+      placeholder: Error output / empty results / browser not responding...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error / Log Output
+      description: Paste the full terminal output (no screenshots)
+      render: text
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Environment
+      description: Python version, proxy enabled, CDP mode?
+      placeholder: Python 3.11.4, no proxy, playwright

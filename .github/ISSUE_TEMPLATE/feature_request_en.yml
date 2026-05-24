@@ -1,0 +1,42 @@
+name: Feature Request (English)
+description: Suggest a new feature
+title: "[Feature] "
+labels: [enhancement]
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Related Problem
+      description: What problem does this feature solve? (e.g., "I always have to do X manually, it's tedious")
+      placeholder: Every time I want to crawl Y platform's Z data, I have to manually...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: What would you like to add?
+      placeholder: Add a --xxx flag that can...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Any alternative approaches you've considered?
+      placeholder: Could also use YYY method instead...
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - New platform support
+        - New operation for existing platform
+        - WebUI improvement
+        - Storage backend
+        - Documentation
+        - Other

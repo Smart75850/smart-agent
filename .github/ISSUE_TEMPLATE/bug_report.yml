@@ -1,0 +1,57 @@
+name: Bug Report
+description: 回報一個問題／錯誤
+title: "[Bug] "
+labels: [bug]
+
+body:
+  - type: input
+    id: platform
+    attributes:
+      label: 目標平台
+      description: 邊個平台出事？（bilibili / xiaohongshu / douyin / zhihu / kuaishou）
+      placeholder: bilibili
+    validations:
+      required: true
+
+  - type: input
+    id: operation
+    attributes:
+      label: 操作類型
+      description: search / hot / detail / comment / user
+      placeholder: search
+    validations:
+      required: true
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: 瀏覽器引擎
+      options:
+        - playwright
+        - cdp
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 問題描述
+      description: 發生咩事？預期應該係點？
+      placeholder: 運行後報錯 / 結果為空 / 瀏覽器無反應...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 錯誤訊息／Log
+      description: 貼上 terminal 嘅完整輸出（唔使截圖）
+      render: text
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 環境設定
+      description: Python 版本、有冇開 proxy、有冇用 CDP mode
+      placeholder: Python 3.11.4, 冇 proxy, 用 playwright

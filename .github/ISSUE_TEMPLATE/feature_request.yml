@@ -1,0 +1,42 @@
+name: Feature Request
+description: 提議一個新功能
+title: "[Feature] "
+labels: [enhancement]
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 相關問題
+      description: 呢個功能係為了解決咩問題？（例如：「每次都要手動做 X，好麻煩」）
+      placeholder: 每次想爬 Y 平台嘅 Z 數據時，都要手動做...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 建議方案
+      description: 你希望加啲咩功能？
+      placeholder: 加一個 --xxx 參數，可以...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案
+      description: 有冇諗過其他做法？
+      placeholder: 或者可以用 YYY 方式取代...
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 影響範圍
+      options:
+        - 新平台支援
+        - 現有平台新操作
+        - WebUI 改進
+        - 儲存後端
+        - 文件／文檔
+        - 其他

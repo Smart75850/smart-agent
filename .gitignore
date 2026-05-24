@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual env
+venv/
+.venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Browser profiles (Chrome user data — large, machine-specific)
+chrome_*/
+chrome_debug/
+
+# Browser data (cookies, sessions)
+browser_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.png
+*.txt
+*.json
+!requirements.txt
+!test_all_platforms.py
+
+# pytest
+.pytest_cache/
+
+# Project specific
+platform_verify.txt

@@ -1,0 +1,42 @@
+[project]
+name = "smart-agent"
+version = "0.1.0"
+description = "Non-Commercial Learning License 1.0 — 純爬蟲，多平台內容採集 MCP Server"
+requires-python = ">=3.11"
+authors = [{name = "Smart75850"}]
+license = {text = "NON-COMMERCIAL LEARNING LICENSE 1.0"}
+readme = "README_EN.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+]
+dependencies = [
+    "fastmcp>=0.5.0",
+    "playwright>=1.50.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "openpyxl>=3.1.0",
+    "mysql-connector-python>=9.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Smart75850/smart-agent"
+Repository = "https://github.com/Smart75850/smart-agent.git"
+Issues = "https://github.com/Smart75850/smart-agent/issues"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[project.optional-dependencies]
+pro = [
+    "camoufox>=0.4.0",
+    "langgraph>=0.4.0",
+    "openai>=1.60.0",
+    "html2text>=2024.0.0",
+    "pydantic>=2.0.0",
+]

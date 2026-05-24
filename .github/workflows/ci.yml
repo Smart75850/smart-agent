@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
+
+      - name: Check imports
+        run: |
+          python -c "
+            from config.settings import Settings
+            from constant.platform import PlatformType, CrawlType, ErrorCode
+            from proxy.proxy_manager import ProxyManager
+            from cache.memory_cache import MemoryCache
+            from store import get_store
+            for name in ['json', 'csv', 'jsonl', 'sqlite', 'excel']:
+                get_store(name)
+            from base.platform_base import PlatformAdapter
+            from src.utils.browser_service import BrowserService
+            from src.agents.bilibili_adapter import BilibiliAdapter
+            from src.agents.xiaohongshu_adapter import XiaohongshuAdapter
+            from src.agents.douyin_adapter import DouyinAdapter
+            from src.agents.zhihu_adapter import ZhihuAdapter
+            from src.agents.kuaishou_adapter import KuaishouAdapter
+            print('All imports OK')
+          "
+
+      - name: Check syntax
+        run: |
+          python -m py_compile main.py
+          python -m py_compile api/main.py
+          python -m py_compile config/settings.py
+          echo "Syntax OK"
+
+      - name: CLI help
+        run: |
+          python main.py --help
