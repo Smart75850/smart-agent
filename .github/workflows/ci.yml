@@ -33,38 +33,38 @@ jobs:
       - name: Check imports
         run: |
           python -c "
-import sys, traceback
-try:
-    from config.settings import Settings
-    print('config.settings OK')
-    from constant.platform import PlatformType, CrawlType, ErrorCode
-    print('constant.platform OK')
-    from proxy.proxy_manager import ProxyManager
-    print('proxy.proxy_manager OK')
-    from cache.memory_cache import MemoryCache
-    print('cache.memory_cache OK')
-    from store import get_store
-    for name in ['json', 'csv', 'jsonl', 'sqlite', 'excel']:
-        get_store(name)
-        print(f'store.{name} OK')
-    from base.platform_base import PlatformAdapter
-    print('base.platform_base OK')
-    from src.utils.browser_service import BrowserService
-    print('src.utils.browser_service OK')
-    from src.agents.bilibili_adapter import BilibiliAdapter
-    print('src.agents.bilibili_adapter OK')
-    from src.agents.xiaohongshu_adapter import XiaohongshuAdapter
-    print('src.agents.xiaohongshu_adapter OK')
-    from src.agents.douyin_adapter import DouyinAdapter
-    print('src.agents.douyin_adapter OK')
-    from src.agents.zhihu_adapter import ZhihuAdapter
-    print('src.agents.zhihu_adapter OK')
-    from src.agents.kuaishou_adapter import KuaishouAdapter
-    print('src.agents.kuaishou_adapter OK')
-    print('All imports OK')
-except Exception:
-    traceback.print_exc()
-    sys.exit(1)
+          import sys, traceback
+          try:
+              from config.settings import Settings
+              print('config.settings OK')
+              from constant.platform import PlatformType, CrawlType, ErrorCode
+              print('constant.platform OK')
+              from proxy.proxy_manager import ProxyManager
+              print('proxy.proxy_manager OK')
+              from cache.memory_cache import MemoryCache
+              print('cache.memory_cache OK')
+              from store import get_store
+              for name in ['json', 'csv', 'jsonl', 'sqlite', 'excel']:
+                  get_store(name)
+                  print(f'store.{name} OK')
+              from base.platform_base import PlatformAdapter
+              print('base.platform_base OK')
+              from src.utils.browser_service import BrowserService
+              print('src.utils.browser_service OK')
+              from src.agents.bilibili_adapter import BilibiliAdapter
+              print('src.agents.bilibili_adapter OK')
+              from src.agents.xiaohongshu_adapter import XiaohongshuAdapter
+              print('src.agents.xiaohongshu_adapter OK')
+              from src.agents.douyin_adapter import DouyinAdapter
+              print('src.agents.douyin_adapter OK')
+              from src.agents.zhihu_adapter import ZhihuAdapter
+              print('src.agents.zhihu_adapter OK')
+              from src.agents.kuaishou_adapter import KuaishouAdapter
+              print('src.agents.kuaishou_adapter OK')
+              print('All imports OK')
+          except Exception:
+              traceback.print_exc()
+              sys.exit(1)
           "
 
       - name: Check syntax
