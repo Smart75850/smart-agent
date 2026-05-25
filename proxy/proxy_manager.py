@@ -51,6 +51,16 @@ class ProxyManager:
         self._index += 1
         return {"server": proxy}
 
+    def get_next_proxy(self) -> Optional[str]:
+        """返回原始 proxy URL（唔包 Playwright dict），畀 AccountManager fallback 用。"""
+        if not self._proxies:
+            return None
+        if not self._explicit and not settings.PROXY_ENABLED:
+            return None
+        proxy = self._proxies[self._index % len(self._proxies)]
+        self._index += 1
+        return proxy
+
     @property
     def enabled(self) -> bool:
         if self._explicit:

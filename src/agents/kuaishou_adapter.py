@@ -7,13 +7,13 @@ from src.utils.logger import logger
 
 _SEARCH_JS = """\
 () => {
-    const items = document.querySelectorAll(
-        'a[href*="/photo"], [class*="video-card"], [class*="search-result"] a, [class*="card"] a[href*="photo"]'
-    );
     const seen = new Set();
     const results = [];
-    items.forEach(el => {
-        const href = el.getAttribute('href');
+    const cards = document.querySelectorAll(
+        'a[href*="/photo"], [class*="video-card"], [class*="VideoCard"], [class*="search-result"] a, [class*="card"] a[href*="photo"]'
+    );
+    cards.forEach(el => {
+        const href = el.getAttribute('href') || el.href || '';
         if (!href || seen.has(href)) return;
         seen.add(href);
         const titleEl = el.querySelector('[class*="title"], [class*="desc"], [class*="subject"]');
@@ -23,20 +23,20 @@ _SEARCH_JS = """\
             title: titleEl?.textContent?.trim() ?? null,
             author: authorEl?.textContent?.trim() ?? null,
             plays: playEl?.textContent?.trim() ?? null,
-            link: href ?? null,
+            link: href.startsWith('http') ? href : 'https://www.kuaishou.com' + href,
         });
     });
     if (results.length === 0) {
         const photoLinks = document.querySelectorAll('a[href*="/photo"]');
         photoLinks.forEach(a => {
-            const href = a.getAttribute('href');
+            const href = a.getAttribute('href') || '';
             if (!href || seen.has(href)) return;
             seen.add(href);
             results.push({
                 title: a.textContent?.trim()?.slice(0, 100) ?? null,
                 author: null,
                 plays: null,
-                link: href,
+                link: href.startsWith('http') ? href : 'https://www.kuaishou.com' + href,
             });
         });
     }
@@ -63,32 +63,63 @@ _HOT_JS = """\
 }"""
 
 
-async def kuaishou_search(keyword: str) -> str:
-    """搜索快手視頻，需登入先有結果。回傳 JSON 字串。"""
-    logger.info(f"快手搜索: keyword={keyword}")
-    url = f"https://www.kuaishou.com/search/video?searchKey={keyword}"
-    result = await browser.evaluate(url, _SEARCH_JS)
-    logger.info(f"快手搜索完成: {len(result)} 條結果")
-    return json.dumps(result, ensure_ascii=False)
+async def kuaishou_search(keyword: str, count: int = 40) -> str:
+    """搜索快手视频 — CDP 滚动翻页，不需要登录。"""
+    logger.info(f"快手搜索: keyword={keyword} count={count}")
+    page = await browser.new_page()
+
+    try:
+        url = f"https://www.kuaishou.com/search/video?searchKey={keyword}"
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(4000)
+
+        all_results = []
+        seen = set()
+        max_scrolls = (count // 20) + 3
+
+        for _ in range(max_scrolls):
+            items = await page.evaluate(_SEARCH_JS)
+            new_items = 0
+            for item in items:
+                key = item.get("link", "")
+                if key and key not in seen:
+                    seen.add(key)
+                    all_results.append(item)
+                    new_items += 1
+
+            if new_items == 0 and len(all_results) > 0:
+                break
+
+            if len(all_results) >= count:
+                break
+
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2500)
+
+        result = all_results[:count]
+        logger.info(f"快手搜索完成: {len(result)} 条")
+        return json.dumps(result, ensure_ascii=False)
+    finally:
+        await page.close()
 
 
 async def kuaishou_hot() -> str:
-    """爬取快手熱榜（/discover/hot → /new-reco），回傳 JSON 字串。"""
-    logger.info("快手熱榜: 開始爬取")
+    """爬取快手热榜（/discover/hot → /new-reco），回传 JSON 字串。"""
+    logger.info("快手热榜: 开始爬取")
     page = await browser.new_page()
     try:
         await page.goto("https://www.kuaishou.com/new-reco", wait_until="domcontentloaded")
         await page.wait_for_timeout(8000)
         result = await page.evaluate(_HOT_JS)
-        logger.info(f"快手熱榜完成: {len(result)} 條結果")
+        logger.info(f"快手热榜完成: {len(result)} 条结果")
         return json.dumps(result, ensure_ascii=False)
     finally:
         await page.close()
 
 
 async def kuaishou_detail(photo_id: str) -> str:
-    """爬取快手視頻詳情，需登入先有完整內容。回傳 JSON 字串。"""
-    logger.info(f"快手詳情: photo_id={photo_id}")
+    """爬取快手视频详情，需登入先有完整内容。回传 JSON 字串。"""
+    logger.info(f"快手详情: photo_id={photo_id}")
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.kuaishou.com/photo/{photo_id}", wait_until="domcontentloaded")
@@ -105,21 +136,20 @@ async def kuaishou_detail(photo_id: str) -> str:
         likes: likeEl?.textContent?.trim() || '',
     };
 }""")
-        logger.info("快手詳情完成")
+        logger.info("快手详情完成")
         return json.dumps(result, ensure_ascii=False)
     finally:
         await page.close()
 
 
 async def kuaishou_comment(photo_id: str) -> str:
-    """爬取快手視頻評論，需登入先有完整內容。回傳 JSON 字串。"""
-    logger.info(f"快手評論: photo_id={photo_id}")
+    """爬取快手视频评论，需登入先有完整内容。回传 JSON 字串。"""
+    logger.info(f"快手评论: photo_id={photo_id}")
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.kuaishou.com/photo/{photo_id}", wait_until="domcontentloaded")
         await page.wait_for_timeout(5000)
         result = await page.evaluate("""() => {
-    // 一級評論 container
     const containers = document.querySelectorAll('[class*="commentItem"], [class*="CommentItem"], [class*="comment-item"], [class*="parent"]');
     if (containers.length > 0) {
         const seen = new Set();
@@ -128,13 +158,11 @@ async def kuaishou_comment(photo_id: str) -> str:
             return t && t.length >= 5 && !seen.has(t) && (seen.add(t), true);
         }).map(c => ({
             content: c.querySelector('[class*="text"], [class*="content"], p, span')?.textContent?.trim() || c.textContent.trim().slice(0, 200),
-            // 🆕 二級評論
             replies: Array.from(c.querySelectorAll('[class*="reply"], [class*="Reply"], [class*="sub"]')).map(r => ({
                 content: r.querySelector('[class*="text"], [class*="content"], p, span')?.textContent?.trim() || r.textContent.trim().slice(0, 200),
             })),
         }));
     }
-    // fallback: flat 模式
     const items = document.querySelectorAll('[class*="comment"] [class*="text"], [class*="comment"] p, [class*="Comment"] p, [class*="reply"] [class*="content"]');
     const seen = new Set();
     return Array.from(items).filter(el => {
@@ -142,15 +170,15 @@ async def kuaishou_comment(photo_id: str) -> str:
         return t && t.length >= 2 && !seen.has(t) && (seen.add(t), true);
     }).map(el => ({ content: el.textContent.trim(), replies: [] }));
 }""")
-        logger.info(f"快手評論完成: {len(result)} 條")
+        logger.info(f"快手评论完成: {len(result)} 条")
         return json.dumps(result, ensure_ascii=False)
     finally:
         await page.close()
 
 
 async def kuaishou_user(user_id: str) -> str:
-    """爬取快手用戶主頁視頻列表，需登入先有完整內容。回傳 JSON 字串。"""
-    logger.info(f"快手用戶: user_id={user_id}")
+    """爬取快手用户主页视频列表，需登入先有完整内容。回传 JSON 字串。"""
+    logger.info(f"快手用户: user_id={user_id}")
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.kuaishou.com/profile/{user_id}", wait_until="domcontentloaded")
@@ -173,7 +201,7 @@ async def kuaishou_user(user_id: str) -> str:
     });
     return results;
 }""")
-        logger.info(f"快手用戶完成: {len(result)} 條")
+        logger.info(f"快手用户完成: {len(result)} 条")
         return json.dumps(result, ensure_ascii=False)
     finally:
         await page.close()
@@ -186,10 +214,10 @@ class KuaishouAdapter(PlatformAdapter):
 
     @property
     def need_login(self) -> bool:
-        return True
+        return False
 
     async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await kuaishou_search(keyword))
+        data = json.loads(await kuaishou_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:

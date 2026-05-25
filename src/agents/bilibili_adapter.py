@@ -1,5 +1,8 @@
+import asyncio
 import json
+import re
 from typing import Optional
+from urllib.parse import quote
 
 from base.platform_base import PlatformAdapter
 from src.utils.browser_service import browser
@@ -49,13 +52,41 @@ async def bilibili_rank(category: str = "all") -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
-async def bilibili_search(keyword: str) -> str:
-    """搜索 B站 關鍵字，回傳 JSON 字串。"""
-    logger.info(f"B站搜索: keyword={keyword}")
-    url = f"https://search.bilibili.com/all?keyword={keyword}"
-    result = await browser.evaluate(url, _SEARCH_JS, wait_selector=".bili-video-card")
+async def bilibili_search(keyword: str, count: int = 40) -> str:
+    """搜索 B站 关键字，支持翻页拿更多结果。回傳 JSON 字串。"""
+    logger.info(f"B站搜索: keyword={keyword} count={count}")
+    all_items = []
+    seen_bvids = set()
+    per_page = 42  # B站每页约 42 条
+
+    for page_num in range(1, 15):  # 最多 15 页
+        if page_num == 1:
+            url = f"https://search.bilibili.com/all?keyword={quote(keyword)}"
+        else:
+            url = f"https://search.bilibili.com/all?keyword={quote(keyword)}&page={page_num}"
+
+        result = await browser.evaluate(url, _SEARCH_JS, wait_selector=".bili-video-card")
+        if not result:
+            break
+
+        new_count = 0
+        for item in result:
+            link = item.get("link", "")
+            bv_match = re.search(r'(BV[a-zA-Z0-9]+)', link)
+            bvid = bv_match.group(1) if bv_match else link
+            if bvid and bvid not in seen_bvids:
+                seen_bvids.add(bvid)
+                all_items.append(item)
+                new_count += 1
+
+        if new_count == 0:
+            break
+        if len(all_items) >= count:
+            break
+
+    result = all_items[:count]
     result = _normalize_links(result)
-    logger.info(f"B站搜索完成: {len(result)} 條結果")
+    logger.info(f"B站搜索完成: {len(result)} 條 (翻{page_num}页)")
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -219,7 +250,7 @@ class BilibiliAdapter(PlatformAdapter):
         return False
 
     async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await bilibili_search(keyword))
+        data = json.loads(await bilibili_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:

@@ -1,7 +1,6 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
 *.egg-info/
 dist/
 build/
@@ -19,26 +18,30 @@ env/
 *.swp
 *.swo
 
-# Browser profiles (Chrome user data — large, machine-specific)
+# Browser profiles & data
 chrome_*/
 chrome_debug/
-
-# Browser data (cookies, sessions)
 browser_data/
+
+# Output & logs
+output/
+logs/
+*.log
+
+# Cache
+.cache_*/
+.claude/
+.pytest_cache/
+__pycache__/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Test artifacts
+# Screenshots
 *.png
-*.txt
-*.json
-!requirements.txt
-!test_all_platforms.py
+*.jpg
 
-# pytest
-.pytest_cache/
-
-# Project specific
-platform_verify.txt
+# Credentials (keep example)
+config/accounts.json
+!config/accounts.example.json

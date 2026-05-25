@@ -1,28 +1,42 @@
+import asyncio
 import json
+import os
+from pathlib import Path
 from typing import Optional
 
 from base.platform_base import PlatformAdapter
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
-# 需登入：小紅薯搜索頁面有 login overlay，未登入無法提取結果。
-# Phase 1 加載 cookie 後可正常工作。
+_COOKIE_FILE = Path(__file__).parent.parent.parent / "output" / "xiaohongshu_cookies.json"
+_PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "pw_xhs_live"
+
 _SEARCH_JS = """\
 () => {
-    const items = document.querySelectorAll('.note-item, .feeds-page .note-item, [class*="note-item"]');
-    return Array.from(items).map(item => {
-        const titleEl = item.querySelector('.title') || item.querySelector('[class*="title"]');
-        const authorEl = item.querySelector('.author, .name, .username, [class*="author"], [class*="name"]');
-        const likeEl = item.querySelector('.like, .engage-bar, [class*="like"], [class*="engage"]');
-        const linkEl = item.querySelector('a[href*="explore"], a[href*="note"]');
-        return {
-            title: titleEl?.textContent?.trim() ?? null,
-            author: authorEl?.textContent?.trim() ?? null,
-            likes: likeEl?.textContent?.trim() ?? null,
-            note_id: linkEl?.getAttribute('href')?.match(/explore\\/([^?&/]+)/)?.[1] ?? null,
-            link: linkEl?.getAttribute('href') ?? null,
-        };
+    const out = []; const seen = new Set();
+    const cards = document.querySelectorAll('.note-item, [class*="note-item"], [class*="NoteItem"], section a[href*="/explore/"], [class*="feeds-page"] a[href*="/explore/"], a[href*="/search_result/"]');
+    cards.forEach(el => {
+        const linkEl = el.tagName === 'A' ? el : el.querySelector('a[href*="/explore/"], a[href*="/search_result/"]');
+        const href = linkEl?.getAttribute('href') || '';
+        if (!href || seen.has(href)) return;
+        seen.add(href);
+        const title = el.querySelector('.title, [class*="title"], [class*="note-title"]')?.textContent?.trim()
+            || el.querySelector('span')?.textContent?.trim()
+            || el.textContent.trim().slice(0, 80);
+        const author = el.querySelector('.author, .name, [class*="author"], [class*="name"]')?.textContent?.trim() || '';
+        const likes = el.querySelector('.like, [class*="like"], [class*="count"], [class*="engage"]')?.textContent?.trim() || '';
+        if (title.length > 3) out.push({title: title, author: author, likes: likes, link: href});
     });
+    if (out.length === 0) {
+        document.querySelectorAll('a[href*="/explore/"]').forEach(a => {
+            const href = a.getAttribute('href') || '';
+            if (!href || seen.has(href)) return;
+            seen.add(href);
+            const t = a.textContent.trim();
+            if (t.length > 5) out.push({title: t.slice(0, 100), author: '', likes: '', link: href});
+        });
+    }
+    return out;
 }"""
 
 _DETAIL_JS = """\
@@ -44,13 +58,65 @@ _DETAIL_JS = """\
 }"""
 
 
-async def xiaohongshu_search(keyword: str) -> str:
-    """搜索小紅薯筆記，需登入先有完整內容。回傳 JSON 字串。"""
-    logger.info(f"小紅薯搜索: keyword={keyword}")
-    url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
-    result = await browser.evaluate(url, _SEARCH_JS)
-    logger.info(f"小紅薯搜索完成: {len(result)} 條結果")
-    return json.dumps(result, ensure_ascii=False)
+async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
+    """搜索小紅薯筆記，scroll 翻頁，需登入。回傳 JSON 字串。"""
+    logger.info(f"小紅薯搜索: keyword={keyword} count={count}")
+
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as pw:
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=str(_PERSIST_DIR),
+            headless=False,
+            viewport={"width": 1920, "height": 1080},
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            args=["--no-sandbox"],
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
+
+        try:
+            search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
+
+            # 檢查登入牆
+            body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
+            if "登录后查看" in body:
+                logger.warning("小紅薯未登入，請先執行 login_search_xhs.py 掃碼登入")
+                await context.close()
+                return json.dumps([], ensure_ascii=False)
+
+            all_results = []
+            seen = set()
+            max_scrolls = max((count // 30) + 3, 5)
+
+            for _ in range(max_scrolls):
+                items = await page.evaluate(_SEARCH_JS)
+                new_count = 0
+                for item in items:
+                    key = item.get("link", "") or item.get("title", "")
+                    if key and key not in seen:
+                        seen.add(key)
+                        all_results.append(item)
+                        new_count += 1
+
+                if new_count == 0 and len(all_results) > 0:
+                    break
+
+                if len(all_results) >= count:
+                    break
+
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2500)
+
+            result = all_results[:count]
+            logger.info(f"小紅薯搜索完成: {len(result)} 條")
+            return json.dumps(result, ensure_ascii=False)
+
+        finally:
+            await context.close()
 
 
 async def xiaohongshu_note_detail(note_id: str) -> str:
@@ -154,7 +220,7 @@ class XiaohongshuAdapter(PlatformAdapter):
         return True
 
     async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await xiaohongshu_search(keyword))
+        data = json.loads(await xiaohongshu_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:

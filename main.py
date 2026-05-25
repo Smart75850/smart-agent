@@ -11,7 +11,8 @@ from pathlib import Path
 
 from src.utils.browser_service import browser
 from src.utils.logger import logger
-from store import get_store
+from src.utils.checkpoint import get_checkpoint
+from store import get_store, save_with_dedup
 from config.settings import settings
 
 # ── adapter imports ──────────────────────────────────────────────
@@ -67,6 +68,10 @@ def parse_args(argv=None):
     parser.add_argument(
         "--limit", type=int, default=None,
         help="結果數量上限（optional）",
+    )
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="斷點續跑：跳過已完成任務",
     )
     return parser.parse_args(argv)
 
@@ -167,10 +172,25 @@ async def main():
 
     all_results = {}
     ts = time.strftime("%Y%m%d_%H%M%S")
+    ck = get_checkpoint()
+
+    # ── resume 模式：跳過已完成任務 ──────────────────────────
+    if args.resume:
+        before = len(tasks)
+        tasks = [
+            t for t in tasks
+            if not ck.is_task_done(t[0], t[1], args.keyword)
+        ]
+        skipped = before - len(tasks)
+        if skipped:
+            logger.info(f"--resume 模式：跳過 {skipped} 個已完成任務")
 
     try:
         for platform, action, func, kwargs in tasks:
             key = f"{platform}_{action}"
+            # 寫入 checkpoint（pending→running）
+            ck.save_task(platform, action, args.keyword, status="running")
+
             try:
                 result = await func(**kwargs)
                 # adapter 方法返回 list[dict]/dict，raw function 返回 JSON str
@@ -183,15 +203,24 @@ async def main():
                 all_results[key] = data
                 # store 儲存（per-platform）
                 store = get_store(settings.STORE_BACKEND)
-                filepath = store.save(data, args.output, key)
+                filepath = save_with_dedup(store, data, args.output, key)
                 # stdout 輸出
                 count = len(data) if isinstance(data, list) else 1
                 logger.info(f"[{platform}] {action}: {count} 條")
                 logger.info(f"  → Saved to {filepath}")
+                ck.mark_done(platform, action, args.keyword, collected_count=count)
             except Exception as exc:
                 err_msg = f"{type(exc).__name__}: {exc}"
                 all_results[key] = {"error": err_msg}
                 logger.error(f"[{platform}] {action}: ERROR — {err_msg}")
+                ck.mark_failed(platform, action, args.keyword, error_msg=err_msg)
+
+        # ── final stats ──────────────────────────────────────
+        tasks_summary = ck.get_all_tasks()
+        done_count = sum(1 for t in tasks_summary if t["status"] == "done")
+        failed_count = sum(1 for t in tasks_summary if t["status"] == "failed")
+        total = len(tasks_summary)
+        logger.info(f"checkpoint 彙總：共 {total} 任務，{done_count} 成功，{failed_count} 失敗")
 
         # ── 寫 output ───────────────────────────────────────
         out_path = out_dir / f"result_{ts}.json"

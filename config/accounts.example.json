@@ -1,0 +1,23 @@
+{
+  "douyin": [
+    {
+      "name": "号1",
+      "cookies_file": "browser_data/douyin_1.json",
+      "proxy": "http://ip1:8080"
+    },
+    {
+      "name": "号2",
+      "cookies_file": "browser_data/douyin_2.json",
+      "proxy": "http://ip2:8080"
+    }
+  ],
+  "xiaohongshu": [
+    {
+      "name": "小红书号1",
+      "cookies_file": "browser_data/xiaohongshu_1.json",
+      "proxy": ""
+    }
+  ],
+  "zhihu": [],
+  "kuaishou": []
+}

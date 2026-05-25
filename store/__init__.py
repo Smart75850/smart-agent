@@ -1,5 +1,6 @@
 from .json_store import JSONStore
 from .csv_store import CSVStore
+from src.utils.checkpoint import get_checkpoint
 
 _stores = {
     "json": JSONStore,
@@ -41,3 +42,12 @@ def get_store(backend: str = "json"):
             database=settings.MYSQL_DATABASE,
         )
     return cls()
+
+
+def save_with_dedup(store, data: list[dict], output_dir: str, platform: str) -> str:
+    """过滤重复数据后保存，返回文件路径；无新数据返回空字符串。"""
+    ck = get_checkpoint()
+    new_data = ck.filter_new_items(data, platform)
+    if not new_data:
+        return ""
+    return store.save(new_data, output_dir, platform)

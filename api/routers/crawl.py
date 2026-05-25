@@ -9,6 +9,7 @@ from typing import Optional
 
 from src.utils.browser_service import browser
 from src.utils.logger import logger
+from src.utils.checkpoint import get_checkpoint
 from store import get_store
 from config.settings import settings
 
@@ -82,12 +83,17 @@ async def _run_crawl(task_id: str, req: CrawlRequest):
 
         platform = req.platform
         action = req.type
+        keyword = req.keyword
+        ck = get_checkpoint()
+        ck.save_task(platform, action, keyword, status="running")
 
-        if action == "user" and platform == "douyin":
+        if action == "user" and platform == "douyin" and keyword:
             # 兼容舊 raw function
             from src.agents.douyin_adapter import douyin_user_videos
-            raw = await douyin_user_videos(user_id=req.keyword)
+            raw = await douyin_user_videos(user_id=keyword)
             data = json.loads(raw)
+        elif action == "user" and platform == "douyin":
+            raise ValueError("user 模式需要 keyword 作為 user_id")
         else:
             _lazy_init_adapters()
             adapter = _ADAPTERS.get(platform)
@@ -98,11 +104,11 @@ async def _run_crawl(task_id: str, req: CrawlRequest):
                 raise ValueError(f"唔支援嘅操作: {action}")
 
             if method_name == "search":
-                kwargs = {"keyword": req.keyword} if req.keyword else {}
+                kwargs = {"keyword": keyword} if keyword else {}
             elif method_name in ("detail", "comment"):
-                kwargs = {"item_id": req.keyword}
+                kwargs = {"item_id": keyword}
             elif method_name == "user":
-                kwargs = {"user_id": req.keyword}
+                kwargs = {"user_id": keyword}
             else:
                 kwargs = {}
 
@@ -123,8 +129,13 @@ async def _run_crawl(task_id: str, req: CrawlRequest):
             "result_count": count,
             "filepath": filepath,
         })
+        ck.mark_done(platform, action, keyword, collected_count=count)
         logger.info(f"[API] {key}: {count} 條 → {filepath}")
     except Exception as exc:
         err_msg = f"{type(exc).__name__}: {exc}"
         logger.error(f"[API] crawl {task_id}: ERROR — {err_msg}")
         _tasks[task_id].update({"status": "error", "error": err_msg})
+        if keyword:
+            ck.mark_failed(platform, action, keyword, error_msg=err_msg)
+        elif req.platform and req.type:
+            ck.mark_failed(req.platform, req.type, req.keyword or "", error_msg=err_msg)
