@@ -76,6 +76,7 @@ async def bilibili_search(keyword: str, count: int = 40) -> str:
             bvid = bv_match.group(1) if bv_match else link
             if bvid and bvid not in seen_bvids:
                 seen_bvids.add(bvid)
+                item["bvid"] = bvid
                 all_items.append(item)
                 new_count += 1
 
@@ -104,89 +105,61 @@ def _normalize_links(data: list[dict]) -> list[dict]:
 
 
 async def bilibili_comment(bvid: str) -> str:
+    """爬取 B站 評論，DOM 滚动提取。"""
     logger.info(f"B站評論: bvid={bvid}")
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.bilibili.com/video/{bvid}", wait_until="domcontentloaded")
         await page.wait_for_timeout(3000)
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await page.wait_for_timeout(3000)
+        # 滚动到评论区
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.3)")
+        await page.wait_for_timeout(2000)
+        # 多次滚动加载更多评论
+        for _ in range(5):
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2000)
 
         result = await page.evaluate("""() => {
-    const el = document.querySelector('bili-comments');
-    if (!el || !el.shadowRoot) return [];
-
-    const threads = el.shadowRoot.querySelectorAll('bili-comment-thread-renderer');
-    const results = [];
-
-    threads.forEach(thread => {
-        if (!thread.shadowRoot) return;
-        const renderer = thread.shadowRoot.querySelector('bili-comment-renderer');
-        if (!renderer || !renderer.shadowRoot) return;
-        const root = renderer.shadowRoot;
-
-        const userInfo = root.querySelector('bili-comment-user-info');
-        let user = '';
-        if (userInfo && userInfo.shadowRoot) {
-            const nameEl = userInfo.shadowRoot.querySelector('#user-name a');
-            if (nameEl) user = nameEl.textContent.trim();
-        }
-
-        const richText = root.querySelector('bili-rich-text');
-        let content = '';
-        if (richText && richText.shadowRoot) {
-            const contentsEl = richText.shadowRoot.querySelector('#contents');
-            if (contentsEl) content = contentsEl.textContent.trim();
-        }
-
-        const actions = root.querySelector('bili-comment-action-buttons-renderer');
-        let likes = '', date = '';
-        if (actions && actions.shadowRoot) {
-            const likeEl = actions.shadowRoot.querySelector('#like #count');
-            if (likeEl) likes = likeEl.textContent.trim();
-            const dateEl = actions.shadowRoot.querySelector('#pubdate');
-            if (dateEl) date = dateEl.textContent.trim();
-        }
-
-        // 🆕 二級評論 — 遍歷 thread 內所有 reply renderer
-        const replies = [];
-        const replyRenderers = thread.shadowRoot.querySelectorAll('bili-comment-reply-renderer');
-        if (replyRenderers.length === 0) {
-            // fallback: bili-comment-replies-renderer 可能包住 reply
-            const rr = thread.shadowRoot.querySelector('bili-comment-replies-renderer');
-            if (rr && rr.shadowRoot) {
-                rr.shadowRoot.querySelectorAll('bili-comment-reply-renderer').forEach(r => {
-                    if (!r.shadowRoot) return;
-                    const s = r.shadowRoot;
-                    const ru = s.querySelector('bili-comment-user-info');
-                    const rt = s.querySelector('bili-rich-text');
-                    const rl = s.querySelector('bili-comment-action-buttons-renderer');
-                    replies.push({
-                        user: ru?.shadowRoot?.querySelector('#user-name a')?.textContent?.trim() || '',
-                        content: rt?.shadowRoot?.querySelector('#contents')?.textContent?.trim() || '',
-                        likes: rl?.shadowRoot?.querySelector('#like #count')?.textContent?.trim() || '',
-                    });
-                });
+    // 尝试从 shadow DOM 提取（B站新版评论组件）
+    const biliComments = document.querySelector('bili-comments');
+    if (biliComments && biliComments.shadowRoot) {
+        const root = biliComments.shadowRoot;
+        const threads = root.querySelectorAll('bili-comment-thread-renderer');
+        const items = [];
+        threads.forEach(thread => {
+            if (!thread.shadowRoot) return;
+            const renderer = thread.shadowRoot.querySelector('bili-comment-renderer');
+            if (!renderer || !renderer.shadowRoot) return;
+            const r = renderer.shadowRoot;
+            const userInfo = r.querySelector('bili-comment-user-info');
+            const richText = r.querySelector('bili-rich-text');
+            let user = '', content = '';
+            if (userInfo && userInfo.shadowRoot) {
+                user = userInfo.shadowRoot.querySelector('#user-name a')?.textContent?.trim() || '';
             }
-        } else {
-            replyRenderers.forEach(r => {
-                if (!r.shadowRoot) return;
-                const s = r.shadowRoot;
-                const ru = s.querySelector('bili-comment-user-info');
-                const rt = s.querySelector('bili-rich-text');
-                const rl = s.querySelector('bili-comment-action-buttons-renderer');
-                replies.push({
-                    user: ru?.shadowRoot?.querySelector('#user-name a')?.textContent?.trim() || '',
-                    content: rt?.shadowRoot?.querySelector('#contents')?.textContent?.trim() || '',
-                    likes: rl?.shadowRoot?.querySelector('#like #count')?.textContent?.trim() || '',
-                });
-            });
-        }
+            if (richText && richText.shadowRoot) {
+                content = richText.shadowRoot.querySelector('#contents')?.textContent?.trim() || '';
+            }
+            if (user || content) items.push({user, content, likes: '', date: ''});
+        });
+        if (items.length >= 5) return items;
+    }
 
-        results.push({ user, content, likes, date, replies });
-    });
+    // fallback: 纯 DOM 提取
+    const replyItems = document.querySelectorAll('.reply-item, [class*="reply-item"], [class*="ReplyItem"]');
+    if (replyItems.length >= 2) {
+        return Array.from(replyItems).slice(0, 40).map(el => ({
+            user: el.querySelector('.user-name, [class*="user-name"], [class*="User"]')?.textContent?.trim() || '',
+            content: el.querySelector('.reply-content, [class*="content"], .text')?.textContent?.trim() || el.textContent.trim().slice(0, 200),
+            likes: '',
+            date: '',
+        }));
+    }
 
-    return results;
+    // last fallback: 抓所有可见文本块
+    const allText = document.body.innerText;
+    const lines = allText.split('\\n').filter(l => l.trim().length > 10).slice(0, 60);
+    return lines.map(l => ({user: '', content: l.trim().slice(0, 200), likes: '', date: ''}));
 }""")
         logger.info(f"B站評論完成: {len(result)} 條")
         return json.dumps(result, ensure_ascii=False)
@@ -199,18 +172,24 @@ async def bilibili_detail(bvid: str) -> str:
     logger.info(f"B站詳情: bvid={bvid}")
     result = await browser.evaluate(
         f"https://www.bilibili.com/video/{bvid}",
-        """() => ({
-  title: document.querySelector('.video-title')?.textContent?.trim() || '',
-  desc: document.querySelector('.video-desc')?.textContent?.trim() || '',
-  plays: document.querySelector('.video-info-detail .view')?.textContent?.trim() || '',
-  likes: document.querySelector('.video-info-detail .like')?.textContent?.trim() || '',
-  coins: document.querySelector('.video-info-detail .coin')?.textContent?.trim() || '',
-  favs: document.querySelector('.video-info-detail .collect')?.textContent?.trim() || '',
-  tags: Array.from(document.querySelectorAll('.tag-area .tag')).map(t => t.textContent.trim()),
-})""",
+        """() => {
+  const midEl = document.querySelector('a[href*="space.bilibili.com"]');
+  const midHref = midEl?.getAttribute('href') || '';
+  const midMatch = midHref.match(/space\\.bilibili\\.com\\/(\\d+)/);
+  return {
+    title: document.querySelector('.video-title')?.textContent?.trim() || '',
+    desc: document.querySelector('.video-desc')?.textContent?.trim() || '',
+    plays: document.querySelector('.video-info-detail .view')?.textContent?.trim() || '',
+    likes: document.querySelector('.video-info-detail .like')?.textContent?.trim() || '',
+    coins: document.querySelector('.video-info-detail .coin')?.textContent?.trim() || '',
+    favs: document.querySelector('.video-info-detail .collect')?.textContent?.trim() || '',
+    tags: Array.from(document.querySelectorAll('.tag-area .tag')).map(t => t.textContent.trim()),
+    mid: midMatch ? midMatch[1] : '',
+  };
+}""",
     )
     title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
-    logger.info(f"B站詳情完成: {title}")
+    logger.info(f"B站詳情完成: {title} mid={result.get('mid', '?')}")
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -220,19 +199,54 @@ async def bilibili_user(uid: str) -> str:
     page = await browser.new_page()
     try:
         await page.goto(f"https://space.bilibili.com/{uid}/video", wait_until="domcontentloaded")
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(4000)
+        # 多次滚动触发懒加载
+        for _ in range(4):
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(1500)
+        # 滚回顶部再滚一遍确保触发
+        await page.evaluate("window.scrollTo(0, 0)")
+        await page.wait_for_timeout(500)
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await page.wait_for_timeout(2000)
         result = await page.evaluate("""() => {
-    const cards = document.querySelectorAll('.small-item');
+    // 多重选择器 fallback
+    let cards = document.querySelectorAll('.bili-video-card');
+    if (cards.length === 0) cards = document.querySelectorAll('.cube-item');
+    if (cards.length === 0) cards = document.querySelectorAll('.small-item');
+    if (cards.length === 0) cards = document.querySelectorAll('[class*="video-card"]');
+    // 终极 fallback: 从页面中所有 BV 链接向上找容器
+    if (cards.length === 0) {
+        const bvLinks = document.querySelectorAll('a[href*="/video/BV"]');
+        const parents = new Set();
+        bvLinks.forEach(a => {
+            const card = a.closest('div[class], li[class]');
+            if (card) parents.add(card);
+        });
+        cards = Array.from(parents);
+    }
+    const seen = new Set();
     return Array.from(cards).map(card => {
-        let link = card.querySelector('a')?.getAttribute('href') || '';
-        if (link.startsWith('//')) link = 'https:' + link;
+        const linkEl = card.querySelector('a[href*="/video/BV"]') || card.querySelector('a');
+        const href = linkEl?.getAttribute('href') || '';
+        let link = href;
+        if (link && link.startsWith('//')) link = 'https:' + link;
+        const titleEl = card.querySelector('.title, .bili-video-card__info--tit, [class*="title"], [class*="Title"]');
+        const playEl = card.querySelector('.play, .bili-video-card__stats--item:first-child, [class*="play"], [class*="count"], [class*="view"]');
+        const durationEl = card.querySelector('.bili-video-card__stats__duration, [class*="duration"]');
+        const authorEl = card.querySelector('.bili-video-card__info--author, [class*="author"], [class*="name"]');
+        const key = href || titleEl?.textContent?.trim();
+        if (!key || seen.has(key)) return null;
+        seen.add(key);
         return {
-            title: card.querySelector('.title')?.textContent?.trim() || '',
-            plays: card.querySelector('.play')?.textContent?.trim() || '',
-            comments: card.querySelector('.comment')?.textContent?.trim() || '',
+            title: titleEl?.textContent?.trim() || '',
+            author: authorEl?.textContent?.trim() || '',
+            plays: playEl?.textContent?.trim() || '',
+            likes: '',
+            duration: durationEl?.textContent?.trim() || '',
             link,
         };
-    });
+    }).filter(Boolean);
 }""")
         logger.info(f"B站用戶完成: {len(result)} 條")
         return json.dumps(result, ensure_ascii=False)

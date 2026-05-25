@@ -19,35 +19,32 @@ _HOT_JS = """\
 
 _SEARCH_JS = """\
 () => {
-    const sel = '.SearchResult-item, [class*="SearchResult"], [class*="Card"], .ContentItem, .AnswerCard, .QuestionCard';
-    const items = document.querySelectorAll(sel);
-    const seen = new Set();
-    const results = [];
-    items.forEach(item => {
-        const titleEl = item.querySelector('.ContentItem-title, [class*="title"], h2, h1, [itemprop="name"]');
-        const excerptEl = item.querySelector('.RichContent-inner, .ContentItem-excerpt, [class*="excerpt"], [class*="summary"]');
-        const voteEl = item.querySelector('.Voters, .Button--vote, [class*="vote"], [class*="like"]');
-        const linkEl = item.querySelector('a[href*="/question/"], a[href*="/answer/"], a[href*="/pin/"]');
-        const title = titleEl?.textContent?.trim();
-        if (!title || title.length < 3 || seen.has(title)) return;
-        seen.add(title);
-        results.push({
-            title: title,
-            excerpt: excerptEl?.textContent?.trim() ?? null,
-            votes: voteEl?.textContent?.trim() ?? null,
-            link: linkEl?.getAttribute('href') ?? null,
-        });
-    });
-    if (results.length === 0) {
-        const hotItems = document.querySelectorAll('.HotSearchCard-itemText');
-        const heatItems = document.querySelectorAll('.HotSearchCard-heat');
-        hotItems.forEach((el, i) => {
-            const t = el?.textContent?.trim();
-            if (!t) return;
-            results.push({ title: t, excerpt: null, votes: heatItems[i]?.textContent?.trim() ?? null, link: null });
-        });
+    const cards = document.querySelectorAll('[class*="Search"] [class*="Card" i], [class*="SearchResult"], .ContentItem, .AnswerCard, .QuestionCard');
+    if (cards.length === 0) {
+        const all = document.querySelectorAll('[class*="Card"], [class*="item"]');
+        return Array.from(all).slice(0, 30).map(el => ({
+            title: el.querySelector('[class*="title"], [class*="Title"], h2, h3')?.textContent?.trim() || '',
+            excerpt: el.querySelector('[class*="excerpt"], [class*="summary"], [class*="content"], p')?.textContent?.trim()?.slice(0, 200) || '',
+            votes: el.querySelector('[class*="vote"], [class*="like"], [class*="count"], [class*="meta"]')?.textContent?.trim() || '',
+            link: el.querySelector('a')?.getAttribute('href') || '',
+        })).filter(x => x.title.length > 3);
     }
-    return results;
+    const seen = new Set();
+    return Array.from(cards).map(card => {
+        const titleEl = card.querySelector('[class*="title"], [class*="Title"], h2, h1, h3, [itemprop="name"], a strong, a');
+        const excerptEl = card.querySelector('[class*="excerpt"], [class*="summary"], [class*="content"], [class*="RichText"], p');
+        const metaEl = card.querySelector('[class*="vote"], [class*="like"], [class*="count"], [class*="meta"], [class*="actions"], [class*="Number"], [class*="Hot"], [class*="metrics"]');
+        const linkEl = card.querySelector('a[href*="/question/"], a[href*="/answer/"], a[href*="/pin/"], a[href*="/hot/"], a[href*="/roundtable/"], a[href*="/zhuanlan/"], a[href]');
+        const title = titleEl?.textContent?.trim() || '';
+        if (!title || title.length < 3 || seen.has(title)) return null;
+        seen.add(title);
+        return {
+            title,
+            excerpt: excerptEl?.textContent?.trim()?.slice(0, 300) || '',
+            votes: metaEl?.textContent?.trim() || '',
+            link: linkEl?.getAttribute('href') || '',
+        };
+    }).filter(Boolean);
 }"""
 
 
@@ -107,11 +104,15 @@ async def zhihu_detail(question_id: str) -> str:
         title: titleEl?.textContent?.trim() || '',
         desc: descEl?.textContent?.trim() || '',
         answer_count: document.querySelector('.QuestionItem-answers, .List-headerText')?.textContent?.trim() || '',
-        top_answers: Array.from(answers).slice(0, 5).map(a => ({
-            author: a.querySelector('.AuthorInfo-name, .UserItem-name, [class*="author"] [class*="name"]')?.textContent?.trim() || '',
-            content: a.querySelector('.RichContent-inner, .RichText')?.textContent?.trim()?.slice(0, 500) || '',
-            votes: a.querySelector('.Voters, .Button--vote')?.textContent?.trim() || '',
-        })),
+        top_answers: Array.from(answers).slice(0, 5).map(a => {
+            const authorLink = a.querySelector('a[href*="/people/"], a[href*="/org/"]');
+            return {
+                author: a.querySelector('.AuthorInfo-name, .UserItem-name, [class*="author"] [class*="name"]')?.textContent?.trim() || '',
+                author_url: authorLink?.getAttribute('href') || '',
+                content: a.querySelector('.RichContent-inner, .RichText')?.textContent?.trim()?.slice(0, 500) || '',
+                votes: a.querySelector('.Voters, .Button--vote')?.textContent?.trim() || '',
+            };
+        }),
     };
 }""")
         title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"

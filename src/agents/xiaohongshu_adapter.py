@@ -130,30 +130,61 @@ async def xiaohongshu_note_detail(note_id: str) -> str:
 
 
 async def xiaohongshu_comment(note_id: str) -> str:
-    """爬取小紅薯筆記評論，需登入先有完整內容。回傳 JSON 字串。"""
+    """爬取小紅薯筆記評論，使用 persistent context 以保持登入態。"""
     logger.info(f"小紅薯評論: note_id={note_id}")
-    page = await browser.new_page()
-    try:
-        await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
-    const items = document.querySelectorAll('[class*="comment-item"], [class*="CommentItem"], .comment-item');
+
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as pw:
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=str(_PERSIST_DIR),
+            headless=False,
+            viewport={"width": 1920, "height": 1080},
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            args=["--no-sandbox"],
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
+
+        try:
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
+            # 滚动触发评论加载
+            for _ in range(5):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(1500)
+            result = await page.evaluate("""() => {
+    const items = document.querySelectorAll('[class*="comment-item"], [class*="CommentItem"], .comment-item, [class*="comment"], [class*="Comment"]');
     const seen = new Set();
-    return Array.from(items).filter(item => {
+    const out = [];
+    items.forEach(item => {
         const t = item.textContent.trim();
-        return t && t.length >= 2 && !seen.has(t) && (seen.add(t), true);
-    }).map(item => ({
-        content: item.querySelector('[class*="content"], [class*="text"], .content, .text')?.textContent?.trim() || item.textContent.trim().slice(0, 200),
-        // 🆕 二級評論
-        replies: Array.from(item.querySelectorAll('[class*="reply-item"], [class*="ReplyItem"], .reply-item')).map(r => ({
-            content: r.querySelector('[class*="text"], [class*="content"], .text, .content')?.textContent?.trim() || r.textContent.trim().slice(0, 200),
-        })),
-    }));
+        if (!t || t.length < 3 || seen.has(t)) return;
+        seen.add(t);
+        const contentEl = item.querySelector('[class*="content"], [class*="text"], .content, .text, p');
+        out.push({
+            content: contentEl?.textContent?.trim() || t.slice(0, 200),
+            replies: Array.from(item.querySelectorAll('[class*="reply-item"], [class*="ReplyItem"], .reply-item, [class*="sub"]')).map(r => ({
+                content: r.querySelector('[class*="text"], [class*="content"], p')?.textContent?.trim() || r.textContent.trim().slice(0, 200),
+            })),
+        });
+    });
+    // 如果没找到足够评论，提取页面文本块兜底
+    if (out.length < 8) {
+        const allText = document.body?.innerText || '';
+        const lines = allText.split('\\n').filter(l => l.trim().length > 10).slice(0, 60);
+        for (const l of lines) {
+            const t = l.trim().slice(0, 200);
+            if (t && !seen.has(t)) { seen.add(t); out.push({content: t, replies: []}); }
+        }
+    }
+    return out;
 }""")
-        logger.info(f"小紅薯評論完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"小紅薯評論完成: {len(result)} 條")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await context.close()
 
 
 async def xiaohongshu_hot() -> str:

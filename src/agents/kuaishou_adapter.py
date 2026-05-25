@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Optional
 
@@ -64,57 +65,101 @@ _HOT_JS = """\
 
 
 async def kuaishou_search(keyword: str, count: int = 40) -> str:
-    """搜索快手视频 — CDP 滚动翻页，不需要登录。"""
+    """搜索快手视频 — 拦截 search/feed API。"""
     logger.info(f"快手搜索: keyword={keyword} count={count}")
-    page = await browser.new_page()
-
     try:
-        url = f"https://www.kuaishou.com/search/video?searchKey={keyword}"
-        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(4000)
+        page = await browser.new_page()
+        try:
+            all_items = []
+            seen = set()
 
-        all_results = []
-        seen = set()
-        max_scrolls = (count // 20) + 3
+            async def on_response(resp):
+                if "search/feed" in resp.url:
+                    try:
+                        body = await resp.json()
+                        feeds = body.get("feeds") or []
+                        for f in feeds:
+                            photo = f.get("photo", {}) or {}
+                            pid = str(photo.get("id", ""))
+                            if not pid or pid in seen:
+                                continue
+                            seen.add(pid)
+                            author = f.get("author", {}) or {}
+                            all_items.append({
+                                "title": photo.get("caption", ""),
+                                "author": author.get("name", author.get("nickname", "")),
+                                "plays": str(photo.get("viewCount", "")),
+                                "likes": str(photo.get("likeCount", "")),
+                                "photo_id": pid,
+                                "link": f"https://www.kuaishou.com/photo/{pid}",
+                            })
+                    except Exception:
+                        pass
 
-        for _ in range(max_scrolls):
-            items = await page.evaluate(_SEARCH_JS)
-            new_items = 0
-            for item in items:
-                key = item.get("link", "")
-                if key and key not in seen:
-                    seen.add(key)
-                    all_results.append(item)
-                    new_items += 1
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
 
-            if new_items == 0 and len(all_results) > 0:
-                break
+            url = f"https://www.kuaishou.com/search/video?searchKey={keyword}"
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
 
-            if len(all_results) >= count:
-                break
+            max_scrolls = max((count // 20) + 3, 5)
+            for _ in range(max_scrolls):
+                if len(all_items) >= count:
+                    break
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2500)
 
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(2500)
-
-        result = all_results[:count]
-        logger.info(f"快手搜索完成: {len(result)} 条")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            await page.wait_for_timeout(2000)
+            result = all_items[:count]
+            logger.info(f"快手搜索完成: {len(result)} 条")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"快手搜索异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def kuaishou_hot() -> str:
-    """爬取快手热榜（/discover/hot → /new-reco），回传 JSON 字串。"""
+    """爬取快手热榜 — 拦截 feed/hot API。"""
     logger.info("快手热榜: 开始爬取")
-    page = await browser.new_page()
     try:
-        await page.goto("https://www.kuaishou.com/new-reco", wait_until="domcontentloaded")
-        await page.wait_for_timeout(8000)
-        result = await page.evaluate(_HOT_JS)
-        logger.info(f"快手热榜完成: {len(result)} 条结果")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+        page = await browser.new_page()
+        try:
+            hot_items = []
+
+            async def on_response(resp):
+                if "feed/hot" in resp.url:
+                    try:
+                        body = await resp.json()
+                        feeds = body.get("feeds") or []
+                        for f in feeds:
+                            photo = f.get("photo", {}) or {}
+                            pid = str(photo.get("id", ""))
+                            author = f.get("author", {}) or {}
+                            hot_items.append({
+                                "title": photo.get("caption", ""),
+                                "author": author.get("name", author.get("nickname", "")),
+                                "plays": str(photo.get("viewCount", "")),
+                                "likes": str(photo.get("likeCount", "")),
+                                "photo_id": pid,
+                                "link": f"https://www.kuaishou.com/photo/{pid}",
+                            })
+                    except Exception:
+                        pass
+
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+            await page.goto("https://www.kuaishou.com", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(8000)
+
+            logger.info(f"快手热榜完成: {len(hot_items)} 条结果")
+            return json.dumps(hot_items, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"快手热榜异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def kuaishou_detail(photo_id: str) -> str:

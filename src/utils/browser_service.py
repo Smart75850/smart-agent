@@ -21,13 +21,6 @@ class BrowserService:
 
     async def start(self, cookies_dict: dict = None, proxy: str = None,
                     cookie_domain: str = ".douyin.com"):
-        """启动浏览器（Playwright / CDP）。
-
-        可选参数:
-            cookies_dict:  账号 cookies 键值对，注入到 browser context
-            proxy:         绑定 proxy URL，覆盖 ProxyManager 公共池
-            cookie_domain: cookie 作用域名，默认 .douyin.com
-        """
         engine = environ.get("BROWSER_ENGINE") or ENGINE
         self._engine = engine
         self._inject_cookies = cookies_dict or {}
@@ -37,8 +30,9 @@ class BrowserService:
             from playwright.async_api import async_playwright
 
             self._playwright = await async_playwright().start()
+            headless = environ.get("BROWSER_HEADLESS", "false").lower() == "true"
             launch_args: dict = {
-                "headless": True,
+                "headless": headless,
                 "args": ["--no-sandbox"],
             }
             if proxy:
@@ -54,7 +48,6 @@ class BrowserService:
                 await self._cleanup()
                 raise
 
-            # 创建带 stealth 的 context
             self._context = await self._browser.new_context(
                 viewport={"width": 1280, "height": 800},
                 locale="zh-CN",
@@ -76,7 +69,6 @@ class BrowserService:
             except ImportError:
                 pass
 
-            # 注入 cookies（如有）
             if self._inject_cookies:
                 try:
                     await self._context.add_cookies([
@@ -89,9 +81,18 @@ class BrowserService:
         elif engine == "cdp":
             from playwright.async_api import async_playwright
             self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.connect_over_cdp(
-                f"http://localhost:{CDP_PORT}"
-            )
+            # 临时禁用代理，避免 127.0.0.1 走代理导致 502
+            old_no_proxy = environ.get("no_proxy", "")
+            environ["no_proxy"] = "127.0.0.1,localhost"
+            environ["NO_PROXY"] = "127.0.0.1,localhost"
+            try:
+                self._browser = await self._playwright.chromium.connect_over_cdp(
+                    f"http://127.0.0.1:{CDP_PORT}"
+                )
+            finally:
+                if old_no_proxy:
+                    environ["no_proxy"] = old_no_proxy
+                    environ["NO_PROXY"] = old_no_proxy
             self._context = self._browser.contexts[0] if self._browser.contexts else None
             if self._context and self._inject_cookies:
                 try:
@@ -109,7 +110,6 @@ class BrowserService:
         return self._browser is not None
 
     async def new_page(self):
-        """创建新页面（带 stealth 的 context）。"""
         if not self._browser:
             raise RuntimeError("浏览器未启动，请先调用 start()")
         if self._context:
@@ -117,7 +117,6 @@ class BrowserService:
         return await self._browser.new_page()
 
     async def evaluate(self, url, js, wait_selector=None):
-        """打开 URL → 执行 JS → 返回结果，内部自动管理 page 生命周期。"""
         page = None
         try:
             page = await self.new_page()
@@ -136,7 +135,6 @@ class BrowserService:
                 await page.close()
 
     async def close(self):
-        """关闭浏览器并释放资源。"""
         await self._cleanup()
 
     async def _cleanup(self):

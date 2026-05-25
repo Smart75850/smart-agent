@@ -42,6 +42,15 @@ Thumbs.db
 *.png
 *.jpg
 
+# Test output
+phase1_test_results.json
+
+# Temp diagnostic scripts
+diag_*.py
+open_sites.py
+verify_login.py
+quick_test_*.py
+
 # Credentials (keep example)
 config/accounts.json
 !config/accounts.example.json
