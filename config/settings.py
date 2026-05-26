@@ -21,6 +21,14 @@ class Settings:
     STORE_BACKEND: str = "json"
     OUTPUT_DIR: str = "output"
 
+    # LangGraph
+    LANGGRAPH_CHECKPOINT_DB: str = "output/langgraph_checkpoint.db"
+
+    # LLM (Doubao)
+    LLM_API_KEY: str = ""
+    LLM_API_URL: str = ""
+    LLM_MODEL: str = "doubao-pro-32k"
+
     # MySQL（可選後端）
     MYSQL_HOST: str = "localhost"
     MYSQL_PORT: int = 3306
@@ -46,6 +54,10 @@ class Settings:
             MYSQL_USER=environ.get("MYSQL_USER", "root"),
             MYSQL_PASSWORD=environ.get("MYSQL_PASSWORD", ""),
             MYSQL_DATABASE=environ.get("MYSQL_DATABASE", "smart_agent"),
+            LANGGRAPH_CHECKPOINT_DB=environ.get("LANGGRAPH_CHECKPOINT_DB", "output/langgraph_checkpoint.db"),
+            LLM_API_KEY=environ.get("LLM_API_KEY", ""),
+            LLM_API_URL=environ.get("LLM_API_URL", ""),
+            LLM_MODEL=environ.get("LLM_MODEL", "doubao-pro-32k"),
         )
 
 

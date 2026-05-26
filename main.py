@@ -54,11 +54,11 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--type", default="search",
-        choices=["search", "hot", "rank", "detail", "comment", "user"],
+        choices=["search", "hot", "rank", "detail", "comment", "user", "aggregate"],
         help="操作類型（預設 search，按平台決定可用選項）",
     )
     parser.add_argument(
-        "--engine", default="playwright", choices=["playwright", "cdp"],
+        "--engine", default="playwright", choices=["playwright", "cdp", "langgraph"],
         help="瀏覽器引擎（預設 playwright）",
     )
     parser.add_argument(
