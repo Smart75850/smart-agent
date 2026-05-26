@@ -54,7 +54,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--type", default="search",
-        choices=["search", "hot", "rank", "detail", "comment", "user", "aggregate"],
+        choices=["search", "hot", "rank", "detail", "comment", "user", "aggregate", "trend"],
         help="操作類型（預設 search，按平台決定可用選項）",
     )
     parser.add_argument(
@@ -222,6 +222,30 @@ async def main():
         print(f"執行計劃 ({len(tasks)} 個任務):")
         for plat, action, _, _ in tasks:
             print(f"  [{plat}] {action}")
+        return
+
+    # ── trend scout ────────────────────────────────────────
+    if args.type == "trend":
+        from src.orchestrator.agents import TrendScout
+        from dataclasses import asdict
+        scout = TrendScout()
+        platforms = _ALL_HOT if args.platform == "all" else [args.platform]
+        trend_dir = Path(args.output)
+        trend_dir.mkdir(parents=True, exist_ok=True)
+        trend_ts = time.strftime("%Y%m%d_%H%M%S")
+        await browser.start()
+        try:
+            for p in platforms:
+                report = await scout.run(platform=p, keyword=args.keyword, limit=args.limit or 20)
+                out_path = trend_dir / f"trend_{p}_{trend_ts}.json"
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(asdict(report), f, ensure_ascii=False, indent=2)
+                print(f"\n[{p}] {report.summary}")
+                for item in report.items[:5]:
+                    print(f"  viral={item.viral_score:3d} | {item.title[:40]}")
+                print(f"  ...共 {report.total_candidates} 個候選 → {out_path}")
+        finally:
+            await browser.close()
         return
 
     # ── aggregate + langgraph 快速路徑 ───────────────────────

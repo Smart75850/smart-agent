@@ -1,8 +1,7 @@
 """LangGraph StateGraph 定义 + 编译。"""
 from langgraph.graph import StateGraph, START, END
 from langgraph.constants import Send
-from langgraph.checkpoint.sqlite import SqliteSaver
-
+from langgraph.checkpoint.memory import InMemorySaver
 from src.orchestrator.state import PipelineState
 from src.orchestrator.nodes import (
     search_platform,
@@ -61,12 +60,9 @@ def build_graph() -> StateGraph:
 
 
 def compile_graph():
-    """编译 graph，带 SqliteSaver checkpointer。"""
-    import os
+    """编译 graph，带 InMemorySaver checkpointer。"""
     builder = build_graph()
-    db_path = settings.LANGGRAPH_CHECKPOINT_DB
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    checkpointer = SqliteSaver.from_conn_string(db_path)
+    checkpointer = InMemorySaver()
     compiled = builder.compile(checkpointer=checkpointer)
     logger.info("LangGraph 编译完成")
     return compiled

@@ -24,10 +24,15 @@ class Settings:
     # LangGraph
     LANGGRAPH_CHECKPOINT_DB: str = "output/langgraph_checkpoint.db"
 
-    # LLM (Doubao)
+    # LLM (Doubao) — 相容舊 config
     LLM_API_KEY: str = ""
     LLM_API_URL: str = ""
     LLM_MODEL: str = "doubao-pro-32k"
+
+    # DeepSeek V4 Flash — Agent LLM 後端
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_API_URL: str = "https://api.deepseek.com/v1"
+    DEEPSEEK_MODEL: str = "deepseek-chat"
 
     # MySQL（可選後端）
     MYSQL_HOST: str = "localhost"
@@ -58,6 +63,9 @@ class Settings:
             LLM_API_KEY=environ.get("LLM_API_KEY", ""),
             LLM_API_URL=environ.get("LLM_API_URL", ""),
             LLM_MODEL=environ.get("LLM_MODEL", "doubao-pro-32k"),
+            DEEPSEEK_API_KEY=environ.get("DEEPSEEK_API_KEY", ""),
+            DEEPSEEK_API_URL=environ.get("DEEPSEEK_API_URL", "https://api.deepseek.com/v1"),
+            DEEPSEEK_MODEL=environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
         )
 
 
