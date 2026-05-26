@@ -82,6 +82,8 @@
 | CookieBridge | Chrome Extension (MV3) + Python HTTP 服務，一鍵同步瀏覽器登錄態 |
 | DeepSeek API | `.env` 自動加載（python-dotenv），DeepSeek V4 Flash 驅動全部分析 |
 | 降級模式 | 所有 Agent 無 API key 時自動降級為模板/熱度排序 |
+| Docker 部署 | `Dockerfile` + `docker-compose.yml` + `deploy-docker.ps1` 一鍵起容器 |
+| Windows 部署 | `deploy.ps1` + `deploy.bat` 一鍵安裝依賴 + 啟動 WebUI |
 
 ---
 
@@ -214,4 +216,4 @@
 
 ---
 
-*最後更新：2026-05-26 — P13 Windows 一鍵部署完成（deploy.ps1 + deploy.bat）*
+*最後更新：2026-05-26 — P14 Docker 一鍵部署腳本完成（deploy-docker.ps1）*
