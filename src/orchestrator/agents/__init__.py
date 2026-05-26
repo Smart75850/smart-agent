@@ -3,6 +3,9 @@ from src.orchestrator.agents.product_miner import ProductMiner, ProductItem, Pro
 from src.orchestrator.agents.video_analyst import VideoAnalyst, VideoBreakdown, VideoReport
 from src.orchestrator.agents.sentiment_reader import SentimentReader, SentimentItem, SentimentReport
 from src.orchestrator.agents.copy_writer import CopyWriter, CopyVariant, CopyReport
+from src.orchestrator.agents.content_remixer import (
+    ContentRemixer, RemixInput, RemixReport, TrackInsight, ContentRewrite,
+)
 
 __all__ = [
     "TrendScout", "TrendItem", "TrendReport",
@@ -10,4 +13,5 @@ __all__ = [
     "VideoAnalyst", "VideoBreakdown", "VideoReport",
     "SentimentReader", "SentimentItem", "SentimentReport",
     "CopyWriter", "CopyVariant", "CopyReport",
+    "ContentRemixer", "RemixInput", "RemixReport", "TrackInsight", "ContentRewrite",
 ]
