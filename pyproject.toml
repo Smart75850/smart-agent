@@ -1,6 +1,6 @@
 [project]
 name = "smart-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Smart Agent Pro — AI-powered multi-platform content analysis with LangGraph + DeepSeek"
 requires-python = ">=3.11"
 authors = [{name = "Smart75850"}]

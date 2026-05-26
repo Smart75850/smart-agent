@@ -7,8 +7,8 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P13 全部完成
-⬜ 進行中：全平台 full pipeline 實戰驗證
+✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P15 全部完成
+⬜ 進行中：無（核心功能全部完成）
 **下一步：全平台 full pipeline 實戰驗證（抖音/快手/小紅書/知乎 各跑一次）**
 
 ---
@@ -191,42 +191,46 @@
 
 ---
 
-## Go 高性能版本方案（P15）— 🔄 進行中
+## Go 高性能版本（P15）— ✅ 已完成
 
 ### 架構：Go 主進程 + Python 瀏覽器 Sidecar
 
 ```
-Go Binary (15MB, 單文件部署)
+Go Binary (6.7MB, 單文件, 零依賴)
 ├── HTTP API Server (net/http)
 ├── DAG Orchestrator (goroutine fan-out)
-├── Sidecar Client (HTTP → Python :18500)
-│
-Python Sidecar (現有代碼 100% 復用)
+└── Sidecar Client (HTTP → Python :18500)
+
+Python Sidecar (sidecar_server.py, 現有代碼 100% 復用)
 ├── 7 Agents (不改)
 ├── BrowserService (Playwright/Camoufox/CDP)
 └── 5 Platform Adapters (不改)
 ```
 
-### 路線 A（當前）：Go 做殼，Python 做腦
+### 交付物
 
-| 階段 | 內容 | 預估 |
-|------|------|:--:|
-| 1 | sidecar_server.py（~60行 FastAPI） | 1天 |
-| 2 | Go HTTP API + 路由 | 1天 |
-| 3 | Go DAG 編排（goroutine fan-out） | 1天 |
-| 4 | Go CLI + Sidecar 客戶端 | 1天 |
-| 5 | 構建腳本 + 打包 | 1天 |
-| **合計** | | **5天** |
+| 文件 | 行數 | 說明 |
+|------|:--:|------|
+| `sidecar_server.py` | 212 | Python FastAPI 微服務 (18500)，封裝 Adapter + Agent |
+| `go/cmd/smart-agent/main.go` | 91 | Go CLI 入口 |
+| `go/internal/api/` | 4 文件 | HTTP API 服務器 (替代 FastAPI) |
+| `go/internal/orchestrator/` | 2 文件 | DAG 編排 (替代 LangGraph) |
+| `go/internal/sidecar/client.go` | 106 | Python sidecar HTTP 客戶端 |
+| `go/internal/crawler/aggregator.go` | 78 | 聚合 + 三路去重 + 排序 |
+| `go/internal/config/settings.go` | 26 | 環境變量配置 |
+| `go/pkg/models/types.go` | 46 | 共享資料類型 |
+| `deploy-go.ps1` | 96 | Go 版本一鍵構建部署 |
+| **合計** | **~1,100** | **11 個新文件** |
 
-### 性能對比（預期）
+### 實測性能
 
-| 指標 | Python (asyncio) | Go (goroutine) |
-|------|:--:|:--:|
-| 5 平台並行搜索 | ~15s | ~5s |
-| 7 Agent LLM 調用 | ~27s | ~9s |
-| 內存佔用 | ~300MB | ~50MB |
-| 部署體積 | ~500MB (venv) | ~15MB (單二進制) |
-| 冷啟動 | ~3s | ~0.1s |
+| 指標 | Python (asyncio) | Go (goroutine) | 實際 |
+|------|:--:|:--:|:--:|
+| 二進制體積 | ~500MB (venv) | ~15MB (預估) | **6.7MB** |
+| 外部依賴 | 20+ | 2 (預估) | **0** (純標準庫) |
+| Full Pipeline | ~100s | ~28s (預估) | **72s** |
+| 內存佔用 | ~300MB | ~50MB | 待測 |
+| 冷啟動 | ~3s | ~0.1s | 即時 |
 
 ### Go 版對獲客的質變
 
@@ -237,6 +241,14 @@ Python Sidecar (現有代碼 100% 復用)
 | 用戶上手 | 30分鐘裝環境 | **3秒**雙擊exe |
 | 付費轉化 | ~0% | ~5% |
 | 獲客引擎穩定性 | 3天OOM | **3個月不重啟** |
+
+### 部署
+
+```powershell
+.\deploy-go.ps1                 # 一鍵構建 + 啟動 sidecar + Go API
+.\smart-agent-go.exe --serve    # 僅啟動 API 服務器 (localhost:8000)
+.\smart-agent-go.exe --keyword AI绘画 --pipeline full   # CLI 全流程
+```
 
 ---
 
@@ -351,6 +363,11 @@ smart-agent-pro/
 - B站 5 ✅ / 小紅書 5 ✅ / 抖音 5 ✅ / 知乎 5 ✅ / 快手 5 ✅
 - 總計 25/25 全部通過
 
+**2026-05-26 Go Full Pipeline（keyword=AI绘画，5平台，Go orchestrator + Python sidecar）**：
+- 5 平台搜索 24s → TrendScout 9s → Level1 12s（product/video/sentiment 並行）
+- → Level2 27s（copy/remix/pic 並行）→ 總計 72s
+- 7/7 Agent 全部通過，Go 二進制 6.7MB（零外部依賴）
+
 ---
 
 ## 規則（所有 AI 工具遵守）
@@ -362,5 +379,5 @@ smart-agent-pro/
 
 ---
 
-*最後更新：2026-05-26 — P14 Docker 一鍵部署腳本完成（deploy-docker.ps1）*
+*最後更新：2026-05-26 — P15 Go 高性能版本完成（Go 殼 + Python 腦，6.7MB 單二進制，Full Pipeline 72s）*
 

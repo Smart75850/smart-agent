@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.3.0 (2026-05-26) — 部署 & 高性能版
+
+### 新增
+- **Go 高性能版本 (P15)**：Go 殼 + Python 腦架構，6.7MB 單二進制，零外部依賴
+  - Go HTTP API Server (net/http，替代 FastAPI)
+  - Go DAG Orchestrator (goroutine fan-out，替代 LangGraph)
+  - Python Sidecar (sidecar_server.py，封裝 5 Adapter + 7 Agent)
+  - 實測 Full Pipeline 72s（5 平台搜索 + 7 Agent 全鏈路）
+- **Windows 一鍵部署 (P13)**：deploy.ps1 + deploy.bat，6 步自動化安裝
+- **Docker 一鍵部署 (P14)**：deploy-docker.ps1（5 步構建+啟動，支持 --WithMySQL）
+- **Agent 並行化 (P11)**：兩階段 Send fan-out（Level1: product/video/sentiment，Level2: copy/remix/pic）
+- **API pipeline 端點 (P0)**：POST /api/pipeline，非同步執行，GET 輪詢結果
+
+### 修改
+- `src/orchestrator/graph.py` — 線性鏈改兩階段 fan-out + 條件路由 + Send API
+- `docker-compose.yml` — 移除過時 version 字段
+- `STATUS.md` — 新增 P11-P15 驗證記錄 + Go 版架構文檔
+
+### 部署腳本
+- `deploy.ps1` / `deploy.bat` (P13) — Windows 本地一鍵部署
+- `deploy-docker.ps1` (P14) — Docker 一鍵部署
+- `deploy-go.ps1` (P15) — Go 版本構建+部署
+
+---
+
 ## v0.2.0 (2026-05-26) — Agent 智能分析層
 
 ### 新增
