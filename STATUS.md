@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P5 Agent + Camoufox 引擎
-⬜ 進行中：附加模塊（P6-P9）+ CookieBridge
-下一步：CookieBridge Chrome Extension
+✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P5 Agent + Camoufox + CookieBridge
+⬜ 進行中：附加模塊（P7-P9）
+下一步：ContentRemixAgent（数据分析/总结/改写）
 
 ---
 
@@ -78,15 +78,21 @@
 
 改動：`settings.py`（8 配置項）、`browser_service.py`（camoufox 分支）、`xiaohongshu_adapter.py`（search/comment persistent context）、`main.py`（choices）
 
-### ❌ 未開始 — 按優先級排列（經芭芭拉審閱調整）
+### ✅ 已完成 — CookieBridge
 
-> 註：P1-P5 + Camoufox 已完成，以下係剩餘任務。
-                                 
+Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登录态。
 
-第四優先（商業化關鍵 — 🟡 提前）
-  P6 — CookieBridge              Chrome Extension 同步登錄態
-                                 （要賣 Pro 版俾人，呢個係 UX 痛點）
+| 组件 | 文件 |
+|------|------|
+| Extension | `src/cookie_bridge/extension/` (manifest.json / popup.html / popup.js) |
+| Python 服务 | `src/cookie_bridge/server.py` (POST /cookies + GET /health) |
+| 自动注入 | `browser_service.py` → `_load_platform_cookies()` |
 
+用法：`python main.py --cookie-bridge` → Chrome Extension 点「同步」→ 5 平台 cookies 自动保存到 `browser_data/`
+
+### ❌ 未開始
+
+```
 第五優先（附加模塊）
   P7 — ContentRemixAgent         數據分析/總結/改寫
   P8 — PicTacticAgent            智能配圖生成
@@ -137,4 +143,4 @@
 
 ---
 
-*最後更新：2026-05-26 — Camoufox 第三引擎完成，B站/抖音驗證通過*
+*最後更新：2026-05-26 — CookieBridge Chrome Extension 完成，服務驗證通過*
