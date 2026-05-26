@@ -80,6 +80,7 @@ class CopyWriter:
             keyword=keyword,
             trend_items=[it for r in trend_data.values() for it in (r.get("items", []) if isinstance(r, dict) else [])],
             products=product_data.get("items", []) if isinstance(product_data, dict) else [],
+            video_breakdowns=video_data.get("items", []) if isinstance(video_data, dict) else [],
         )
 
         return {"copy_report": asdict(report)}

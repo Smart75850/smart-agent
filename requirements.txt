@@ -1,13 +1,12 @@
-﻿fastmcp>=0.5.0
+fastmcp>=0.5.0
 playwright>=1.50.0
+playwright-stealth>=0.0.3
+httpx>=0.27.0
+camoufox>=0.1.0
 uvicorn>=0.34.0
 fastapi>=0.115.0
 pydantic>=2.0.0
 openpyxl>=3.1.0
 mysql-connector-python>=9.0.0
-requests>=2.32.0
-py_mini_racer>=0.6.0
-gmssl>=3.2.0
-playwright-stealth>=0.0.3
 langgraph>=0.4.0
 langchain-core>=0.3.0

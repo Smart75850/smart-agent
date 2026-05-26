@@ -12,7 +12,6 @@ Flow:
 
 import json
 from dataclasses import dataclass, field, asdict
-from typing import Optional
 
 import httpx
 

@@ -3,6 +3,7 @@ from os import environ
 
 from config.settings import settings
 from proxy.proxy_manager import ProxyManager
+from src.utils.logger import logger
 
 ENGINE = settings.BROWSER_ENGINE
 CDP_PORT = settings.CDP_PORT

@@ -210,11 +210,10 @@ class ContentRemixer:
 
         keywords: list[str] = []
         if titles:
-            from collections import Counter as C
             words = []
             for t in titles:
                 words.extend(w for w in t[:30].replace(" ", "").replace("，", ",").split(",") if len(w) >= 2)
-            keywords = [w for w, _ in C(words).most_common(5)]
+            keywords = [w for w, _ in Counter(words).most_common(5)]
 
         total = sum(platform_counts.values())
 
