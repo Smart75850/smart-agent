@@ -8,8 +8,8 @@
 ## 當前焦點
 
 ✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P7 Agent + Camoufox + CookieBridge
-⬜ 進行中：附加模塊（P8-P9）
-下一步：PicTacticAgent（智能配图策略）
+⬜ 進行中：附加模塊（P9）
+下一步：Video/Image Downloader（批量下載）
 
 ---
 
@@ -60,7 +60,7 @@
 | P4 | Sentiment Reader | `agents/sentiment_reader.py` | `ba81aee` | 評論情緒分析（positive/neutral/negative%） |
 | P5 | Copy Writer | `agents/copy_writer.py` | `f9f20cb` | 營銷文案生成（headline/short/medium/long） |
 | P6 | Content Remixer | `agents/content_remixer.py` | `f4f2134` | 數據分析/總結/改寫（summarize/analyze/rewrite） |
-| P7 | Pic Tactic | `agents/pic_tactic.py` | — | 智能配圖策略（cover/social/trend） |
+| P7 | Pic Tactic | `agents/pic_tactic.py` | `11eb2fa` | 智能配圖策略（cover/social/trend） |
 
 每個 Agent 均支持：
 - DeepSeek V4 Flash LLM 分析（無 API key 時自動降級為模板模式）

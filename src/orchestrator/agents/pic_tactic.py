@@ -254,7 +254,7 @@ class PicTactic:
         products: list = None,
     ) -> VisualReport:
         if mode == "cover" and platform in _PLATFORM_DEFAULTS:
-            t = _PLATFORM_DEFAULTS[platform]
+            t = dict(_PLATFORM_DEFAULTS[platform], target_platform=platform)
             return VisualReport(
                 topic=topic or "通用",
                 mode="cover",
@@ -269,9 +269,11 @@ class PicTactic:
             for p, t in _PLATFORM_DEFAULTS.items():
                 if platform and p != platform:
                     continue
-                tactics.append(VisualTactic(**t))
+                td = dict(t, target_platform=p)
+                tactics.append(VisualTactic(**td))
             if not tactics:
-                tactics = [VisualTactic(**_PLATFORM_DEFAULTS["douyin"])]
+                td = dict(_PLATFORM_DEFAULTS["douyin"], target_platform="douyin")
+                tactics = [VisualTactic(**td)]
             return VisualReport(
                 topic=topic or "通用",
                 mode="social",
