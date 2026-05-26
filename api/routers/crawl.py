@@ -34,12 +34,16 @@ def _lazy_init_adapters():
     from src.agents.douyin_adapter import DouyinAdapter
     from src.agents.zhihu_adapter import ZhihuAdapter
     from src.agents.kuaishou_adapter import KuaishouAdapter
+    from src.agents.weibo_adapter import WeiboAdapter
+    from src.agents.tieba_adapter import TiebaAdapter
     _ADAPTERS.update({
         "bilibili": BilibiliAdapter(),
         "xiaohongshu": XiaohongshuAdapter(),
         "douyin": DouyinAdapter(),
         "zhihu": ZhihuAdapter(),
         "kuaishou": KuaishouAdapter(),
+        "weibo": WeiboAdapter(),
+        "tieba": TiebaAdapter(),
     })
 
 

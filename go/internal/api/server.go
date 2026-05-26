@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -109,9 +111,40 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /api/crawl", s.handleCrawl)
 	s.mux.HandleFunc("GET /api/data/{platform}", s.handleDataPlatform)
 	s.mux.HandleFunc("GET /api/data", s.handleDataList)
+	s.mux.HandleFunc("GET /api/platforms", s.handlePlatforms)
+	s.mux.HandleFunc("GET /", s.handleWebUI)
+	s.mux.HandleFunc("GET /api/ws", s.handleWebSocket)
 }
 
 func decodeJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(v)
+}
+
+func (s *Server) handleWebUI(w http.ResponseWriter, r *http.Request) {
+	webuiPath := filepath.Join("api", "webui", "index.html")
+	data, err := os.ReadFile(webuiPath)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "WebUI not found — please run from project root")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
+func (s *Server) handlePlatforms(w http.ResponseWriter, r *http.Request) {
+	platforms := []map[string]any{
+		{"id": "bilibili", "name": "B站", "need_login": false, "types": []string{"search", "rank", "detail", "comment", "user"}},
+		{"id": "xiaohongshu", "name": "小紅書", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "douyin", "name": "抖音", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "zhihu", "name": "知乎", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "kuaishou", "name": "快手", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "weibo", "name": "微博", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "tieba", "name": "貼吧", "need_login": false, "types": []string{"search", "hot", "detail", "comment", "user"}},
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"platforms": platforms})
+}
+
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"message": "WebSocket not available in Go server, use Python server for real-time logs"})
 }

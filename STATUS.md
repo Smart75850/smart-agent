@@ -9,6 +9,7 @@
 
 ✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P15 全部完成
 ✅ 全平台 full pipeline 實戰驗證（7 平台全部通過）
+✅ WebUI 雙模式（單平台爬取 + Pipeline 全流程分析）+ Go 版前端服務
 **下一步：生產環境部署 + 實戰數據積累**
 
 ---
@@ -213,14 +214,15 @@ Python Sidecar (sidecar_server.py, 現有代碼 100% 復用)
 |------|:--:|------|
 | `sidecar_server.py` | 212 | Python FastAPI 微服務 (18500)，封裝 Adapter + Agent |
 | `go/cmd/smart-agent/main.go` | 91 | Go CLI 入口 |
-| `go/internal/api/` | 4 文件 | HTTP API 服務器 (替代 FastAPI) |
+| `go/internal/api/` | 4 文件 | HTTP API 服務器 (替代 FastAPI)，含 WebUI 靜態文件 + /api/platforms |
 | `go/internal/orchestrator/` | 2 文件 | DAG 編排 (替代 LangGraph) |
 | `go/internal/sidecar/client.go` | 106 | Python sidecar HTTP 客戶端 |
 | `go/internal/crawler/aggregator.go` | 78 | 聚合 + 三路去重 + 排序 |
 | `go/internal/config/settings.go` | 26 | 環境變量配置 |
 | `go/pkg/models/types.go` | 46 | 共享資料類型 |
 | `deploy-go.ps1` | 96 | Go 版本一鍵構建部署 |
-| **合計** | **~1,100** | **11 個新文件** |
+| `api/webui/index.html` | ~480 | WebUI 雙模式（單平台爬取 + Pipeline 全流程分析） |
+| **合計** | **~1,550** | **12 個新/改文件** |
 
 ### 實測性能
 
@@ -388,5 +390,5 @@ smart-agent-pro/
 
 ---
 
-*最後更新：2026-05-26 — 全平台驗證完成 + 微博/貼吧適配器（7 平台全部就緒）*
+*最後更新：2026-05-26 — WebUI Pipeline 雙模式 + Go 前端服務 + API 層 7 平台補全*
 

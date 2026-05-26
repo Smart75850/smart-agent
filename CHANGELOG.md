@@ -13,11 +13,18 @@
 - **Agent 並行化 (P11)**：兩階段 Send fan-out（Level1: product/video/sentiment，Level2: copy/remix/pic）
 - **API pipeline 端點 (P0)**：POST /api/pipeline，非同步執行，GET 輪詢結果
 - **全平台 full pipeline 實戰驗證**：7/7 平台唔崩，B站/小紅書/知乎/微博有真實數據
+- **WebUI 雙模式界面**：單平台爬取 + Pipeline 全流程分析（多平台勾選 + Agent 報告卡片）
+- **Go API 前端服務**：Go server 支援 WebUI 靜態文件 + /api/platforms 端點
 - **微博 + 貼吧適配器 (P16)**：weibo_adapter.py + tieba_adapter.py（search/hot/detail/comment/user）
 
 ### 修改
 - `src/orchestrator/graph.py` — 線性鏈改兩階段 fan-out + 條件路由 + Send API
 - `src/orchestrator/nodes.py` — ADAPTER_MAP 加 weibo/tieba
+- `api/routers/crawl.py` — _ADAPTERS 加 WeiboAdapter/TiebaAdapter
+- `api/routers/pipeline.py` — _DEFAULT_PLATFORMS 加 weibo/tieba
+- `api/webui/index.html` — 重寫為雙模式界面（單平台爬取 + Pipeline 全流程分析）
+- `go/internal/api/server.go` — 加 WebUI 靜態文件服務 + /api/platforms + /api/ws stub
+- `src/aggregator.py` — 加 weibo/tieba 平台 ID 提取
 - `src/aggregator.py` — 加 weibo/tieba 平台 ID 提取
 - `constant/platform.py` — PlatformType 加 WEIBO/TIEBA
 - `api/routers/platforms.py` — _PLATFORMS 加微博/貼吧

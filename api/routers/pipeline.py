@@ -11,7 +11,7 @@ router = APIRouter()
 
 _tasks: dict[str, dict] = {}
 
-_DEFAULT_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
+_DEFAULT_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
 
 
 class PipelineRequest(BaseModel):

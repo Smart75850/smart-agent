@@ -51,11 +51,28 @@ header .conn-status {
 .conn-dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .conn-dot.off { background: var(--red); }
 
+/* ── Tabs ─────────────────────────────────────── */
+#tab-bar {
+  display: flex; gap: 0; flex-shrink: 0;
+  padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  background: none; border: none; color: var(--text-dim);
+  padding: 10px 20px; font-size: 13px; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all .15s;
+  font-family: inherit;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* ── Main layout ──────────────────────────────── */
 main {
   flex: 1; display: flex; flex-direction: column;
   padding: 16px 24px; gap: 16px; overflow: hidden;
 }
+.tab-content { display: none; flex-direction: column; gap: 16px; flex: 1; overflow: hidden; }
+.tab-content.active { display: flex; }
+
 section {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column;
@@ -63,7 +80,7 @@ section {
 section h2 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
 
 /* ── Controls ─────────────────────────────────── */
-#controls { flex-shrink: 0; }
+#controls, #pipeline-controls { flex-shrink: 0; }
 .control-row {
   display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
 }
@@ -81,31 +98,49 @@ section h2 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-tra
 .control-group select:focus,
 .control-group input:focus { border-color: var(--accent); }
 
-/* type dropdown: narrower */
 #type { min-width: 90px; }
+#keyword, #pl-keyword { flex: 1; min-width: 140px; }
+#limit, #pl-limit { width: 60px; text-align: center; }
 
-/* keyword: grow */
-#keyword { flex: 1; min-width: 140px; }
+/* platform checkboxes */
+.platform-checks {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.platform-checks label {
+  display: flex; align-items: center; gap: 4px; font-size: 12px;
+  cursor: pointer; padding: 4px 10px; border-radius: 4px;
+  background: var(--surface2); border: 1px solid var(--border);
+  transition: border-color .15s; user-select: none;
+}
+.platform-checks label:hover { border-color: var(--accent); }
+.platform-checks label.checked { border-color: var(--accent); background: rgba(108,140,255,.12); }
+.platform-checks input[type=checkbox] { accent-color: var(--accent); }
 
-/* limit: small */
-#limit { width: 60px; text-align: center; }
+/* pipeline mode radios */
+.mode-radios {
+  display: flex; gap: 12px; align-items: center;
+}
+.mode-radios label {
+  display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;
+}
+.mode-radios input[type=radio] { accent-color: var(--accent); }
 
-/* crawl button */
-#crawl-btn {
+/* buttons */
+.btn-primary {
   background: var(--accent); color: #fff; border: none; border-radius: 6px;
   padding: 8px 22px; font-size: 13px; font-weight: 600; cursor: pointer;
   transition: background .15s; white-space: nowrap;
   height: 34px; display: flex; align-items: center; gap: 6px;
 }
-#crawl-btn:hover { background: var(--accent-hover); }
-#crawl-btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; }
 .spinner {
   display: none; width: 14px; height: 14px;
   border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
   border-radius: 50%; animation: spin .6s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-#crawl-btn.loading .spinner { display: inline-block; }
+.btn-primary.loading .spinner { display: inline-block; }
 
 /* ── Log Panel ────────────────────────────────── */
 #log-panel { flex: 1; min-height: 100px; overflow: hidden; }
@@ -120,6 +155,7 @@ section h2 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-tra
 .log-WARNING { color: var(--yellow); }
 .log-ERROR { color: var(--red); }
 .log-SYSTEM { color: var(--accent); font-style: italic; }
+.log-SUCCESS { color: var(--green); }
 #log-clear {
   position: absolute; top: 16px; right: 16px;
   background: transparent; border: 1px solid var(--border); color: var(--text-dim);
@@ -147,6 +183,31 @@ section h2 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-tra
   padding: 12px; white-space: pre; min-height: 100px; max-height: 320px;
 }
 
+/* ── Agent Report Cards ───────────────────────── */
+#agent-reports { flex-shrink: 0; display: none; }
+#agent-reports.visible { display: flex; flex-direction: column; }
+#agent-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.agent-card {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 12px; cursor: pointer; transition: border-color .15s;
+}
+.agent-card:hover { border-color: var(--accent); }
+.agent-card h3 { font-size: 12px; color: var(--accent); margin-bottom: 4px; }
+.agent-card .summary { font-size: 11px; color: var(--text-dim); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.agent-card .full { display: none; font-size: 11px; color: var(--text); line-height: 1.5; margin-top: 6px; }
+.agent-card.expanded .summary { display: none; }
+.agent-card.expanded .full { display: block; }
+
+/* ── Pipeline Progress ───────────────────────── */
+#pl-progress {
+  display: none; align-items: center; gap: 8px; padding: 8px 0; font-size: 12px; color: var(--text-dim);
+}
+#pl-progress.visible { display: flex; }
+
 /* ── Mobile ───────────────────────────────────── */
 @media (max-width: 700px) {
   body { font-size: 13px; }
@@ -155,8 +216,9 @@ section h2 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-tra
   main { padding: 10px 14px; gap: 10px; }
   .control-row { flex-direction: column; gap: 8px; }
   .control-group select, .control-group input { width: 100%; }
-  #keyword { min-width: unset; }
-  #crawl-btn { width: 100%; justify-content: center; }
+  #keyword, #pl-keyword { min-width: unset; }
+  .btn-primary { width: 100%; justify-content: center; }
+  #agent-cards { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -171,101 +233,134 @@ section h2 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-tra
   </span>
 </header>
 
+<div id="tab-bar">
+  <button class="tab-btn active" data-tab="crawl">单平台爬取</button>
+  <button class="tab-btn" data-tab="pipeline">全流程分析</button>
+</div>
+
 <main>
-  <!-- Controls -->
-  <section id="controls">
-    <h2>爬取控制</h2>
-    <div class="control-row">
-      <div class="control-group">
-        <label for="platform">Platform</label>
-        <select id="platform"></select>
+  <!-- ═══════════ Crawl Tab ═══════════ -->
+  <div class="tab-content active" id="tab-crawl">
+    <section id="controls">
+      <h2>爬取控制</h2>
+      <div class="control-row">
+        <div class="control-group">
+          <label for="platform">Platform</label>
+          <select id="platform"></select>
+        </div>
+        <div class="control-group">
+          <label for="type">Type</label>
+          <select id="type"></select>
+        </div>
+        <div class="control-group" style="flex:1;min-width:140px">
+          <label for="keyword">Keyword</label>
+          <input id="keyword" type="text" placeholder="搜索關鍵詞...">
+        </div>
+        <div class="control-group">
+          <label for="engine">Engine</label>
+          <select id="engine">
+            <option value="playwright">Playwright</option>
+            <option value="cdp">CDP</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="limit">Limit</label>
+          <input id="limit" type="number" value="20" min="1" max="500">
+        </div>
+        <button class="btn-primary" id="crawl-btn">
+          <span class="spinner"></span>
+          <span class="btn-text">开始爬取</span>
+        </button>
       </div>
-      <div class="control-group">
-        <label for="type">Type</label>
-        <select id="type"></select>
-      </div>
-      <div class="control-group" style="flex:1;min-width:140px">
-        <label for="keyword">Keyword</label>
-        <input id="keyword" type="text" placeholder="搜索關鍵詞...">
-      </div>
-      <div class="control-group">
-        <label for="engine">Engine</label>
-        <select id="engine">
-          <option value="playwright">Playwright</option>
-          <option value="cdp">CDP</option>
-        </select>
-      </div>
-      <div class="control-group">
-        <label for="limit">Limit</label>
-        <input id="limit" type="number" value="20" min="1" max="500">
-      </div>
-      <button id="crawl-btn">
-        <span class="spinner"></span>
-        <span class="btn-text">開始爬取</span>
-      </button>
-    </div>
-  </section>
+    </section>
 
-  <!-- Log Panel -->
-  <section id="log-panel" style="position:relative">
-    <h2>即時日誌</h2>
-    <button id="log-clear">清除</button>
-    <div id="log-container"><div class="log-entry"><span class="log-time">—</span><span class="log-SYSTEM">Waiting for connection...</span></div></div>
-  </section>
+    <section id="log-panel" style="position:relative">
+      <h2>即时日志</h2>
+      <button id="log-clear">清除</button>
+      <div id="log-container"><div class="log-entry"><span class="log-time">—</span><span class="log-SYSTEM">Waiting for connection...</span></div></div>
+    </section>
 
-  <!-- Results Panel -->
-  <section id="results-panel" style="position:relative">
-    <div id="results-header">
-      <h2>結果預覽</h2>
-      <span class="empty-note" id="results-note">尚未爬取</span>
-      <span id="results-actions">
-        <button class="dl-btn" id="dl-json" disabled>下載 JSON</button>
-        <button class="dl-btn" id="dl-csv" disabled>下載 CSV</button>
-      </span>
-    </div>
-    <pre id="results-content">等待爬取完成...</pre>
-  </section>
+    <section id="results-panel" style="position:relative">
+      <div id="results-header">
+        <h2>结果预览</h2>
+        <span class="empty-note" id="results-note">尚未爬取</span>
+        <span id="results-actions">
+          <button class="dl-btn" id="dl-json" disabled>下载 JSON</button>
+          <button class="dl-btn" id="dl-csv" disabled>下载 CSV</button>
+        </span>
+      </div>
+      <pre id="results-content">等待爬取完成...</pre>
+    </section>
+  </div>
+
+  <!-- ═══════════ Pipeline Tab ═══════════ -->
+  <div class="tab-content" id="tab-pipeline">
+    <section id="pipeline-controls">
+      <h2>全流程分析</h2>
+      <div class="control-row" style="margin-bottom:10px">
+        <div class="control-group" style="flex:1;min-width:200px">
+          <label for="pl-keyword">Keyword</label>
+          <input id="pl-keyword" type="text" placeholder="输入分析关键词...">
+        </div>
+        <div class="control-group">
+          <label for="pl-limit">Limit</label>
+          <input id="pl-limit" type="number" value="10" min="1" max="100">
+        </div>
+      </div>
+      <div class="control-row" style="margin-bottom:10px">
+        <div class="control-group" style="width:100%">
+          <label>Platforms</label>
+          <div class="platform-checks" id="pl-platforms"></div>
+        </div>
+      </div>
+      <div class="control-row">
+        <div class="control-group">
+          <label>Pipeline Mode</label>
+          <div class="mode-radios">
+            <label><input type="radio" name="pl-mode" value="full" checked> Full (搜索+7 Agent)</label>
+            <label><input type="radio" name="pl-mode" value="simple"> Simple (仅搜索)</label>
+          </div>
+        </div>
+        <button class="btn-primary" id="pl-btn">
+          <span class="spinner"></span>
+          <span class="btn-text">开始分析</span>
+        </button>
+      </div>
+      <div id="pl-progress">
+        <span>⏳</span><span id="pl-progress-text"></span>
+      </div>
+    </section>
+
+    <section id="agent-reports">
+      <h2>Agent 分析报告</h2>
+      <div id="agent-cards"></div>
+    </section>
+
+    <section id="log-panel-pl" style="position:relative">
+      <h2>即时日志</h2>
+      <button id="log-clear-pl">清除</button>
+      <div id="log-container-pl"><div class="log-entry"><span class="log-time">—</span><span class="log-SYSTEM">选择平台与关键词，点击「开始分析」...</span></div></div>
+    </section>
+
+    <section id="results-panel-pl" style="position:relative">
+      <div id="results-header">
+        <h2>搜索结果</h2>
+        <span class="empty-note" id="results-note-pl">尚未分析</span>
+        <span id="results-actions-pl">
+          <button class="dl-btn" id="dl-json-pl" disabled>下载 JSON</button>
+          <button class="dl-btn" id="dl-csv-pl" disabled>下载 CSV</button>
+        </span>
+      </div>
+      <pre id="results-content-pl">等待分析完成...</pre>
+    </section>
+  </div>
 </main>
 
 <script>
 (function(){
 'use strict';
 
-// ─── DOM refs ────────────────────────────────────
 const $ = id => document.getElementById(id);
-const platformEl = $('platform');
-const typeEl = $('type');
-const keywordEl = $('keyword');
-const engineEl = $('engine');
-const limitEl = $('limit');
-const crawlBtn = $('crawl-btn');
-const logContainer = $('log-container');
-const resultsContent = $('results-content');
-const resultsNote = $('results-note');
-const dlJson = $('dl-json');
-const dlCsv = $('dl-csv');
-const connDot = $('conn-dot');
-const connText = $('conn-text');
-
-// ─── State ──────────────────────────────────────
-let platforms = [];
-const typeLabels = { search:'搜索', hot:'熱榜', rank:'排行榜', detail:'詳情', user:'用戶視頻' };
-let lastResults = null;
-let ws = null;
-let wsReconnectTimer = null;
-let pollTimer = null;
-
-// ─── Toast (simple) ────────────────────────────
-function toast(msg, isError) {
-  // Use the log panel as feedback
-  // Actually just console and log panel entry
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.innerHTML = `<span class="log-time">${fmtTime()}</span><span class="log-${isError ? 'ERROR' : 'SYSTEM'}">${escapeHtml(msg)}</span>`;
-  logContainer.appendChild(entry);
-  trimLog();
-  scrollLog();
-}
 
 // ─── Helpers ────────────────────────────────────
 function fmtTime() {
@@ -277,98 +372,136 @@ function escapeHtml(s) {
   d.textContent = s;
   return d.innerHTML;
 }
-function scrollLog() { logContainer.scrollTop = logContainer.scrollHeight; }
-function trimLog() {
-  while (logContainer.children.length > 500) logContainer.removeChild(logContainer.firstChild);
-}
 
-// ─── Log panel ──────────────────────────────────
-function addLog(level, msg, time) {
+// ─── Shared State ────────────────────────────────
+let platforms = [];
+const typeLabels = { search:'搜索', hot:'热榜', rank:'排行榜', detail:'详情', user:'用户视频' };
+let lastResults = null;
+let lastPipelineResult = null;
+let ws = null;
+let wsReconnectTimer = null;
+let pollTimer = null;
+
+// ─── Log helpers ─────────────────────────────────
+function addLog(containerId, level, msg, time) {
+  const c = $(containerId);
   const entry = document.createElement('div');
   entry.className = 'log-entry';
   const t = time || fmtTime();
   entry.innerHTML = `<span class="log-time">${escapeHtml(t)}</span><span class="log-${level}">${escapeHtml(msg)}</span>`;
-  logContainer.appendChild(entry);
-  trimLog();
-  scrollLog();
+  c.appendChild(entry);
+  while (c.children.length > 500) c.removeChild(c.firstChild);
+  c.scrollTop = c.scrollHeight;
 }
 
-// ─── Platform -> Type mapping ───────────────────
-function getTypesForPlatform(pid) {
-  const p = platforms.find(x => x.id === pid);
-  return p ? p.types : ['search'];
-}
-function populateTypes(pid) {
-  const types = getTypesForPlatform(pid);
-  typeEl.innerHTML = types.map(t => `<option value="${t}">${typeLabels[t]||t}</option>`).join('');
-  // Ensure current selection is valid
-  if (!types.includes(typeEl.value)) typeEl.value = types[0] || '';
-}
-
-// ─── Fetch platforms on load ────────────────────
-async function loadPlatforms() {
-  try {
-    const res = await fetch('/api/platforms');
-    const data = await res.json();
-    platforms = data.platforms || [];
-    platformEl.innerHTML = platforms.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    if (platforms.length) {
-      populateTypes(platforms[0].id);
-    }
-  } catch(e) {
-    addLog('ERROR', `無法載入平台列表: ${e.message}`);
-  }
-}
+function addLogCrawl(level, msg) { addLog('log-container', level, msg); }
+function addLogPL(level, msg) { addLog('log-container-pl', level, msg); }
 
 // ─── WebSocket ──────────────────────────────────
 function connectWs() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = `${proto}//${location.host}/api/ws`;
-  ws = new WebSocket(url);
-
-  ws.onopen = () => {
-    connDot.className = 'conn-dot on';
-    connText.textContent = 'Connected';
-    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
-  };
-  ws.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      if (d.type === 'ping') return;
-      addLog(d.level || 'INFO', d.message || '', d.time);
-    } catch(_) {}
-  };
-  ws.onclose = () => {
-    connDot.className = 'conn-dot off';
-    connText.textContent = 'Reconnecting...';
-    ws = null;
-    wsReconnectTimer = setTimeout(connectWs, 3000);
-  };
-  ws.onerror = () => { ws && ws.close(); };
+  try {
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      $('conn-dot').className = 'conn-dot on';
+      $('conn-text').textContent = 'Connected';
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+    };
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'ping') return;
+        addLogCrawl(d.level || 'INFO', d.message || '', d.time);
+        addLogPL(d.level || 'INFO', d.message || '', d.time);
+      } catch(_) {}
+    };
+    ws.onclose = () => {
+      $('conn-dot').className = 'conn-dot off';
+      $('conn-text').textContent = 'Disconnected';
+      ws = null;
+      wsReconnectTimer = setTimeout(connectWs, 10000);
+    };
+    ws.onerror = () => { if (ws) { ws.close(); ws = null; } };
+  } catch(_) {
+    $('conn-dot').className = 'conn-dot off';
+    $('conn-text').textContent = 'WS N/A';
+  }
 }
 
-// ─── Crawl logic ────────────────────────────────
-async function startCrawl() {
-  const platform = platformEl.value;
-  const type = typeEl.value;
-  const keyword = keywordEl.value;
-  const engine = engineEl.value;
-  const limit = parseInt(limitEl.value, 10) || 20;
+// ─── Fetch platforms ─────────────────────────────
+async function loadPlatforms() {
+  try {
+    const res = await fetch('/api/platforms');
+    const data = await res.json();
+    platforms = data.platforms || [];
+    // Crawl tab: platform dropdown
+    const sel = $('platform');
+    sel.innerHTML = platforms.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    if (platforms.length) populateTypes(platforms[0].id);
+    // Pipeline tab: checkboxes
+    const checks = $('pl-platforms');
+    checks.innerHTML = platforms.map(p =>
+      `<label class="checked"><input type="checkbox" value="${p.id}" checked> ${p.name}</label>`
+    ).join('');
+    // update checkbox label style on change
+    checks.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        cb.parentElement.classList.toggle('checked', cb.checked);
+      });
+    });
+  } catch(e) {
+    addLogCrawl('ERROR', `无法载入平台列表: ${e.message}`);
+  }
+}
 
-  // Validate
+function getTypesForPlatform(pid) {
+  const p = platforms.find(x => x.id === pid);
+  return p ? p.types : ['search'];
+}
+function populateTypes(pid) {
+  const types = getTypesForPlatform(pid);
+  const sel = $('type');
+  sel.innerHTML = types.map(t => `<option value="${t}">${typeLabels[t]||t}</option>`).join('');
+  if (!types.includes(sel.value)) sel.value = types[0] || '';
+}
+
+// ─── Tab switching ───────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    $('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// CRAWL TAB
+// ═══════════════════════════════════════════════════
+
+async function startCrawl() {
+  const platform = $('platform').value;
+  const type = $('type').value;
+  const keyword = $('keyword').value;
+  const engine = $('engine').value;
+  const limit = parseInt($('limit').value, 10) || 20;
+
   if (type === 'search' && !keyword.trim()) {
-    addLog('WARNING', '搜索類型需要輸入關鍵詞');
+    addLogCrawl('WARNING', '搜索类型需要输入关键词');
     return;
   }
 
-  crawlBtn.classList.add('loading');
-  crawlBtn.disabled = true;
-  resultsContent.textContent = '爬取中...';
-  resultsNote.textContent = '爬取中';
-  dlJson.disabled = true;
-  dlCsv.disabled = true;
+  const btn = $('crawl-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  $('results-content').textContent = '爬取中...';
+  $('results-note').textContent = '爬取中';
+  $('dl-json').disabled = true;
+  $('dl-csv').disabled = true;
   lastResults = null;
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
 
   try {
     const res = await fetch('/api/crawl', {
@@ -376,86 +509,119 @@ async function startCrawl() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ platform, type, keyword, engine, limit }),
     });
-    const { task_id } = await res.json();
-    addLog('INFO', `任務已提交: ${task_id.slice(0,8)}...`);
-    pollTask(task_id);
+    const data = await res.json();
+
+    if (data.task_id) {
+      // Async pattern (Python backend)
+      addLogCrawl('INFO', `任务已提交: ${data.task_id.slice(0,8)}...`);
+      pollCrawlTask(data.task_id, platform);
+    } else if (data.data !== undefined || data.platform) {
+      // Sync pattern (Go backend or direct response)
+      handleCrawlResult(data, platform);
+    } else if (data.error) {
+      addLogCrawl('ERROR', `任务错误: ${data.error}`);
+      finishCrawl(null);
+    } else {
+      // Unknown format, try to display
+      lastResults = Array.isArray(data) ? data : (data.data || [data]);
+      showResults(lastResults, platform);
+      finishCrawl({ result_count: lastResults.length });
+    }
   } catch(e) {
-    addLog('ERROR', `提交任務失敗: ${e.message}`);
-    crawlBtn.classList.remove('loading');
-    crawlBtn.disabled = false;
+    addLogCrawl('ERROR', `提交任务失败: ${e.message}`);
+    finishCrawl(null);
   }
 }
 
-async function pollTask(taskId) {
+async function pollCrawlTask(taskId, platform) {
   try {
     const res = await fetch(`/api/crawl/${taskId}`);
+    if (!res.ok) {
+      // Endpoint not available (Go backend), try /api/data/{platform}
+      addLogCrawl('INFO', 'Poll endpoint unavailable, fetching data directly...');
+      const dataRes = await fetch(`/api/data/${platform}`);
+      const data = await dataRes.json();
+      lastResults = data.data || [];
+      showResults(lastResults, platform);
+      finishCrawl({ result_count: lastResults.length });
+      return;
+    }
     const data = await res.json();
     if (data.error) {
-      addLog('ERROR', `任務錯誤: ${data.error}`);
+      addLogCrawl('ERROR', `任务错误: ${data.error}`);
       finishCrawl(null);
       return;
     }
     if (data.status === 'done') {
-      addLog('INFO', `任務完成: ${data.result_count} 條結果`);
+      addLogCrawl('INFO', `任务完成: ${data.result_count} 条结果`);
+      // fetch actual data
+      try {
+        const dataRes = await fetch(`/api/data/${platform}`);
+        const d = await dataRes.json();
+        lastResults = d.data || [];
+        showResults(lastResults, platform);
+      } catch(_) {}
       finishCrawl(data);
       return;
     }
     if (data.status === 'error') {
-      addLog('ERROR', `任務失敗: ${data.error || '未知錯誤'}`);
+      addLogCrawl('ERROR', `任务失败: ${data.error || '未知错误'}`);
       finishCrawl(null);
       return;
     }
-    // still running
-    pollTimer = setTimeout(() => pollTask(taskId), 2000);
+    pollTimer = setTimeout(() => pollCrawlTask(taskId, platform), 2000);
   } catch(e) {
-    addLog('ERROR', `輪詢任務失敗: ${e.message}`);
-    // retry
-    pollTimer = setTimeout(() => pollTask(taskId), 2000);
+    addLogCrawl('ERROR', `轮询失败: ${e.message}`);
+    pollTimer = setTimeout(() => pollCrawlTask(taskId, platform), 2000);
   }
 }
 
-async function finishCrawl(taskData) {
-  crawlBtn.classList.remove('loading');
-  crawlBtn.disabled = false;
-  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+function handleCrawlResult(data, platform) {
+  // Handle Go backend sync response or direct data
+  if (Array.isArray(data)) {
+    lastResults = data;
+  } else if (data.data && Array.isArray(data.data)) {
+    lastResults = data.data;
+  } else if (data.items) {
+    lastResults = data.items;
+  } else {
+    lastResults = [data];
+  }
+  showResults(lastResults, platform);
+  finishCrawl({ result_count: lastResults.length });
+}
 
-  if (!taskData) {
-    resultsContent.textContent = '爬取失敗，請查看日誌。';
-    resultsNote.textContent = '失敗';
+function showResults(items, platform) {
+  if (!items || !items.length) {
+    $('results-content').textContent = '无结果（可能需登录）';
+    $('results-note').textContent = '0 条结果';
     return;
   }
+  // Show first 50 items max to avoid DOM bloat
+  const display = items.slice(0, 50);
+  $('results-content').textContent = JSON.stringify(display, null, 2);
+  $('results-note').textContent = `${items.length} 条结果`;
+  $('dl-json').disabled = false;
+  $('dl-csv').disabled = false;
+}
 
-  // Fetch actual data
-  try {
-    const platform = platformEl.value;
-    const res = await fetch(`/api/data/${platform}`);
-    const data = await res.json();
-    lastResults = data.data || [];
-
-    if (!lastResults.length) {
-      resultsContent.textContent = '無結果（可能需登入）';
-      resultsNote.textContent = '0 條結果';
-      return;
-    }
-
-    resultsContent.textContent = JSON.stringify(lastResults, null, 2);
-    resultsNote.textContent = `${lastResults.length} 條結果`;
-    dlJson.disabled = false;
-    dlCsv.disabled = false;
-  } catch(e) {
-    addLog('ERROR', `獲取數據失敗: ${e.message}`);
-    resultsContent.textContent = '獲取數據失敗';
+function finishCrawl(taskData) {
+  const btn = $('crawl-btn');
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  if (!taskData) {
+    $('results-content').textContent = '爬取失败，请查看日志。';
+    $('results-note').textContent = '失败';
   }
 }
 
-// ─── Download JSON ─────────────────────────────
+// ─── Download (Crawl) ───────────────────────────
 function downloadJson() {
   if (!lastResults || !lastResults.length) return;
   const blob = new Blob([JSON.stringify(lastResults, null, 2)], { type: 'application/json' });
-  downloadBlob(blob, `${platformEl.value}_${typeEl.value}.json`);
+  downloadBlob(blob, `${$('platform').value}_${$('type').value}.json`);
 }
-
-// ─── Download CSV ──────────────────────────────
 function downloadCsv() {
   if (!lastResults || !lastResults.length) return;
   const rows = lastResults;
@@ -464,9 +630,8 @@ function downloadCsv() {
   for (const row of rows) {
     csv += headers.map(h => csvEscape(String(row[h] ?? ''))).join(',') + '\n';
   }
-  const bom = '﻿';
-  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-  downloadBlob(blob, `${platformEl.value}_${typeEl.value}.csv`);
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `${$('platform').value}_${$('type').value}.csv`);
 }
 function csvEscape(v) {
   if (v.includes(',') || v.includes('"') || v.includes('\n')) {
@@ -482,12 +647,198 @@ function downloadBlob(blob, name) {
   URL.revokeObjectURL(a.href);
 }
 
-// ─── Event bindings ────────────────────────────
-platformEl.addEventListener('change', () => populateTypes(platformEl.value));
-crawlBtn.addEventListener('click', startCrawl);
-$('log-clear').addEventListener('click', () => { logContainer.innerHTML = ''; });
-dlJson.addEventListener('click', downloadJson);
-dlCsv.addEventListener('click', downloadCsv);
+// ═══════════════════════════════════════════════════
+// PIPELINE TAB
+// ═══════════════════════════════════════════════════
+
+function getSelectedPlatforms() {
+  const cbs = $('pl-platforms').querySelectorAll('input[type=checkbox]:checked');
+  return Array.from(cbs).map(cb => cb.value);
+}
+
+function getPipelineMode() {
+  const radio = document.querySelector('input[name="pl-mode"]:checked');
+  return radio ? radio.value : 'full';
+}
+
+async function startPipeline() {
+  const keyword = $('pl-keyword').value.trim();
+  const plats = getSelectedPlatforms();
+  const mode = getPipelineMode();
+  const limit = parseInt($('pl-limit').value, 10) || 10;
+
+  if (!keyword) {
+    addLogPL('WARNING', '请输入分析关键词');
+    return;
+  }
+  if (!plats.length) {
+    addLogPL('WARNING', '请至少选择一个平台');
+    return;
+  }
+
+  const btn = $('pl-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  $('results-content-pl').textContent = '分析中...';
+  $('results-note-pl').textContent = '分析中';
+  $('dl-json-pl').disabled = true;
+  $('dl-csv-pl').disabled = true;
+  $('agent-cards').innerHTML = '';
+  $('agent-reports').classList.remove('visible');
+  $('pl-progress').classList.add('visible');
+  $('pl-progress-text').textContent = `正在提交任务 (${plats.length} 平台, ${mode} 模式)...`;
+  lastPipelineResult = null;
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+
+  addLogPL('SYSTEM', `启动 Pipeline: keyword="${keyword}" platforms=${plats.join(',')} mode=${mode}`);
+
+  try {
+    const res = await fetch('/api/pipeline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, platforms: plats, limit, pipeline_mode: mode }),
+    });
+    const data = await res.json();
+    if (data.task_id) {
+      addLogPL('INFO', `任务已提交: ${data.task_id.slice(0,8)}...`);
+      pollPipelineTask(data.task_id);
+    } else if (data.error) {
+      addLogPL('ERROR', `提交失败: ${data.error}`);
+      finishPipeline(null);
+    } else {
+      // Sync response (unlikely for pipeline)
+      handlePipelineResult(data);
+    }
+  } catch(e) {
+    addLogPL('ERROR', `提交任务失败: ${e.message}`);
+    finishPipeline(null);
+  }
+}
+
+async function pollPipelineTask(taskId) {
+  try {
+    const res = await fetch(`/api/pipeline/${taskId}`);
+    const data = await res.json();
+    if (data.error) {
+      addLogPL('ERROR', `任务错误: ${data.error}`);
+      finishPipeline(null);
+      return;
+    }
+    if (data.status === 'completed' || data.status === 'done') {
+      addLogPL('SUCCESS', `Pipeline 完成`);
+      handlePipelineResult(data.result || data);
+      return;
+    }
+    if (data.status === 'failed' || data.status === 'error') {
+      addLogPL('ERROR', `Pipeline 失败: ${data.error || '未知错误'}`);
+      finishPipeline(null);
+      return;
+    }
+    // running
+    const elapsed = data.result ? '' : '';
+    $('pl-progress-text').textContent = `分析中... (status: ${data.status})`;
+    pollTimer = setTimeout(() => pollPipelineTask(taskId), 2000);
+  } catch(e) {
+    addLogPL('ERROR', `轮询失败: ${e.message}`);
+    pollTimer = setTimeout(() => pollPipelineTask(taskId), 2000);
+  }
+}
+
+function handlePipelineResult(result) {
+  if (!result) {
+    finishPipeline(null);
+    return;
+  }
+  lastPipelineResult = result;
+
+  // Show search results
+  const fullResult = result.full_result || result;
+  const finalOutput = fullResult.final_output || [];
+  if (finalOutput.length) {
+    const display = finalOutput.slice(0, 50);
+    $('results-content-pl').textContent = JSON.stringify(display, null, 2);
+    $('results-note-pl').textContent = `${finalOutput.length} 条搜索结果`;
+    $('dl-json-pl').disabled = false;
+    $('dl-csv-pl').disabled = false;
+  } else {
+    $('results-content-pl').textContent = '无搜索结果';
+    $('results-note-pl').textContent = '0 条';
+  }
+
+  // Agent reports
+  const agents = [
+    { key: 'trend_summary', name: 'TrendScout 爆款识别', icon: '🔥' },
+    { key: 'product_summary', name: 'ProductMiner 选品分析', icon: '📦' },
+    { key: 'video_summary', name: 'VideoAnalyst 视频拆解', icon: '🎬' },
+    { key: 'sentiment_summary', name: 'SentimentReader 评论情绪', icon: '💬' },
+    { key: 'copy_summary', name: 'CopyWriter 营销文案', icon: '✍️' },
+    { key: 'remix_summary', name: 'ContentRemixer 内容改写', icon: '🔄' },
+    { key: 'visual_summary', name: 'PicTactic 配图策略', icon: '🖼️' },
+  ];
+
+  const cardsHtml = agents.map(a => {
+    const summary = result[a.key] || '';
+    const fullKey = a.key.replace('_summary', '_report');
+    const fullData = fullResult[fullKey] || result[fullKey] || {};
+    const fullJson = JSON.stringify(fullData, null, 2);
+    if (!summary && Object.keys(fullData).length === 0) return '';
+    return `<div class="agent-card" onclick="this.classList.toggle('expanded')">
+      <h3>${a.icon} ${a.name}</h3>
+      <div class="summary">${escapeHtml(summary || '(点击展开查看完整报告)')}</div>
+      <div class="full"><pre style="white-space:pre-wrap;margin:0;font-size:11px">${escapeHtml(fullJson)}</pre></div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if (cardsHtml) {
+    $('agent-cards').innerHTML = cardsHtml;
+    $('agent-reports').classList.add('visible');
+  }
+
+  addLogPL('SUCCESS', `分析完成: ${finalOutput.length} 条结果, ${$('agent-cards').children.length} 个 Agent 报告`);
+  finishPipeline(result);
+}
+
+function finishPipeline(result) {
+  const btn = $('pl-btn');
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  $('pl-progress').classList.remove('visible');
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  if (!result) {
+    $('results-content-pl').textContent = '分析失败，请查看日志。';
+    $('results-note-pl').textContent = '失败';
+  }
+}
+
+// ─── Download (Pipeline) ────────────────────────
+function downloadJsonPL() {
+  if (!lastPipelineResult) return;
+  const blob = new Blob([JSON.stringify(lastPipelineResult, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'pipeline_result.json');
+}
+function downloadCsvPL() {
+  const fullResult = (lastPipelineResult || {}).full_result || lastPipelineResult || {};
+  const rows = fullResult.final_output || [];
+  if (!rows.length) return;
+  const headers = [...new Set(rows.flatMap(Object.keys))];
+  let csv = headers.map(h => csvEscape(h)).join(',') + '\n';
+  for (const row of rows) {
+    csv += headers.map(h => csvEscape(String(row[h] ?? ''))).join(',') + '\n';
+  }
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, 'pipeline_results.csv');
+}
+
+// ─── Event bindings ─────────────────────────────
+$('platform').addEventListener('change', () => populateTypes($('platform').value));
+$('crawl-btn').addEventListener('click', startCrawl);
+$('pl-btn').addEventListener('click', startPipeline);
+$('log-clear').addEventListener('click', () => { $('log-container').innerHTML = ''; });
+$('log-clear-pl').addEventListener('click', () => { $('log-container-pl').innerHTML = ''; });
+$('dl-json').addEventListener('click', downloadJson);
+$('dl-csv').addEventListener('click', downloadCsv);
+$('dl-json-pl').addEventListener('click', downloadJsonPL);
+$('dl-csv-pl').addEventListener('click', downloadCsvPL);
 
 // ─── Init ──────────────────────────────────────
 loadPlatforms();
