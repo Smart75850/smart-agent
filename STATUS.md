@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎 + Phase 2 LangGraph + P1-P10 全部完成
-⬜ 進行中：無（核心功能全部完成）
-**下一步：API 層 pipeline 端點 + 集成測試 + 全平台實戰驗證**
+✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P13 全部完成
+⬜ 進行中：全平台 full pipeline 實戰驗證
+**下一步：全平台 full pipeline 實戰驗證（抖音/快手/小紅書/知乎 各跑一次）**
 
 ---
 
@@ -88,16 +88,17 @@
 ## 待辦（按優先級）
 
 ### 🔴 P0 — 必須完成
-- [ ] **API 層 pipeline 端點** — `POST /api/pipeline` 暴露 `run_pipeline()` 俾 WebUI 調用
-- [ ] **全平台 full pipeline 實戰驗證** — 5 平台各跑一次 `--pipeline full`，確認無報錯
+- [x] **API 層 pipeline 端點** — `POST /api/pipeline` 暴露 `run_pipeline()` 俾 WebUI 調用
+- [ ] **全平台 full pipeline 實戰驗證** — 5 平台各跑一次 `--pipeline full`，確認無報錯（已測 B站）
 
 ### 🟡 P1 — 應該完成
-- [ ] **Agent 集成測試** — pytest 測試覆蓋 full pipeline 降級模式
-- [ ] **Agent 並行化** — 將線性鏈改為 fan-out（product_miner / video_analyst / sentiment_reader 可並行）
-- [ ] **個別 Agent 失敗不影響整體** — try/catch 包裝 agent node，單個失敗跳過繼續
+- [x] **Agent 集成測試** — pytest 測試覆蓋 full pipeline 降級模式（23 tests）
+- [x] **Agent 並行化** — 兩階段 Send fan-out（Stage1: product/video/sentiment → Stage2: copy/remix/pic）
+- [x] **個別 Agent 失敗不影響整體** — try/catch 包裝 agent node，單個失敗跳過繼續
 
 ### 🟢 P2 — 可以延後
-- [ ] Docker 一鍵部署
+- [x] Docker 一鍵部署（Dockerfile + docker-compose.yml）
+- [x] Windows 一鍵部署（deploy.ps1 + deploy.bat）
 - [ ] 微博、貼吧平台支援
 - [ ] Golang 高性能版本
 
@@ -174,13 +175,14 @@
 
 ---
 
-## Pro 版第三階段（長期）— 全部 ❌ 未開始
+## Pro 版第三階段（長期）
 
 | 模塊 | 狀態 |
 |------|:----:|
+| Docker 一鍵部署 | ✅ |
+| Windows 一鍵部署 | ✅ |
 | Golang 高性能版本 | ❌ |
 | 微博、貼吧平台支援 | ❌ |
-| Docker 一鍵部署 | ❌ |
 
 ---
 
@@ -212,4 +214,4 @@
 
 ---
 
-*最後更新：2026-05-26 — P10 Agent 接入 LangGraph DAG + DeepSeek API 配置完成*
+*最後更新：2026-05-26 — P13 Windows 一鍵部署完成（deploy.ps1 + deploy.bat）*
