@@ -54,6 +54,7 @@ class VideoAnalyst(BaseAgent):
         trend_reports = state.get("trend_reports", {})
         merged = state.get("merged_items", [])
         all_breakdowns = []
+        summaries = []
 
         for p, report_dict in trend_reports.items():
             items = report_dict.get("items", [])
@@ -61,11 +62,14 @@ class VideoAnalyst(BaseAgent):
                 raw_items = [it.get("raw", {}) for it in items if isinstance(it, dict)]
                 report = await self.run(items=raw_items[:5], platform=p)
                 all_breakdowns.extend(report.items)
+                if report.summary:
+                    summaries.append(report.summary)
 
         return {"video_report": asdict(VideoReport(
             platform="all",
             total_analyzed=len(all_breakdowns),
             items=all_breakdowns,
+            summary=" | ".join(summaries) if summaries else "",
         ))}
 
     async def _llm_generate(self, items: list, platform: str) -> VideoReport:

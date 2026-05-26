@@ -56,10 +56,13 @@ _AGENT_FACTORY = {
 async def _agent_node(state: PipelineState, agent_name: str) -> dict:
     """通用 Agent 节点：容错调用，单 Agent 失败不中断链路。"""
     mod_path, cls_name = _AGENT_FACTORY[agent_name]
+    logger.info(f"Agent [{agent_name}] 开始...")
     try:
         mod = __import__(mod_path, fromlist=[cls_name])
         agent_cls = getattr(mod, cls_name)
-        return await agent_cls().as_node(state)
+        result = await agent_cls().as_node(state)
+        logger.info(f"Agent [{agent_name}] 完成")
+        return result
     except Exception as exc:
         logger.warning(f"Agent [{agent_name}] 失败，跳过: {exc}")
         return {}
@@ -83,6 +86,7 @@ def _route_after_merge(state: PipelineState) -> str:
 
 def _fanout_level1(state: PipelineState) -> list[Send]:
     """trend_scout 后并行分叉：选品 + 视频 + 情绪 同时分析。"""
+    logger.info(f"Fanout Level1 → product_miner | video_analyst | sentiment_reader (并行)")
     return [
         Send("product_miner", state),
         Send("video_analyst", state),
@@ -92,6 +96,7 @@ def _fanout_level1(state: PipelineState) -> list[Send]:
 
 def _fanout_level2(state: PipelineState) -> list[Send]:
     """分析完成后并行分叉：文案 + 改写 + 配图 同时生成。"""
+    logger.info(f"Fanout Level2 → copy_writer | content_remixer | pic_tactic (并行)")
     return [
         Send("copy_writer", state),
         Send("content_remixer", state),

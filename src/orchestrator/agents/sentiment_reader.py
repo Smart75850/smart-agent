@@ -65,6 +65,7 @@ class SentimentReader(BaseAgent):
     async def as_node(self, state: dict) -> dict:
         trend_reports = state.get("trend_reports", {})
         all_sentiments = []
+        summaries = []
 
         for p, report_dict in trend_reports.items():
             items = report_dict.get("items", [])
@@ -72,11 +73,14 @@ class SentimentReader(BaseAgent):
                 raw_items = [it.get("raw", {}) for it in items if isinstance(it, dict)]
                 report = await self.run(items=raw_items[:3], platform=p, fetch_comments=False)
                 all_sentiments.extend(report.items)
+                if report.summary:
+                    summaries.append(report.summary)
 
         return {"sentiment_report": asdict(SentimentReport(
             platform="all",
             total_analyzed=len(all_sentiments),
             items=all_sentiments,
+            summary=" | ".join(summaries) if summaries else "",
         ))}
 
     # ── internal ──────────────────────────────────────────────

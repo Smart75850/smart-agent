@@ -60,6 +60,7 @@ class ProductMiner(BaseAgent):
         trend_reports = state.get("trend_reports", {})
         merged = state.get("merged_items", [])
         all_products = []
+        summaries = []
 
         for platform, report_dict in trend_reports.items():
             items = report_dict.get("items", [])
@@ -67,11 +68,14 @@ class ProductMiner(BaseAgent):
                 raw_items = [it.get("raw", {}) for it in items if isinstance(it, dict)]
                 report = await self.run(items=raw_items or merged, keyword=state.get("keyword", ""))
                 all_products.extend(report.items)
+                if report.summary:
+                    summaries.append(report.summary)
 
         return {"product_report": asdict(ProductReport(
             keyword=state.get("keyword", ""),
             total_products=len(all_products),
             items=all_products,
+            summary=" | ".join(summaries) if summaries else "",
         ))}
 
     # ── internal ──────────────────────────────────────────────
