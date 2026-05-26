@@ -102,7 +102,7 @@
 - [x] Docker 一鍵部署（Dockerfile + docker-compose.yml）
 - [x] Windows 一鍵部署（deploy.ps1 + deploy.bat）
 - [ ] 微博、貼吧平台支援
-- [ ] Golang 高性能版本
+- [x] Golang 高性能版本
 
 ---
 
@@ -183,7 +183,7 @@
 |------|:----:|
 | Docker 一鍵部署 | ✅ |
 | Windows 一鍵部署 | ✅ |
-| Golang 高性能版本 | 🔄 進行中（方案A：Go殼+Python腦） |
+| Golang 高性能版本 | ✅ Go殼+Python腦（sidecar_server.py + Go CLI + Go API Server） |
 | 微博、貼吧平台支援 | ❌ |
 
 ---

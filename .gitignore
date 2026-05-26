@@ -54,3 +54,7 @@ quick_test_*.py
 # Credentials (keep example)
 config/accounts.json
 !config/accounts.example.json
+
+# Go
+smart-agent-go.exe
+go/sidecar.log
