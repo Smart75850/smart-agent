@@ -1,0 +1,42 @@
+# Environment (contains secrets)
+.env
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+*.egg-info
+
+# IDE
+.vscode
+.idea
+
+# Output data (mount as volume)
+output/
+downloads/
+browser_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+
+# Docs
+*.md
+!requirements.txt
+
+# Virtual env
+venv/
+.venv/
+
+# Test artifacts
+*.log
