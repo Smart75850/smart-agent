@@ -170,8 +170,60 @@ def limit_results(data, n):
     return data
 
 
+
+async def _run_scheduled(schedule: str, func, *args, **kwargs):
+    """定時執行封裝。支援 cron 表達式。"""
+    import time
+    from datetime import datetime
+    try:
+        from croniter import croniter
+        cron = croniter(schedule, datetime.now())
+        next_run = cron.get_next(datetime)
+        wait = (next_run - datetime.now()).total_seconds()
+        logger.info(f"定時任務: next run at {next_run}")
+        await asyncio.sleep(max(0, wait))
+    except ImportError:
+        # 無 croniter 時用簡單 interval (支援 "every-Nh" 格式)
+        if schedule.startswith("every-"):
+            parts = schedule.replace("every-", "").split("h")
+            hours = float(parts[0]) if parts else 1
+            logger.info(f"定時任務: every {hours}h")
+            await asyncio.sleep(hours * 3600)
+        else:
+            logger.error("需要安裝 croniter: pip install croniter")
+            return
+    await func(*args, **kwargs)
+
+
+async def _aggregate_wrapper(args):
+    """aggregate 定時包裝。"""
+    from src.orchestrator import run_pipeline
+    result = await run_pipeline(
+        keyword=args.keyword or "",
+        limit=args.limit or 30,
+        llm_filter=args.llm_filter,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
 async def main():
     args = parse_args()
+
+    # ── list-platforms ────────────────────────────────────
+    if args.list_platforms:
+        platforms = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
+        print("支援平台:")
+        for p in platforms:
+            print(f"  {p}")
+        return
+
+    # ── dry-run ──────────────────────────────────────────
+    if args.dry_run:
+        tasks = build_tasks(args)
+        print(f"執行計劃 ({len(tasks)} 個任務):")
+        for plat, action, _, _ in tasks:
+            print(f"  [{plat}] {action}")
+        return
+
     # ── aggregate + langgraph 快速路徑 ───────────────────────
     if args.type == "aggregate" and args.engine == "langgraph":
         if args.stream:
@@ -192,6 +244,12 @@ async def main():
             print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
+
+    # ── schedule ──────────────────────────────────────────
+    if args.schedule:
+        logger.info(f"啟動定時模式: {args.schedule}")
+        await _run_scheduled(args.schedule, _aggregate_wrapper, args)
+        return
 
     # ── engine ───────────────────────────────────────────────
     os.environ["BROWSER_ENGINE"] = args.engine
