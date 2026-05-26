@@ -141,7 +141,7 @@ class ContentRemixer(BaseAgent):
         )
 
         try:
-            content = await self._call_llm(prompt, temperature=0.5)
+            content = await self._call_llm(prompt, temperature=0.5, json_mode=True)
             parsed = self._parse_json(content)
 
             insights = [

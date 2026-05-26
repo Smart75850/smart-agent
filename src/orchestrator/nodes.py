@@ -137,11 +137,20 @@ async def merge_results(state: PipelineState) -> dict[str, Any]:
     return {"merged_items": all_items}
 
 
-async def _call_llm(prompt: str) -> str:
-    """🟡 修复: 统一的 LLM 调用（被批量调用复用）。"""
+async def _call_llm(prompt: str, json_mode: bool = False) -> str:
+    """统一的 LLM 调用（被批量调用复用）。"""
     api_key = settings.LLM_API_KEY
     api_url = settings.LLM_API_URL
     model = settings.LLM_MODEL
+
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0,
+        "max_tokens": 200,
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -150,12 +159,7 @@ async def _call_llm(prompt: str) -> str:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0,
-                "max_tokens": 200,
-            },
+            json=body,
         )
         data = resp.json()
         return data["choices"][0]["message"]["content"]
@@ -189,7 +193,7 @@ async def llm_filter(state: PipelineState) -> dict[str, Any]:
     )
 
     try:
-        result = await _call_llm(prompt)
+        result = await _call_llm(prompt, json_mode=True)
         relevance = json.loads(result)
         if isinstance(relevance, list) and len(relevance) == len(merged):
             filtered = [item for item, rel in zip(merged, relevance) if rel]
@@ -231,7 +235,7 @@ async def llm_score(state: PipelineState) -> dict[str, Any]:
     )
 
     try:
-        result = await _call_llm(prompt)
+        result = await _call_llm(prompt, json_mode=True)
         scores = json.loads(result)
         if isinstance(scores, list) and len(scores) == len(items):
             scored = [{**item, "score": int(s)} for item, s in zip(items, scores)]

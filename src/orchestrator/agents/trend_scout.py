@@ -118,7 +118,7 @@ class TrendScout(BaseAgent):
         )
 
         try:
-            content = await self._call_llm(prompt, temperature=0.3)
+            content = await self._call_llm(prompt, temperature=0.3, json_mode=True)
             parsed = self._parse_json(content)
 
             trend_items = []

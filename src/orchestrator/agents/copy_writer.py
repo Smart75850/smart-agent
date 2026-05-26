@@ -99,7 +99,7 @@ class CopyWriter(BaseAgent):
         )
 
         try:
-            content = await self._call_llm(prompt, temperature=0.7)
+            content = await self._call_llm(prompt, temperature=0.7, json_mode=True)
             parsed = self._parse_json(content)
 
             variants = [
