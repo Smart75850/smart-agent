@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-已完成：Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + 5 個專用 Agent
-進行中：附加模塊（P6-P9）
-下一步：ContentRemixAgent（數據分析/總結/改寫）
+✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P5 Agent 已完成
+⬜ 進行中：Camoufox MCP 整合 + 附加模塊（P6-P9）
+下一步：整合 Camoufox MCP 做差異化數據層
 
 ---
 
@@ -65,15 +65,34 @@
 - 獨立 `run()` 直接調用 + `as_node()` LangGraph 節點集成
 - Dataclass 類型化輸出 + `asdict()` 序列化
 
-### ❌ 未開始 — 按優先級排列
+### ❌ 未開始 — 按優先級排列（經芭芭拉審閱調整）
+
+> 註：P1-P5 已完成，以下係剩餘任務。**Camoufox MCP 整合係核心差異化** — 冇 Camoufox 就同 MediaCrawler 冇分別。
 
 ```
-第四優先（附加模塊）
-  P6 — ContentRemixAgent    數據分析/總結/改寫
-  P7 — PicTacticAgent       智能配圖生成
-  P8 — Video/Image Downloader 批量下載
-  P9 — CookieBridge         Chrome Extension
+第三優先（差異化數據層 — 🟡 提前）
+  P5 — Camoufox MCP 整合        將底層從 Playwright CDP 遷移到 Camoufox MCP
+                                 （反檢測 + 差異化優勢，完成哂先做 P6-P9）
+                                 
+
+第四優先（商業化關鍵 — 🟡 提前）
+  P6 — CookieBridge              Chrome Extension 同步登錄態
+                                 （要賣 Pro 版俾人，呢個係 UX 痛點）
+
+第五優先（附加模塊）
+  P7 — ContentRemixAgent         數據分析/總結/改寫
+  P8 — PicTacticAgent            智能配圖生成
+  P9 — Video/Image Downloader    批量下載
 ```
+
+---
+
+## 差異化定位
+
+**Smart Agent Pro 嘅核心競爭力：**
+1. **Camoufox MCP 反檢測數據層** — 唔係 Playwright CDP 咁簡單
+2. **電商爆款分析場景** — 唔係通用爬蟲，係針對帶貨/選品嘅深度分析
+3. **LangGraph 智能代理編排** — 自動化商業決策流程
 
 ---
 
@@ -87,21 +106,9 @@
 
 ---
 
-## 目錄結構（第日 split 做 4 個 repo）
+## 設計備註
 
-目前一個 repo，但 module 邊界已劃清，第日 split 直接搬 folder 就得：
-
-```
-smart-agent/
-├── src/
-│   ├── core/            → Repo 1: smart-agent-core（引擎底層）
-│   ├── platforms/       → Repo 2: smart-agent-platforms（平台適配器）
-│   ├── agent/           → Repo 3: smart-agent-agent（AI 代理，最值錢）
-│   ├── api/             → Repo 4: smart-agent-web（WebUI + MCP）
-│   └── utils/
-├── main.py
-└── config/
-```
+⏸️ 拆多個 repo 嘅計劃 — 等 Phase 2 全部做完、代碼穩定咗先考慮。
 
 ---
 
