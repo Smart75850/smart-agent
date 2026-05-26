@@ -1,4 +1,4 @@
-# Smart Agent — 實時狀態
+﻿# Smart Agent — 實時狀態
 
 > **呢個係三個工具（VS Code Claude / Terminal Claude Code / Codex）共享嘅單一事實來源。**
 > **開工第一句就話「睇 STATUS.md」，唔好靠記憶。**
@@ -183,11 +183,157 @@
 |------|:----:|
 | Docker 一鍵部署 | ✅ |
 | Windows 一鍵部署 | ✅ |
-| Golang 高性能版本 | ❌ |
+| Golang 高性能版本 | 🔄 進行中（方案A：Go殼+Python腦） |
 | 微博、貼吧平台支援 | ❌ |
 
 ---
 
+
+---
+
+## Go 高性能版本方案（P15）— 🔄 進行中
+
+### 架構：Go 主進程 + Python 瀏覽器 Sidecar
+
+```
+Go Binary (15MB, 單文件部署)
+├── HTTP API Server (net/http)
+├── DAG Orchestrator (goroutine fan-out)
+├── Sidecar Client (HTTP → Python :18500)
+│
+Python Sidecar (現有代碼 100% 復用)
+├── 7 Agents (不改)
+├── BrowserService (Playwright/Camoufox/CDP)
+└── 5 Platform Adapters (不改)
+```
+
+### 路線 A（當前）：Go 做殼，Python 做腦
+
+| 階段 | 內容 | 預估 |
+|------|------|:--:|
+| 1 | sidecar_server.py（~60行 FastAPI） | 1天 |
+| 2 | Go HTTP API + 路由 | 1天 |
+| 3 | Go DAG 編排（goroutine fan-out） | 1天 |
+| 4 | Go CLI + Sidecar 客戶端 | 1天 |
+| 5 | 構建腳本 + 打包 | 1天 |
+| **合計** | | **5天** |
+
+### 性能對比（預期）
+
+| 指標 | Python (asyncio) | Go (goroutine) |
+|------|:--:|:--:|
+| 5 平台並行搜索 | ~15s | ~5s |
+| 7 Agent LLM 調用 | ~27s | ~9s |
+| 內存佔用 | ~300MB | ~50MB |
+| 部署體積 | ~500MB (venv) | ~15MB (單二進制) |
+| 冷啟動 | ~3s | ~0.1s |
+
+### Go 版對獲客的質變
+
+| 維度 | Python 版 | Go 版 |
+|------|------|------|
+| 目標市場 | 500萬開發者 | **5000萬**電商從業者 |
+| 分發渠道 | 1個（GitHub） | **10+個**（下載站/MS Store/百度網盤/微信群） |
+| 用戶上手 | 30分鐘裝環境 | **3秒**雙擊exe |
+| 付費轉化 | ~0% | ~5% |
+| 獲客引擎穩定性 | 3天OOM | **3個月不重啟** |
+
+---
+
+## 獲客自動化引擎方案 V3
+
+> 等 Go 版完成後全面鋪開。Go 版做完之前只做 Python 版內容矩陣預熱。
+
+### 自動獲客流水線
+
+```
+07:00 LangGraph 自動搜索 → 5平台挖目標用戶痛點
+08:00 LLM 過濾+打分 → 篩出高意向用戶
+09:00 CopyWriter 生成文案 → ContentRemixer 改寫
+10:00 Camoufox 自動發布 → 知乎/B站/小紅書/掘金
+全天  SentimentReader 監控 → 評論區自動回覆
+意向  自動私信 → 加微信 → CookieBridge 免費版
+付費  Stripe webhook → 自動發 license key
+```
+
+### 三層獲客漏斗
+
+| 層級 | 渠道 | 方式 | 轉化目標 |
+|------|------|------|------|
+| 頂層 | GitHub/下載站/MS Store | 免費版下載 | 日200下載 |
+| 中層 | B站/知乎/小紅書/掘金 | 自動發內容 | 日50進群 |
+| 底層 | 微信/郵件 | 自動跟進 | 日3付費 |
+
+### 內容矩陣自動化
+
+| 平台 | 內容類型 | 生成方式 | 頻率 |
+|------|------|------|:--:|
+| B站 | 教程視頻 | VideoAnalyst 腳本 + AI配音 | 3/週 |
+| 知乎 | 深度回答 | CopyWriter + ContentRemixer | 5/週 |
+| 小紅書 | 種草帖 | CopyWriter 清單體 | 5/週 |
+| 掘金/CSDN | 技術文章 | ContentRemixer 改寫 | 2/週 |
+| GitHub | README更新 | 自動 | 每次Release |
+
+### 分發渠道（Go版上線後）
+
+| 渠道 | 類型 | 預估流量 |
+|------|:--:|:--:|
+| GitHub Releases | 免費 | ⭐⭐⭐⭐ |
+| 華軍軟件園/太平洋下載 | 免費 | ⭐⭐⭐ |
+| 百度網盤 | 免費 | ⭐⭐⭐ |
+| Microsoft Store | 免費 | ⭐⭐ |
+| 微信群/QQ群直接發 | 免費 | ⭐⭐⭐ |
+| 公眾號「回覆下載」 | 免費 | ⭐⭐⭐ |
+
+### 付費產品線
+
+| 產品 | 定價 | 目標客戶 |
+|------|:--:|------|
+| CookieBridge 獨立版 | ¥9.9/月 | 需要登錄態同步嘅用戶 |
+| Smart Agent Free | 免費 | 所有用戶（日3次搜索） |
+| Smart Agent Pro | ¥99/月 | 電商運營/主播 |
+| 獲客自動化引擎 | ¥199/月 | 中小企業主 |
+| AI Agent 實戰課程 | ¥299 | 開發者/技術運營 |
+
+### 收入預估（Go版上線3個月後）
+
+| 產品 | 月付費用戶 | 月收入 |
+|------|:--:|:--:|
+| CookieBridge | 50 | ¥495 |
+| Smart Agent Pro | 30 | ¥2,970 |
+| 獲客引擎 | 10 | ¥1,990 |
+| **月經常性收入** | | **¥5,455** |
+| 課程（一次性） | 20單/月 | ¥5,980 |
+| **月總收入** | | **~¥11,400** |
+
+---
+
+## 包裝方案：一裝即用
+
+### CookieBridge 獨立包裝
+
+```
+cookie-bridge-standalone/
+├── install.bat          # 一鍵安裝
+├── start.bat            # 一鍵啟動
+├── server.py            # 核心服務
+├── extension/           # Chrome 擴展
+├── 使用說明.md           # 圖文教程
+└── license.key          # 付費版授權
+```
+
+### Smart Agent Pro 包裝（Go版）
+
+```
+smart-agent-pro/
+├── smart-agent.exe      # 主程式（15MB）
+├── sidecar/             # Python 瀏覽器服務（可選）
+├── config.env           # 配置文件
+├── 使用說明.md
+└── 示範視頻.mp4
+```
+
+分發格式：`smart-agent-pro-v1.0.0.zip`（~50MB 含 sidecar）
 ## 設計備註
 
 ⏸️ 拆多個 repo 嘅計劃 — 等 Phase 2 全部做完、代碼穩定咗先考慮。
@@ -217,3 +363,4 @@
 ---
 
 *最後更新：2026-05-26 — P14 Docker 一鍵部署腳本完成（deploy-docker.ps1）*
+
