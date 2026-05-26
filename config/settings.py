@@ -1,5 +1,15 @@
 from dataclasses import dataclass
 from os import environ
+from pathlib import Path
+
+# 自动加载項目根目錄的 .env
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path)
+except ImportError:
+    pass
 
 
 @dataclass

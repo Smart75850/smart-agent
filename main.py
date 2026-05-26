@@ -78,6 +78,10 @@ def parse_args(argv=None):
         help="啟用 LLM 過濾打分（僅 --engine=langgraph 時有效）",
     )
     parser.add_argument(
+        "--pipeline", default="simple", choices=["simple", "full"],
+        help="管道模式: simple=搜索合并, full=完整Agent分析链 (仅 --type=aggregate 时有效)",
+    )
+    parser.add_argument(
         "--stream", action="store_true",
         help="啟用 SSE 流式輸出（僅 --engine=langgraph 時有效）",
     )
@@ -206,6 +210,7 @@ async def _aggregate_wrapper(args):
         keyword=args.keyword or "",
         limit=args.limit or 30,
         llm_filter=args.llm_filter,
+        pipeline_mode=args.pipeline,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
@@ -265,6 +270,7 @@ async def main():
                 keyword=args.keyword or "",
                 limit=args.limit or 30,
                 llm_filter=args.llm_filter,
+                pipeline_mode=args.pipeline,
             ):
                 print(json.dumps(event, ensure_ascii=False))
         else:
@@ -273,6 +279,7 @@ async def main():
                 keyword=args.keyword or "",
                 limit=args.limit or 30,
                 llm_filter=args.llm_filter,
+                pipeline_mode=args.pipeline,
             )
             print(json.dumps(result, ensure_ascii=False, indent=2))
         return

@@ -16,9 +16,7 @@ import asyncio
 import json
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 
@@ -42,13 +40,8 @@ class TrendReport:
     summary: str = ""
 
 
-class TrendScout:
+class TrendScout(BaseAgent):
     """爆款趨勢分析 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
     # ── public API ────────────────────────────────────────────
 
@@ -64,7 +57,7 @@ class TrendScout:
             logger.warning(f"TrendScout: [{platform}] 無數據，跳過分析")
             return TrendReport(platform=platform, keyword=keyword, total_candidates=0)
 
-        report = await self._analyze(platform, keyword, items)
+        report = await self._llm_generate(platform, keyword, items)
         logger.info(
             f"TrendScout: [{platform}] {report.total_candidates} 個爆款候選"
         )
@@ -74,16 +67,11 @@ class TrendScout:
         """LangGraph 節點接口。"""
         keyword = state.get("keyword", "")
         platforms = state.get("platforms", ["bilibili"])
-        merged = state.get("merged_items", [])
 
         all_reports = {}
         for p in platforms:
-            items = [it for it in merged if it.get("platform") == p]
-            if not items:
-                items = await self._collect(p, keyword, limit=state.get("limit", 20))
-            if items:
-                report = await self._analyze(p, keyword, items)
-                all_reports[p] = asdict(report)
+            report = await self.run(platform=p, keyword=keyword, limit=state.get("limit", 20))
+            all_reports[p] = asdict(report)
 
         return {"trend_reports": all_reports}
 
@@ -106,13 +94,13 @@ class TrendScout:
         from src.aggregator import _normalize
         return [_normalize(item, platform) for item in (raw if isinstance(raw, list) else [])]
 
-    async def _analyze(
+    async def _llm_generate(
         self, platform: str, keyword: str, items: list[dict]
     ) -> TrendReport:
         """DeepSeek LLM 分析爆款趨勢。"""
         if not self._api_key:
             logger.info("DeepSeek API key 未設定，使用純熱度排序")
-            return self._fallback_sort(platform, keyword, items)
+            return self._fallback(platform, keyword, items)
 
         items_text = "\n".join(
             f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')} | 作者:{it.get('author','')}"
@@ -130,52 +118,37 @@ class TrendScout:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.3,
-                        "max_tokens": 2000,
-                    },
-                )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+            content = await self._call_llm(prompt, temperature=0.3)
+            parsed = self._parse_json(content)
 
-                trend_items = []
-                for ti in parsed.get("items", []):
-                    idx = ti.get("index", 0)
-                    src = items[idx] if 0 <= idx < len(items) else {}
-                    trend_items.append(TrendItem(
-                        title=src.get("title", ""),
-                        platform=platform,
-                        viral_score=int(ti.get("viral_score", 50)),
-                        trend_reason=ti.get("trend_reason", ""),
-                        category=ti.get("category", ""),
-                        engagement={"plays": src.get("plays", "0"), "likes": src.get("likes", "0")},
-                        raw=src,
-                    ))
-
-                trend_items.sort(key=lambda x: x.viral_score, reverse=True)
-                return TrendReport(
+            trend_items = []
+            for ti in parsed.get("items", []):
+                idx = ti.get("index", 0)
+                src = items[idx] if 0 <= idx < len(items) else {}
+                trend_items.append(TrendItem(
+                    title=src.get("title", ""),
                     platform=platform,
-                    keyword=keyword or "hot",
-                    total_candidates=len(trend_items),
-                    items=trend_items,
-                    summary=parsed.get("summary", ""),
-                )
+                    viral_score=int(ti.get("viral_score", 50)),
+                    trend_reason=ti.get("trend_reason", ""),
+                    category=ti.get("category", ""),
+                    engagement={"plays": src.get("plays", "0"), "likes": src.get("likes", "0")},
+                    raw=src,
+                ))
+
+            trend_items.sort(key=lambda x: x.viral_score, reverse=True)
+            return TrendReport(
+                platform=platform,
+                keyword=keyword or "hot",
+                total_candidates=len(trend_items),
+                items=trend_items,
+                summary=parsed.get("summary", ""),
+            )
 
         except Exception as exc:
             logger.warning(f"TrendScout LLM 失敗，降級為熱度排序: {exc}")
-            return self._fallback_sort(platform, keyword, items)
+            return self._fallback(platform, keyword, items)
 
-    def _fallback_sort(self, platform: str, keyword: str, items: list[dict]) -> TrendReport:
+    def _fallback(self, platform: str, keyword: str, items: list[dict]) -> TrendReport:
         """降級模式: 純熱度排序。"""
         def _parse_count(value) -> int:
             s = str(value or 0).replace(",", "").strip()

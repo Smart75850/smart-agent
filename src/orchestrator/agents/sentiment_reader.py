@@ -13,9 +13,7 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 
@@ -40,13 +38,8 @@ class SentimentReport:
     summary: str = ""
 
 
-class SentimentReader:
+class SentimentReader(BaseAgent):
     """評論情緒分析 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
     async def run(self, items: list, platform: str = "", fetch_comments: bool = True) -> SentimentReport:
         """主入口。
@@ -67,7 +60,7 @@ class SentimentReader:
         if not self._api_key:
             return self._fallback(items, platform, comments_data)
 
-        return await self._llm_analyze(items, platform, comments_data)
+        return await self._llm_generate(items, platform, comments_data)
 
     async def as_node(self, state: dict) -> dict:
         trend_reports = state.get("trend_reports", {})
@@ -114,7 +107,7 @@ class SentimentReader:
             logger.debug(f"SentimentReader 評論拉取跳過: {exc}")
             return {}
 
-    async def _llm_analyze(
+    async def _llm_generate(
         self, items: list, platform: str, comments_data: dict
     ) -> SentimentReport:
         items_text = "\n".join(
@@ -135,46 +128,31 @@ class SentimentReader:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.3,
-                        "max_tokens": 2000,
-                    },
-                )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+            content = await self._call_llm(prompt, temperature=0.3)
+            parsed = self._parse_json(content)
 
-                sentiment_items = []
-                for s in parsed.get("items", []):
-                    idx = s.get("index", 0)
-                    src = items[idx] if 0 <= idx < len(items) else {}
-                    sentiment_items.append(SentimentItem(
-                        title=src.get("title", ""),
-                        platform=platform,
-                        sentiment=s.get("sentiment", "neutral"),
-                        positive_pct=int(s.get("positive_pct", 0)),
-                        neutral_pct=int(s.get("neutral_pct", 0)),
-                        negative_pct=int(s.get("negative_pct", 0)),
-                        key_insights=s.get("key_insights", ""),
-                        audience_reaction=s.get("audience_reaction", ""),
-                    ))
-
-                return SentimentReport(
+            sentiment_items = []
+            for s in parsed.get("items", []):
+                idx = s.get("index", 0)
+                src = items[idx] if 0 <= idx < len(items) else {}
+                sentiment_items.append(SentimentItem(
+                    title=src.get("title", ""),
                     platform=platform,
-                    total_analyzed=len(sentiment_items),
-                    items=sentiment_items,
-                    overall_sentiment=parsed.get("overall_sentiment", ""),
-                    summary=parsed.get("summary", ""),
-                )
+                    sentiment=s.get("sentiment", "neutral"),
+                    positive_pct=int(s.get("positive_pct", 0)),
+                    neutral_pct=int(s.get("neutral_pct", 0)),
+                    negative_pct=int(s.get("negative_pct", 0)),
+                    key_insights=s.get("key_insights", ""),
+                    audience_reaction=s.get("audience_reaction", ""),
+                ))
+
+            return SentimentReport(
+                platform=platform,
+                total_analyzed=len(sentiment_items),
+                items=sentiment_items,
+                overall_sentiment=parsed.get("overall_sentiment", ""),
+                summary=parsed.get("summary", ""),
+            )
         except Exception as exc:
             logger.warning(f"SentimentReader LLM 失敗: {exc}")
             return self._fallback(items, platform, comments_data)

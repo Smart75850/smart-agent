@@ -13,18 +13,16 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 
 @dataclass
 class CopyVariant:
-    variant: str = ""             # short / medium / long / headline
-    text: str = ""                # 文案內容
-    tone: str = ""                # 語氣風格
-    target_platform: str = ""     # 適用平台 (douyin/xiaohongshu/etc.)
+    variant: str = ""
+    text: str = ""
+    tone: str = ""
+    target_platform: str = ""
 
 
 @dataclass
@@ -35,13 +33,8 @@ class CopyReport:
     summary: str = ""
 
 
-class CopyWriter:
+class CopyWriter(BaseAgent):
     """營銷文案生成 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
     async def run(
         self,
@@ -50,14 +43,6 @@ class CopyWriter:
         products: list = None,
         video_breakdowns: list = None,
     ) -> CopyReport:
-        """主入口。
-
-        Args:
-            keyword: 核心關鍵詞
-            trend_items: TrendScout 結果 (TrendItem list 或 dict list)
-            products: ProductMiner 結果 (ProductItem list 或 dict list)
-            video_breakdowns: VideoAnalyst 結果 (VideoBreakdown list 或 dict list)
-        """
         if not self._api_key:
             return self._fallback(keyword or "通用")
 
@@ -70,8 +55,6 @@ class CopyWriter:
 
     async def as_node(self, state: dict) -> dict:
         keyword = state.get("keyword", "")
-
-        # 從 state 提取上游結果
         trend_data = state.get("trend_reports", {})
         product_data = state.get("product_report", {})
         video_data = state.get("video_report", {})
@@ -94,7 +77,6 @@ class CopyWriter:
         products: list,
         video_breakdowns: list,
     ) -> CopyReport:
-        # 構建上下文
         context_parts = [f"核心關鍵詞: {keyword or '爆款內容'}"]
         if trend_items:
             titles = [it.get("title", it.title if hasattr(it, 'title') else "")[:40] for it in trend_items[:5]]
@@ -117,40 +99,25 @@ class CopyWriter:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.7,
-                        "max_tokens": 2000,
-                    },
-                )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+            content = await self._call_llm(prompt, temperature=0.7)
+            parsed = self._parse_json(content)
 
-                variants = [
-                    CopyVariant(
-                        variant=v.get("variant", ""),
-                        text=v.get("text", ""),
-                        tone=v.get("tone", ""),
-                        target_platform=v.get("target_platform", ""),
-                    )
-                    for v in parsed.get("variants", [])
-                ]
-
-                return CopyReport(
-                    keyword=keyword or "通用",
-                    total_variants=len(variants),
-                    variants=variants,
-                    summary=parsed.get("summary", ""),
+            variants = [
+                CopyVariant(
+                    variant=v.get("variant", ""),
+                    text=v.get("text", ""),
+                    tone=v.get("tone", ""),
+                    target_platform=v.get("target_platform", ""),
                 )
+                for v in parsed.get("variants", [])
+            ]
+
+            return CopyReport(
+                keyword=keyword or "通用",
+                total_variants=len(variants),
+                variants=variants,
+                summary=parsed.get("summary", ""),
+            )
         except Exception as exc:
             logger.warning(f"CopyWriter LLM 失敗: {exc}")
             return self._fallback(keyword)

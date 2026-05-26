@@ -5,7 +5,6 @@ import uuid
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional
 
 from src.utils.browser_service import browser
 from src.utils.logger import logger

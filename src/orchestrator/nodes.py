@@ -245,7 +245,7 @@ async def llm_score(state: PipelineState) -> dict[str, Any]:
 
 
 async def format_output(state: PipelineState) -> dict[str, Any]:
-    """选择最终输出字段，移除 raw。"""
+    """选择最终输出字段。full 模式附加 Agent 报告。"""
     source = (
         state.get("scored_items")
         or state.get("filtered_items")
@@ -267,5 +267,16 @@ async def format_output(state: PipelineState) -> dict[str, Any]:
             out["score"] = item["score"]
         final.append(out)
 
+    result: dict[str, Any] = {"final_output": final}
+
+    if state.get("pipeline_mode") == "full":
+        for key in (
+            "trend_reports", "product_report", "video_report",
+            "sentiment_report", "copy_report", "remix_report", "visual_report",
+        ):
+            val = state.get(key)
+            if val:
+                result[key] = val
+
     logger.info(f"format_output: {len(final)} 条")
-    return {"final_output": final}
+    return result

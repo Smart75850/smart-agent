@@ -15,9 +15,7 @@ Mode:
 import json
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 # ── 平台降级模板 ──────────────────────────────────────────────
@@ -91,13 +89,8 @@ class VisualReport:
     summary: str = ""
 
 
-class PicTactic:
+class PicTactic(BaseAgent):
     """智能配图策略 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
     async def run(
         self,
@@ -201,46 +194,31 @@ class PicTactic:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.7,
-                        "max_tokens": 2000,
-                    },
-                )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+            content = await self._call_llm(prompt, temperature=0.7)
+            parsed = self._parse_json(content)
 
-                tactics = [
-                    VisualTactic(
-                        scene=t.get("scene", ""),
-                        target_platform=t.get("target_platform", ""),
-                        style=t.get("style", ""),
-                        color_palette=t.get("color_palette", ""),
-                        composition=t.get("composition", ""),
-                        prompt=t.get("prompt", ""),
-                        rationale=t.get("rationale", ""),
-                    )
-                    for t in parsed.get("tactics", [])
-                ]
-
-                return VisualReport(
-                    topic=topic or "通用",
-                    mode=mode,
-                    platform=platform,
-                    total_tactics=len(tactics),
-                    tactics=tactics,
-                    visual_trend=parsed.get("visual_trend", ""),
-                    summary=parsed.get("summary", ""),
+            tactics = [
+                VisualTactic(
+                    scene=t.get("scene", ""),
+                    target_platform=t.get("target_platform", ""),
+                    style=t.get("style", ""),
+                    color_palette=t.get("color_palette", ""),
+                    composition=t.get("composition", ""),
+                    prompt=t.get("prompt", ""),
+                    rationale=t.get("rationale", ""),
                 )
+                for t in parsed.get("tactics", [])
+            ]
+
+            return VisualReport(
+                topic=topic or "通用",
+                mode=mode,
+                platform=platform,
+                total_tactics=len(tactics),
+                tactics=tactics,
+                visual_trend=parsed.get("visual_trend", ""),
+                summary=parsed.get("summary", ""),
+            )
         except Exception as exc:
             logger.warning(f"PicTactic LLM 失败: {exc}")
             return self._fallback(mode, topic, platform, trend_items, products)

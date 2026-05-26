@@ -13,9 +13,7 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 
@@ -40,13 +38,8 @@ class VideoReport:
     summary: str = ""
 
 
-class VideoAnalyst:
+class VideoAnalyst(BaseAgent):
     """爆款視頻結構分析 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
     async def run(self, items: list, platform: str = "") -> VideoReport:
         if not items:
@@ -55,7 +48,7 @@ class VideoAnalyst:
         if not self._api_key:
             return self._fallback(items, platform)
 
-        return await self._llm_analyze(items, platform)
+        return await self._llm_generate(items, platform)
 
     async def as_node(self, state: dict) -> dict:
         trend_reports = state.get("trend_reports", {})
@@ -75,7 +68,7 @@ class VideoAnalyst:
             items=all_breakdowns,
         ))}
 
-    async def _llm_analyze(self, items: list, platform: str) -> VideoReport:
+    async def _llm_generate(self, items: list, platform: str) -> VideoReport:
         items_text = "\n".join(
             f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')}"
             for i, it in enumerate(items[:10])
@@ -93,47 +86,32 @@ class VideoAnalyst:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.3,
-                        "max_tokens": 2000,
-                    },
-                )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+            content = await self._call_llm(prompt, temperature=0.3)
+            parsed = self._parse_json(content)
 
-                breakdowns = []
-                for b in parsed.get("breakdowns", []):
-                    idx = b.get("index", 0)
-                    src = items[idx] if 0 <= idx < len(items) else {}
-                    breakdowns.append(VideoBreakdown(
-                        title=src.get("title", ""),
-                        platform=platform,
-                        hook_type=b.get("hook_type", ""),
-                        hook_effectiveness=int(b.get("hook_effectiveness", 50)),
-                        pacing=b.get("pacing", ""),
-                        structure_template=b.get("structure_template", ""),
-                        conversion_point=b.get("conversion_point", ""),
-                        viral_mechanism=b.get("viral_mechanism", ""),
-                        learnings=b.get("learnings", ""),
-                    ))
-
-                breakdowns.sort(key=lambda x: x.hook_effectiveness, reverse=True)
-                return VideoReport(
+            breakdowns = []
+            for b in parsed.get("breakdowns", []):
+                idx = b.get("index", 0)
+                src = items[idx] if 0 <= idx < len(items) else {}
+                breakdowns.append(VideoBreakdown(
+                    title=src.get("title", ""),
                     platform=platform,
-                    total_analyzed=len(breakdowns),
-                    items=breakdowns,
-                    summary=parsed.get("summary", ""),
-                )
+                    hook_type=b.get("hook_type", ""),
+                    hook_effectiveness=int(b.get("hook_effectiveness", 50)),
+                    pacing=b.get("pacing", ""),
+                    structure_template=b.get("structure_template", ""),
+                    conversion_point=b.get("conversion_point", ""),
+                    viral_mechanism=b.get("viral_mechanism", ""),
+                    learnings=b.get("learnings", ""),
+                ))
+
+            breakdowns.sort(key=lambda x: x.hook_effectiveness, reverse=True)
+            return VideoReport(
+                platform=platform,
+                total_analyzed=len(breakdowns),
+                items=breakdowns,
+                summary=parsed.get("summary", ""),
+            )
         except Exception as exc:
             logger.warning(f"VideoAnalyst LLM 失敗: {exc}")
             return self._fallback(items, platform)

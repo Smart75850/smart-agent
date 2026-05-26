@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P8 Agent + Camoufox + CookieBridge
-⬜ 進行中：附加模塊（全部完成）
-下一步：系統整合測試 + CLI 完善
+✅ Phase 1 引擎 + Phase 2 LangGraph + P1-P10 全部完成
+⬜ 進行中：無（核心功能全部完成）
+**下一步：API 層 pipeline 端點 + 集成測試 + 全平台實戰驗證**
 
 ---
 
@@ -40,64 +40,66 @@
 
 ---
 
-## Pro 版第二階段（智能代理層）
+## Pro 版第二階段（智能代理層）— ✅ 全部完成
 
-### ✅ 已完成
-- `src/orchestrator/` — LangGraph StateGraph（graph.py / nodes.py / state.py / edges.py / pipeline.py）
-- 5 節點 pipeline：search_one（並行 5 平台）→ merge_results → llm_filter → llm_score → format_output
-- 支援同步 `run_pipeline()` + 流式 `run_pipeline_stream()`
+### LangGraph 編排層
+- `src/orchestrator/` — StateGraph DAG（graph.py / nodes.py / state.py / edges.py / pipeline.py）
+- 雙模式管道：`simple`（搜索→合併→輸出）/ `full`（搜索→合併→7 Agent→報告）
+- Fan-out 並行搜索 5 平台 → merge_results 去重排序 → Agent 線性鏈 → format_output
 - SqliteSaver checkpointer、重試機制、adapter 緩存
-- CLI `--type aggregate --engine langgraph`
-- Review rounds 2 全部修復
+- CLI `--type aggregate --engine langgraph --pipeline full`
 
-### ✅ 已完成 — 8 個專用模塊
+### 7 個 AI Agent（P1-P7）
 
-| # | 模塊 | 文件 | Commit | 說明 |
-|:--|-------|------|--------|------|
-| P1 | Trend Scout | `agents/trend_scout.py` | `951117a` | 爆款識別分析（viral_score / trend_reason） |
-| P2 | Product Miner | `agents/product_miner.py` | `82ae857` | 選品深入分析（monetization_potential / 競爭優勢） |
-| P3 | Video Analyst | `agents/video_analyst.py` | `394b15c` | 視頻結構拆解（hook_type / pacing / structure_template） |
-| P4 | Sentiment Reader | `agents/sentiment_reader.py` | `ba81aee` | 評論情緒分析（positive/neutral/negative%） |
-| P5 | Copy Writer | `agents/copy_writer.py` | `f9f20cb` | 營銷文案生成（headline/short/medium/long） |
-| P6 | Content Remixer | `agents/content_remixer.py` | `f4f2134` | 數據分析/總結/改寫（summarize/analyze/rewrite） |
-| P7 | Pic Tactic | `agents/pic_tactic.py` | `11eb2fa` | 智能配圖策略（cover/social/trend） |
-| P8 | Media Downloader | `downloader/media_downloader.py` | — | 批量下載封面+視頻（httpx流式+瀏覽器輔助提取） |
+| # | Agent | 文件 | 說明 |
+|:--|-------|------|------|
+| P1 | Trend Scout | `agents/trend_scout.py` | 爆款識別分析（viral_score / trend_reason） |
+| P2 | Product Miner | `agents/product_miner.py` | 選品深入分析（monetization_potential / 競爭優勢） |
+| P3 | Video Analyst | `agents/video_analyst.py` | 視頻結構拆解（hook_type / pacing / structure_template） |
+| P4 | Sentiment Reader | `agents/sentiment_reader.py` | 評論情緒分析（positive/neutral/negative%） |
+| P5 | Copy Writer | `agents/copy_writer.py` | 營銷文案生成（headline/short/medium/long） |
+| P6 | Content Remixer | `agents/content_remixer.py` | 數據分析/總結/改寫（summarize/analyze/rewrite） |
+| P7 | Pic Tactic | `agents/pic_tactic.py` | 智能配圖策略（cover/social/trend，含英文 AI 提示詞） |
 
-每個 Agent 均支持：
+每個 Agent 支持：
 - DeepSeek V4 Flash LLM 分析（無 API key 時自動降級為模板模式）
 - 獨立 `run()` 直接調用 + `as_node()` LangGraph 節點集成
 - Dataclass 類型化輸出 + `asdict()` 序列化
 
-### ✅ 已完成 — Camoufox 第三引擎
+### 附加模塊（P8-P10）
 
-`BROWSER_ENGINE=camoufox` 支援 Firefox 底層反檢測（C++ 指紋偽裝，WebGL/Canvas/AudioContext 隨機化）。
+| # | 模塊 | 文件 | 說明 |
+|:--|------|------|------|
+| P8 | Media Downloader | `downloader/media_downloader.py` | 批量下載封面+視頻（httpx 流式 + 瀏覽器輔助提取） |
+| P9 | BaseAgent 重構 | `agents/base.py` | 抽取共享 LLM 調用邏輯，7 Agent 統一繼承 |
+| P10 | Agent 接入 DAG | `graph.py` | 7 Agent 串入 LangGraph 線性鏈，`--pipeline full` 一鍵全流程 |
 
-| CLI | 行為 |
-|-----|------|
-| `--engine playwright` | Chromium + stealth（不變） |
-| `--engine cdp` | 遠程 Chrome CDP（不變） |
-| `--engine camoufox` | **新** Camoufox Firefox（C++ 反檢測） |
-| `--engine langgraph` | 編排層（不變） |
+### 基礎設施
 
-改動：`settings.py`（8 配置項）、`browser_service.py`（camoufox 分支）、`xiaohongshu_adapter.py`（search/comment persistent context）、`main.py`（choices）
-
-### ✅ 已完成 — CookieBridge
-
-Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登录态。
-
-| 组件 | 文件 |
+| 模塊 | 說明 |
 |------|------|
-| Extension | `src/cookie_bridge/extension/` (manifest.json / popup.html / popup.js) |
-| Python 服务 | `src/cookie_bridge/server.py` (POST /cookies + GET /health) |
-| 自动注入 | `browser_service.py` → `_load_platform_cookies()` |
+| Camoufox 第三引擎 | Firefox 底層反檢測（C++ 指紋偽裝，WebGL/Canvas 隨機化） |
+| CookieBridge | Chrome Extension (MV3) + Python HTTP 服務，一鍵同步瀏覽器登錄態 |
+| DeepSeek API | `.env` 自動加載（python-dotenv），DeepSeek V4 Flash 驅動全部分析 |
+| 降級模式 | 所有 Agent 無 API key 時自動降級為模板/熱度排序 |
 
-用法：`python main.py --cookie-bridge` → Chrome Extension 点「同步」→ 5 平台 cookies 自动保存到 `browser_data/`
+---
 
-### ❌ 未開始
+## 待辦（按優先級）
 
-```
-（無 — 所有計劃模塊已完成）
-```
+### 🔴 P0 — 必須完成
+- [ ] **API 層 pipeline 端點** — `POST /api/pipeline` 暴露 `run_pipeline()` 俾 WebUI 調用
+- [ ] **全平台 full pipeline 實戰驗證** — 5 平台各跑一次 `--pipeline full`，確認無報錯
+
+### 🟡 P1 — 應該完成
+- [ ] **Agent 集成測試** — pytest 測試覆蓋 full pipeline 降級模式
+- [ ] **Agent 並行化** — 將線性鏈改為 fan-out（product_miner / video_analyst / sentiment_reader 可並行）
+- [ ] **個別 Agent 失敗不影響整體** — try/catch 包裝 agent node，單個失敗跳過繼續
+
+### 🟢 P2 — 可以延後
+- [ ] Docker 一鍵部署
+- [ ] 微博、貼吧平台支援
+- [ ] Golang 高性能版本
 
 ---
 
@@ -106,10 +108,10 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 **Smart Agent Pro 嘅核心競爭力：**
 1. **Camoufox MCP 反檢測數據層** — 唔係 Playwright CDP 咁簡單
 2. **電商爆款分析場景** — 唔係通用爬蟲，係針對帶貨/選品嘅深度分析
-3. **LangGraph 智能代理編排** — 自動化商業決策流程
+3. **LangGraph 智能代理編排** — 自動化商業決策流程（7 Agent 全鏈路）
+4. **DeepSeek V4 Flash** — 低成本 LLM 驅動，無 API key 自動降級
 
 ---
-
 
 ## 市場分析與商業策略（2026-05-26 更新）
 
@@ -160,7 +162,7 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 ### 策略建議
 
-1. **短期**：完善 P6-P9 工具鏈 + 準備「Camoufox + LangGraph 反檢測 AI Agent 實戰」課程
+1. **短期**：完善 API 層 + 全平台驗證 + 準備「Camoufox + LangGraph 反檢測 AI Agent 實戰」課程
 2. **中期**：課程上線（¥199-¥299），目標 100 學員首月；工具以「課程配套」形式提供
 3. **長期**：課程月入 >¥10 萬後，請專人逆向簽名，再考慮獨立 SaaS
 
@@ -168,9 +170,10 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 - **唔同蟻媽媽爭** — 佢哋做數據 dashboard，我哋做 AI 分析 + 文案生成
 - **唔同阿江爭** — 佢教 HTTP 逆向，我哋教反檢測 + AI Agent
-- **核心差異**：Camoufox C++ 指紋偽裝 + LangGraph 智能編排 + 5 個垂直 Agent
+- **核心差異**：Camoufox C++ 指紋偽裝 + LangGraph 智能編排 + 7 個垂直 Agent
 
 ---
+
 ## Pro 版第三階段（長期）— 全部 ❌ 未開始
 
 | 模塊 | 狀態 |
@@ -189,6 +192,11 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 ## 驗證記錄
 
+**2026-05-26 Full Pipeline（keyword=AI绘画，platform=bilibili，DeepSeek LLM）**：
+- B站搜索 3 ✅ → TrendScout ✅ → ProductMiner ✅ → VideoAnalyst ✅
+- → SentimentReader ✅ → CopyWriter ✅ → ContentRemixer ✅ → PicTactic ✅
+- 7/7 Agent 全鏈路 DeepSeek V4 實時分析通過
+
 **2026-05-26 aggregate（keyword=美女，limit=5）**：
 - B站 5 ✅ / 小紅書 5 ✅ / 抖音 5 ✅ / 知乎 5 ✅ / 快手 5 ✅
 - 總計 25/25 全部通過
@@ -204,4 +212,4 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 ---
 
-*最後更新：2026-05-26 — P8 MediaDownloader 批量下载完成*
+*最後更新：2026-05-26 — P10 Agent 接入 LangGraph DAG + DeepSeek API 配置完成*

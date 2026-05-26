@@ -16,9 +16,7 @@ import json
 from collections import Counter
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 
@@ -64,13 +62,8 @@ class RemixReport:
     recommendations: str = ""
 
 
-class ContentRemixer:
+class ContentRemixer(BaseAgent):
     """数据分析/总结/改写 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
     async def run(self, inp: RemixInput) -> RemixReport:
         if not self._api_key:
@@ -148,56 +141,41 @@ class ContentRemixer:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.5,
-                        "max_tokens": 2000,
-                    },
+            content = await self._call_llm(prompt, temperature=0.5)
+            parsed = self._parse_json(content)
+
+            insights = [
+                TrackInsight(
+                    topic=t.get("topic", ""),
+                    competition_level=t.get("competition_level", ""),
+                    entry_barrier=t.get("entry_barrier", ""),
+                    opportunity_score=int(t.get("opportunity_score", 50)),
+                    recommended_angles=t.get("recommended_angles", ""),
                 )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+                for t in parsed.get("track_insights", [])
+            ]
 
-                insights = [
-                    TrackInsight(
-                        topic=t.get("topic", ""),
-                        competition_level=t.get("competition_level", ""),
-                        entry_barrier=t.get("entry_barrier", ""),
-                        opportunity_score=int(t.get("opportunity_score", 50)),
-                        recommended_angles=t.get("recommended_angles", ""),
-                    )
-                    for t in parsed.get("track_insights", [])
-                ]
-
-                rewrites = [
-                    ContentRewrite(
-                        original=r.get("original", ""),
-                        source_platform=r.get("source_platform", ""),
-                        target_platform=r.get("target_platform", ""),
-                        rewritten=r.get("rewritten", ""),
-                        changes_summary=r.get("changes_summary", ""),
-                    )
-                    for r in parsed.get("rewrites", [])
-                ]
-
-                return RemixReport(
-                    topic=inp.topic or "通用",
-                    mode=inp.mode,
-                    summary=parsed.get("summary", ""),
-                    key_keywords=parsed.get("key_keywords", []),
-                    platform_breakdown=parsed.get("platform_breakdown", dict(platform_counts)),
-                    track_insights=insights,
-                    rewrites=rewrites,
-                    recommendations=parsed.get("recommendations", ""),
+            rewrites = [
+                ContentRewrite(
+                    original=r.get("original", ""),
+                    source_platform=r.get("source_platform", ""),
+                    target_platform=r.get("target_platform", ""),
+                    rewritten=r.get("rewritten", ""),
+                    changes_summary=r.get("changes_summary", ""),
                 )
+                for r in parsed.get("rewrites", [])
+            ]
+
+            return RemixReport(
+                topic=inp.topic or "通用",
+                mode=inp.mode,
+                summary=parsed.get("summary", ""),
+                key_keywords=parsed.get("key_keywords", []),
+                platform_breakdown=parsed.get("platform_breakdown", dict(platform_counts)),
+                track_insights=insights,
+                rewrites=rewrites,
+                recommendations=parsed.get("recommendations", ""),
+            )
         except Exception as exc:
             logger.warning(f"ContentRemixer LLM 失败: {exc}")
             return self._fallback(inp)

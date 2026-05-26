@@ -14,9 +14,7 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
-import httpx
-
-from config.settings import settings
+from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
 
 
@@ -40,15 +38,8 @@ class ProductReport:
     summary: str = ""
 
 
-class ProductMiner:
+class ProductMiner(BaseAgent):
     """深入選品 Agent。"""
-
-    def __init__(self):
-        self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
-        self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
-        self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
-
-    # ── public API ────────────────────────────────────────────
 
     async def run(
         self,
@@ -62,7 +53,7 @@ class ProductMiner:
         if not self._api_key:
             return self._fallback(items, keyword)
 
-        return await self._llm_analyze(items, keyword)
+        return await self._llm_generate(items, keyword)
 
     async def as_node(self, state: dict) -> dict:
         """LangGraph 節點接口。"""
@@ -85,7 +76,7 @@ class ProductMiner:
 
     # ── internal ──────────────────────────────────────────────
 
-    async def _llm_analyze(self, items: list, keyword: str) -> ProductReport:
+    async def _llm_generate(self, items: list, keyword: str) -> ProductReport:
         """DeepSeek LLM 選品分析。"""
         items_text = "\n".join(
             f"{i}. {it.get('title','')} | 作者:{it.get('author','')} | 播放:{it.get('plays','0')}"
@@ -105,46 +96,31 @@ class ProductMiner:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._api_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.3,
-                        "max_tokens": 2000,
-                    },
-                )
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
+            content = await self._call_llm(prompt, temperature=0.3)
+            parsed = self._parse_json(content)
 
-                products = []
-                for p in parsed.get("products", []):
-                    idx = p.get("source_index", 0)
-                    src = items[idx] if 0 <= idx < len(items) else {}
-                    products.append(ProductItem(
-                        name=p.get("name", ""),
-                        category=p.get("category", ""),
-                        price_hint=p.get("price_hint", ""),
-                        target_audience=p.get("target_audience", ""),
-                        competitive_advantage=p.get("competitive_advantage", ""),
-                        monetization_potential=int(p.get("monetization_potential", 50)),
-                        source_title=src.get("title", ""),
-                        source_platform=src.get("platform", ""),
-                    ))
+            products = []
+            for p in parsed.get("products", []):
+                idx = p.get("source_index", 0)
+                src = items[idx] if 0 <= idx < len(items) else {}
+                products.append(ProductItem(
+                    name=p.get("name", ""),
+                    category=p.get("category", ""),
+                    price_hint=p.get("price_hint", ""),
+                    target_audience=p.get("target_audience", ""),
+                    competitive_advantage=p.get("competitive_advantage", ""),
+                    monetization_potential=int(p.get("monetization_potential", 50)),
+                    source_title=src.get("title", ""),
+                    source_platform=src.get("platform", ""),
+                ))
 
-                products.sort(key=lambda x: x.monetization_potential, reverse=True)
-                return ProductReport(
-                    keyword=keyword,
-                    total_products=len(products),
-                    items=products,
-                    summary=parsed.get("summary", ""),
-                )
+            products.sort(key=lambda x: x.monetization_potential, reverse=True)
+            return ProductReport(
+                keyword=keyword,
+                total_products=len(products),
+                items=products,
+                summary=parsed.get("summary", ""),
+            )
 
         except Exception as exc:
             logger.warning(f"ProductMiner LLM 失敗: {exc}")
