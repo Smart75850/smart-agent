@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-已完成：Phase 1 引擎全部 + Phase 2 LangGraph 骨架
-進行中：補齊 Phase 2 專用 Agent
-下一步：Trend Scout → Product Miner（核心商業流程）
+已完成：Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + 5 個專用 Agent
+進行中：附加模塊（P6-P9）
+下一步：ContentRemixAgent（數據分析/總結/改寫）
 
 ---
 
@@ -50,20 +50,24 @@
 - CLI `--type aggregate --engine langgraph`
 - Review rounds 2 全部修復
 
+### ✅ 已完成 — 5 個專用 Agent
+
+| # | Agent | 文件 | Commit | 說明 |
+|:--|-------|------|--------|------|
+| P1 | Trend Scout | `agents/trend_scout.py` | `951117a` | 爆款識別分析（viral_score / trend_reason） |
+| P2 | Product Miner | `agents/product_miner.py` | `82ae857` | 選品深入分析（monetization_potential / 競爭優勢） |
+| P3 | Video Analyst | `agents/video_analyst.py` | `394b15c` | 視頻結構拆解（hook_type / pacing / structure_template） |
+| P4 | Sentiment Reader | `agents/sentiment_reader.py` | `ba81aee` | 評論情緒分析（positive/neutral/negative%） |
+| P5 | Copy Writer | `agents/copy_writer.py` | `f9f20cb` | 營銷文案生成（headline/short/medium/long） |
+
+每個 Agent 均支持：
+- DeepSeek V4 Flash LLM 分析（無 API key 時自動降級為模板模式）
+- 獨立 `run()` 直接調用 + `as_node()` LangGraph 節點集成
+- Dataclass 類型化輸出 + `asdict()` 序列化
+
 ### ❌ 未開始 — 按優先級排列
 
 ```
-第一優先（核心商業流程）
-  P1 — Trend Scout          爆款識別分析
-  P2 — Product Miner        選品深入分析
-
-第二優先（分析能力）
-  P3 — Video Analyst        視頻結構拆解（鉤子/節奏/轉化點）
-  P4 — Sentiment Reader     評論情緒分析
-
-第三優先（產出能力）
-  P5 — Copy Writer          營銷文案生成
-
 第四優先（附加模塊）
   P6 — ContentRemixAgent    數據分析/總結/改寫
   P7 — PicTacticAgent       智能配圖生成
@@ -118,4 +122,4 @@ smart-agent/
 
 ---
 
-*最後更新：2026-05-26 由 VS Code Claude 更新（最終版進度總表 + 目錄規劃）*
+*最後更新：2026-05-26 — P1-P5 Agent 全部完成，提交至 pro-origin main*
