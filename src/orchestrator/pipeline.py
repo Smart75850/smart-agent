@@ -1,5 +1,5 @@
 """高层 API — 一鸡两味（同步/流式）。"""
-import uuid
+import hashlib
 from typing import AsyncIterator
 
 from src.orchestrator.state import PipelineState
@@ -24,8 +24,11 @@ def _build_initial_state(keyword: str, limit: int, platforms: list[str] | None, 
     }
 
 
-def _make_config() -> dict:
-    return {"configurable": {"thread_id": str(uuid.uuid4())}}
+def _make_config(keyword: str, platforms: list[str]) -> dict:
+    """🟡 修复: 确定性 thread_id (keyword + platforms 的 SHA256)，不用 UUID。"""
+    key = f"{keyword}|{','.join(sorted(platforms))}"
+    thread_id = hashlib.sha256(key.encode()).hexdigest()[:16]
+    return {"configurable": {"thread_id": thread_id}}
 
 
 async def run_pipeline(
@@ -35,13 +38,12 @@ async def run_pipeline(
     platforms: list[str] | None = None,
     llm_filter: bool = False,
 ) -> list[dict]:
-    """运行 LangGraph 编排管道（同步模式）。
-
-    Returns:
-        归一化后的结果列表
-    """
+    """运行 LangGraph 编排管道（同步模式）。"""
     state = _build_initial_state(keyword, limit, platforms, llm_filter)
-    result = await compiled_graph.ainvoke(state, config=_make_config())
+    result = await compiled_graph.ainvoke(
+        state,
+        config=_make_config(keyword, platforms or _DEFAULT_PLATFORMS),
+    )
     logger.info(f"pipeline 完成: {len(result.get('final_output', []))} 条")
     return result.get("final_output", [])
 
@@ -53,11 +55,11 @@ async def run_pipeline_stream(
     platforms: list[str] | None = None,
     llm_filter: bool = False,
 ) -> AsyncIterator[dict]:
-    """运行 LangGraph 编排管道（流式模式）。
-
-    Yields:
-        astream_events 事件 dict
-    """
+    """运行 LangGraph 编排管道（流式模式）。"""
     state = _build_initial_state(keyword, limit, platforms, llm_filter)
-    async for event in compiled_graph.astream_events(state, config=_make_config(), version="v2"):
+    async for event in compiled_graph.astream_events(
+        state,
+        config=_make_config(keyword, platforms or _DEFAULT_PLATFORMS),
+        version="v2",
+    ):
         yield event

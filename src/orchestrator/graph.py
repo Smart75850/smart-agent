@@ -1,7 +1,7 @@
-﻿"""LangGraph StateGraph 定义 + 编译。"""
+"""LangGraph StateGraph 定义 + 编译。"""
 from langgraph.graph import StateGraph, START, END
 from langgraph.constants import Send
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 from src.orchestrator.state import PipelineState
 from src.orchestrator.nodes import (
@@ -13,6 +13,7 @@ from src.orchestrator.nodes import (
 )
 from src.orchestrator.edges import route_after_merge
 from src.utils.logger import logger
+from config.settings import settings
 
 
 def _fanout_to_searchers(state: PipelineState) -> list[Send]:
@@ -45,11 +46,8 @@ def build_graph() -> StateGraph:
     builder.add_node("llm_score", llm_score)
     builder.add_node("format_output", format_output)
 
-    # START -> fanout (Send) -> search_one -> merge_results
     builder.add_conditional_edges(START, _fanout_to_searchers, path_map=["search_one"])
     builder.add_edge("search_one", "merge_results")
-
-    # 条件路由: LLM 路径 vs 默认路径
     builder.add_conditional_edges(
         "merge_results",
         route_after_merge,
@@ -63,9 +61,12 @@ def build_graph() -> StateGraph:
 
 
 def compile_graph():
-    """编译 graph，带 MemorySaver checkpointer。"""
+    """编译 graph，带 SqliteSaver checkpointer。"""
+    import os
     builder = build_graph()
-    checkpointer = MemorySaver()
+    db_path = settings.LANGGRAPH_CHECKPOINT_DB
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    checkpointer = SqliteSaver.from_conn_string(db_path)
     compiled = builder.compile(checkpointer=checkpointer)
     logger.info("LangGraph 编译完成")
     return compiled

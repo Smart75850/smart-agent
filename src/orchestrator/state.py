@@ -1,4 +1,4 @@
-﻿"""LangGraph 工作流状态定义。"""
+"""LangGraph 工作流状态定义。"""
 from typing import Annotated, TypedDict
 
 
