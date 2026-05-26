@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CookieBridge</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { width: 280px; font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+.header { background: #16213e; padding: 14px 16px; text-align: center; }
+.header h1 { font-size: 16px; color: #00d2ff; }
+.header p { font-size: 11px; color: #888; margin-top: 4px; }
+.platforms { padding: 10px 16px; }
+.platforms label {
+  display: flex; align-items: center; padding: 8px 0; cursor: pointer;
+  border-bottom: 1px solid #2a2a4a; font-size: 13px;
+}
+.platforms label:last-child { border-bottom: none; }
+.platforms input[type="checkbox"] { margin-right: 10px; accent-color: #00d2ff; }
+.actions { padding: 10px 16px 14px; display: flex; gap: 8px; }
+button {
+  flex: 1; padding: 10px; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+}
+button:hover { opacity: .85; }
+.btn-sync { background: #00d2ff; color: #1a1a2e; }
+.btn-select { background: #333; color: #ccc; }
+.status { padding: 0 16px 12px; font-size: 12px; text-align: center; min-height: 20px; }
+.status.ok { color: #4caf50; }
+.status.err { color: #f44336; }
+.status.info { color: #888; }
+.footer { text-align: center; padding: 8px; font-size: 10px; color: #555; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>CookieBridge</h1>
+  <p>同步浏览器登录态到 Smart Agent Pro</p>
+</div>
+<div class="platforms" id="platforms">
+  <label><input type="checkbox" value="bilibili" checked> B站 (bilibili.com)</label>
+  <label><input type="checkbox" value="douyin" checked> 抖音 (douyin.com)</label>
+  <label><input type="checkbox" value="xiaohongshu" checked> 小红书 (xiaohongshu.com)</label>
+  <label><input type="checkbox" value="zhihu" checked> 知乎 (zhihu.com)</label>
+  <label><input type="checkbox" value="kuaishou" checked> 快手 (kuaishou.com)</label>
+</div>
+<div class="actions">
+  <button class="btn-select" id="btn-none">全不选</button>
+  <button class="btn-select" id="btn-all">全选</button>
+  <button class="btn-sync" id="btn-sync">同步</button>
+</div>
+<div class="status info" id="status">准备就绪，请点击「同步」</div>
+<div class="footer">Smart Agent Pro · CookieBridge v1.0</div>
+<script src="popup.js"></script>
+</body>
+</html>

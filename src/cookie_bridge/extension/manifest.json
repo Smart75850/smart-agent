@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "CookieBridge",
+  "version": "1.0",
+  "description": "一键同步浏览器登录态到 Smart Agent Pro",
+  "permissions": ["cookies", "storage"],
+  "host_permissions": [
+    "*://*.bilibili.com/*",
+    "*://*.douyin.com/*",
+    "*://*.xiaohongshu.com/*",
+    "*://*.zhihu.com/*",
+    "*://*.kuaishou.com/*",
+    "http://localhost:18920/*",
+    "http://127.0.0.1:18920/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CookieBridge"
+  }
+}

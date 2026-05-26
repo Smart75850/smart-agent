@@ -158,6 +158,30 @@ class BrowserService:
         else:
             raise ValueError(f"不支持的浏览器引擎: {engine}")
 
+        await self._load_platform_cookies()
+
+    async def _load_platform_cookies(self):
+        """从 browser_data/{platform}_cookies.json 加载 cookies 并注入上下文。"""
+        import json
+        from pathlib import Path
+
+        cookie_dir = Path("browser_data")
+        if not cookie_dir.exists():
+            return
+
+        for filepath in cookie_dir.glob("*_cookies.json"):
+            try:
+                cookies = json.loads(filepath.read_text(encoding="utf-8"))
+                if not cookies:
+                    continue
+
+                platform = filepath.stem.replace("_cookies", "")
+                if self._context:
+                    await self._context.add_cookies(cookies)
+                    logger.info(f"CookieBridge: {platform} 注入 {len(cookies)} 个 cookie")
+            except Exception:
+                pass
+
     @property
     def is_running(self) -> bool:
         return self._browser is not None

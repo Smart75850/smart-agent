@@ -86,6 +86,10 @@ def parse_args(argv=None):
         help="列出支援平台",
     )
     parser.add_argument(
+        "--cookie-bridge", action="store_true",
+        help="啟動 CookieBridge 本地服務，接收 Chrome Extension 同步的 cookies",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="只顯示執行計劃，唔實際執行",
     )
@@ -214,6 +218,11 @@ async def main():
         print("支援平台:")
         for p in platforms:
             print(f"  {p}")
+        return
+
+    if args.cookie_bridge:
+        from src.cookie_bridge.server import start_server
+        start_server()
         return
 
     # ── dry-run ──────────────────────────────────────────
