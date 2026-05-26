@@ -102,6 +102,59 @@ class BrowserService:
                     ])
                 except Exception:
                     pass
+        elif engine == "camoufox":
+            from playwright.async_api import async_playwright
+            from camoufox.async_api import AsyncNewBrowser
+
+            self._playwright = await async_playwright().start()
+
+            cf_kwargs: dict = {
+                "headless": settings.CAMOUFOX_HEADLESS,
+                "humanize": settings.CAMOUFOX_HUMANIZE,
+                "block_webrtc": settings.CAMOUFOX_BLOCK_WEBRTC,
+                "geoip": settings.CAMOUFOX_GEOIP,
+                "locale": settings.CAMOUFOX_LOCALE,
+                "os": settings.CAMOUFOX_OS or "windows",
+            }
+
+            if proxy:
+                cf_kwargs["proxy"] = proxy
+            else:
+                proxy_mgr = ProxyManager()
+                if proxy_mgr.enabled:
+                    cf_kwargs["proxy"] = proxy_mgr.get_next_proxy()
+
+            if settings.CAMOUFOX_SCREEN:
+                try:
+                    w, h = settings.CAMOUFOX_SCREEN.replace("x", " ").split()
+                    cf_kwargs["screen"] = {"width": int(w.strip()), "height": int(h.strip())}
+                except (ValueError, AttributeError):
+                    pass
+
+            if settings.CAMOUFOX_USER_DATA_DIR:
+                cf_kwargs["user_data_dir"] = settings.CAMOUFOX_USER_DATA_DIR
+
+            try:
+                self._browser = await AsyncNewBrowser(self._playwright, **cf_kwargs)
+            except BaseException:
+                await self._cleanup()
+                raise
+
+            self._context = (
+                self._browser.contexts[0]
+                if self._browser.contexts
+                else await self._browser.new_context()
+            )
+
+            if self._inject_cookies:
+                try:
+                    await self._context.add_cookies([
+                        {"name": k, "value": v, "domain": self._cookie_domain, "path": "/"}
+                        for k, v in self._inject_cookies.items()
+                    ])
+                except Exception:
+                    pass
+
         else:
             raise ValueError(f"不支持的浏览器引擎: {engine}")
 

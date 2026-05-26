@@ -10,6 +10,60 @@ from src.utils.logger import logger
 
 _COOKIE_FILE = Path(__file__).parent.parent.parent / "output" / "xiaohongshu_cookies.json"
 _PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "pw_xhs_live"
+_CAMOUFOX_PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "cf_xhs_live"
+
+
+async def _setup_xhs_context():
+    """根据 BROWSER_ENGINE 返回 (page, cleanup_coro)。
+
+    Camoufox 走 AsyncCamoufox persistent profile；
+    Chromium 走 launch_persistent_context。
+    """
+    engine = os.environ.get("BROWSER_ENGINE", "")
+    from config.settings import settings
+
+    if engine == "camoufox":
+        from playwright.async_api import async_playwright
+        from camoufox.async_api import AsyncNewBrowser
+        pw = await async_playwright().start()
+        context = await AsyncNewBrowser(
+            pw,
+            persistent_context=True,
+            headless=False,
+            humanize=True,
+            locale="zh-CN",
+            os=settings.CAMOUFOX_OS or "windows",
+            block_webrtc=True,
+            user_data_dir=str(_CAMOUFOX_PERSIST_DIR),
+            screen={"width": 1920, "height": 1080},
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
+
+        async def cleanup():
+            await context.close()
+            await pw.stop()
+
+        return page, cleanup
+
+    else:
+        from playwright.async_api import async_playwright
+        pw = await async_playwright().start()
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=str(_PERSIST_DIR),
+            headless=False,
+            viewport={"width": 1920, "height": 1080},
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            args=["--no-sandbox"],
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
+
+        async def cleanup():
+            await context.close()
+            await pw.stop()
+
+        return page, cleanup
 
 _SEARCH_JS = """\
 () => {
@@ -62,61 +116,48 @@ async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
     """搜索小紅薯筆記，scroll 翻頁，需登入。回傳 JSON 字串。"""
     logger.info(f"小紅薯搜索: keyword={keyword} count={count}")
 
-    from playwright.async_api import async_playwright
+    page, cleanup = await _setup_xhs_context()
 
-    async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
-            user_data_dir=str(_PERSIST_DIR),
-            headless=False,
-            viewport={"width": 1920, "height": 1080},
-            locale="zh-CN",
-            timezone_id="Asia/Shanghai",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            args=["--no-sandbox"],
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
+    try:
+        search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
+        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(5000)
 
-        try:
-            search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
-            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(5000)
+        # 檢查登入牆
+        body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
+        if "登录后查看" in body:
+            logger.warning("小紅薯未登入，請先執行 login_search_xhs.py 掃碼登入")
+            return json.dumps([], ensure_ascii=False)
 
-            # 檢查登入牆
-            body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
-            if "登录后查看" in body:
-                logger.warning("小紅薯未登入，請先執行 login_search_xhs.py 掃碼登入")
-                await context.close()
-                return json.dumps([], ensure_ascii=False)
+        all_results = []
+        seen = set()
+        max_scrolls = max((count // 30) + 3, 5)
 
-            all_results = []
-            seen = set()
-            max_scrolls = max((count // 30) + 3, 5)
+        for _ in range(max_scrolls):
+            items = await page.evaluate(_SEARCH_JS)
+            new_count = 0
+            for item in items:
+                key = item.get("link", "") or item.get("title", "")
+                if key and key not in seen:
+                    seen.add(key)
+                    all_results.append(item)
+                    new_count += 1
 
-            for _ in range(max_scrolls):
-                items = await page.evaluate(_SEARCH_JS)
-                new_count = 0
-                for item in items:
-                    key = item.get("link", "") or item.get("title", "")
-                    if key and key not in seen:
-                        seen.add(key)
-                        all_results.append(item)
-                        new_count += 1
+            if new_count == 0 and len(all_results) > 0:
+                break
 
-                if new_count == 0 and len(all_results) > 0:
-                    break
+            if len(all_results) >= count:
+                break
 
-                if len(all_results) >= count:
-                    break
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2500)
 
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(2500)
+        result = all_results[:count]
+        logger.info(f"小紅薯搜索完成: {len(result)} 條")
+        return json.dumps(result, ensure_ascii=False)
 
-            result = all_results[:count]
-            logger.info(f"小紅薯搜索完成: {len(result)} 條")
-            return json.dumps(result, ensure_ascii=False)
-
-        finally:
-            await context.close()
+    finally:
+        await cleanup()
 
 
 async def xiaohongshu_note_detail(note_id: str) -> str:
@@ -133,28 +174,16 @@ async def xiaohongshu_comment(note_id: str) -> str:
     """爬取小紅薯筆記評論，使用 persistent context 以保持登入態。"""
     logger.info(f"小紅薯評論: note_id={note_id}")
 
-    from playwright.async_api import async_playwright
+    page, cleanup = await _setup_xhs_context()
 
-    async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
-            user_data_dir=str(_PERSIST_DIR),
-            headless=False,
-            viewport={"width": 1920, "height": 1080},
-            locale="zh-CN",
-            timezone_id="Asia/Shanghai",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            args=["--no-sandbox"],
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
-
-        try:
-            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(5000)
-            # 滚动触发评论加载
-            for _ in range(5):
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(1500)
-            result = await page.evaluate("""() => {
+    try:
+        await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(5000)
+        # 滚动触发评论加载
+        for _ in range(5):
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(1500)
+        result = await page.evaluate("""() => {
     const items = document.querySelectorAll('[class*="comment-item"], [class*="CommentItem"], .comment-item, [class*="comment"], [class*="Comment"]');
     const seen = new Set();
     const out = [];
@@ -181,10 +210,10 @@ async def xiaohongshu_comment(note_id: str) -> str:
     }
     return out;
 }""")
-            logger.info(f"小紅薯評論完成: {len(result)} 條")
-            return json.dumps(result, ensure_ascii=False)
-        finally:
-            await context.close()
+        logger.info(f"小紅薯評論完成: {len(result)} 條")
+        return json.dumps(result, ensure_ascii=False)
+    finally:
+        await cleanup()
 
 
 async def xiaohongshu_hot() -> str:

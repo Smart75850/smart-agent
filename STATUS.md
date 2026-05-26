@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P5 Agent 已完成
-⬜ 進行中：Camoufox MCP 整合 + 附加模塊（P6-P9）
-下一步：整合 Camoufox MCP 做差異化數據層
+✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P5 Agent + Camoufox 引擎
+⬜ 進行中：附加模塊（P6-P9）+ CookieBridge
+下一步：CookieBridge Chrome Extension
 
 ---
 
@@ -65,14 +65,22 @@
 - 獨立 `run()` 直接調用 + `as_node()` LangGraph 節點集成
 - Dataclass 類型化輸出 + `asdict()` 序列化
 
+### ✅ 已完成 — Camoufox 第三引擎
+
+`BROWSER_ENGINE=camoufox` 支援 Firefox 底層反檢測（C++ 指紋偽裝，WebGL/Canvas/AudioContext 隨機化）。
+
+| CLI | 行為 |
+|-----|------|
+| `--engine playwright` | Chromium + stealth（不變） |
+| `--engine cdp` | 遠程 Chrome CDP（不變） |
+| `--engine camoufox` | **新** Camoufox Firefox（C++ 反檢測） |
+| `--engine langgraph` | 編排層（不變） |
+
+改動：`settings.py`（8 配置項）、`browser_service.py`（camoufox 分支）、`xiaohongshu_adapter.py`（search/comment persistent context）、`main.py`（choices）
+
 ### ❌ 未開始 — 按優先級排列（經芭芭拉審閱調整）
 
-> 註：P1-P5 已完成，以下係剩餘任務。**Camoufox MCP 整合係核心差異化** — 冇 Camoufox 就同 MediaCrawler 冇分別。
-
-```
-第三優先（差異化數據層 — 🟡 提前）
-  P5 — Camoufox MCP 整合        將底層從 Playwright CDP 遷移到 Camoufox MCP
-                                 （反檢測 + 差異化優勢，完成哂先做 P6-P9）
+> 註：P1-P5 + Camoufox 已完成，以下係剩餘任務。
                                  
 
 第四優先（商業化關鍵 — 🟡 提前）
@@ -129,4 +137,4 @@
 
 ---
 
-*最後更新：2026-05-26 — P1-P5 Agent 全部完成，提交至 pro-origin main*
+*最後更新：2026-05-26 — Camoufox 第三引擎完成，B站/抖音驗證通過*

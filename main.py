@@ -58,7 +58,7 @@ def parse_args(argv=None):
         help="操作類型（預設 search，按平台決定可用選項）",
     )
     parser.add_argument(
-        "--engine", default="playwright", choices=["playwright", "cdp", "langgraph"],
+        "--engine", default="playwright", choices=["playwright", "cdp", "camoufox", "langgraph"],
         help="瀏覽器引擎（預設 playwright）",
     )
     parser.add_argument(

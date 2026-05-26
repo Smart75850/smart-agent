@@ -5,10 +5,20 @@ from os import environ
 @dataclass
 class Settings:
     # 瀏覽器
-    BROWSER_ENGINE: str = "playwright"   # playwright / cdp
+    BROWSER_ENGINE: str = "playwright"   # playwright / cdp / camoufox
     CDP_PORT: int = 9222
     PAGE_TIMEOUT: int = 30000
     SLEEP_AFTER_LOAD: int = 8            # SPA 等待秒數
+
+    # Camoufox (Firefox 反檢測引擎)
+    CAMOUFOX_HEADLESS: bool = False
+    CAMOUFOX_HUMANIZE: bool = True
+    CAMOUFOX_BLOCK_WEBRTC: bool = True
+    CAMOUFOX_GEOIP: bool = True
+    CAMOUFOX_OS: str = "windows"
+    CAMOUFOX_LOCALE: str = "zh-CN"
+    CAMOUFOX_SCREEN: str = ""
+    CAMOUFOX_USER_DATA_DIR: str = ""
 
     # 代理
     PROXY_ENABLED: bool = False
@@ -66,6 +76,14 @@ class Settings:
             DEEPSEEK_API_KEY=environ.get("DEEPSEEK_API_KEY", ""),
             DEEPSEEK_API_URL=environ.get("DEEPSEEK_API_URL", "https://api.deepseek.com/v1"),
             DEEPSEEK_MODEL=environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+            CAMOUFOX_HEADLESS=environ.get("CAMOUFOX_HEADLESS", "false").lower() == "true",
+            CAMOUFOX_HUMANIZE=environ.get("CAMOUFOX_HUMANIZE", "true").lower() != "false",
+            CAMOUFOX_BLOCK_WEBRTC=environ.get("CAMOUFOX_BLOCK_WEBRTC", "true").lower() != "false",
+            CAMOUFOX_GEOIP=environ.get("CAMOUFOX_GEOIP", "true").lower() != "false",
+            CAMOUFOX_OS=environ.get("CAMOUFOX_OS", "windows"),
+            CAMOUFOX_LOCALE=environ.get("CAMOUFOX_LOCALE", "zh-CN"),
+            CAMOUFOX_SCREEN=environ.get("CAMOUFOX_SCREEN", ""),
+            CAMOUFOX_USER_DATA_DIR=environ.get("CAMOUFOX_USER_DATA_DIR", ""),
         )
 
 
