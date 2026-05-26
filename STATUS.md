@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P5 Agent + Camoufox + CookieBridge
-⬜ 進行中：附加模塊（P7-P9）
-下一步：ContentRemixAgent（数据分析/总结/改写）
+✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P7 Agent + Camoufox + CookieBridge
+⬜ 進行中：附加模塊（P8-P9）
+下一步：PicTacticAgent（智能配图策略）
 
 ---
 
@@ -50,7 +50,7 @@
 - CLI `--type aggregate --engine langgraph`
 - Review rounds 2 全部修復
 
-### ✅ 已完成 — 5 個專用 Agent
+### ✅ 已完成 — 7 個專用 Agent
 
 | # | Agent | 文件 | Commit | 說明 |
 |:--|-------|------|--------|------|
@@ -59,6 +59,8 @@
 | P3 | Video Analyst | `agents/video_analyst.py` | `394b15c` | 視頻結構拆解（hook_type / pacing / structure_template） |
 | P4 | Sentiment Reader | `agents/sentiment_reader.py` | `ba81aee` | 評論情緒分析（positive/neutral/negative%） |
 | P5 | Copy Writer | `agents/copy_writer.py` | `f9f20cb` | 營銷文案生成（headline/short/medium/long） |
+| P6 | Content Remixer | `agents/content_remixer.py` | `f4f2134` | 數據分析/總結/改寫（summarize/analyze/rewrite） |
+| P7 | Pic Tactic | `agents/pic_tactic.py` | — | 智能配圖策略（cover/social/trend） |
 
 每個 Agent 均支持：
 - DeepSeek V4 Flash LLM 分析（無 API key 時自動降級為模板模式）
@@ -94,8 +96,6 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 ```
 第五優先（附加模塊）
-  P7 — ContentRemixAgent         數據分析/總結/改寫
-  P8 — PicTacticAgent            智能配圖生成
   P9 — Video/Image Downloader    批量下載
 ```
 
@@ -143,4 +143,4 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 ---
 
-*最後更新：2026-05-26 — CookieBridge Chrome Extension 完成，服務驗證通過*
+*最後更新：2026-05-26 — P7 PicTacticAgent 智能配图策略完成*
