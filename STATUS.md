@@ -8,8 +8,8 @@
 ## 當前焦點
 
 ✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P15 全部完成
-✅ 全平台 full pipeline 實戰驗證（5/5 平台唔崩，3/5 有數據）
-**下一步：微博、貼吧平台支援（P2 延後任務）**
+✅ 全平台 full pipeline 實戰驗證（7 平台全部通過）
+**下一步：生產環境部署 + 實戰數據積累**
 
 ---
 
@@ -101,7 +101,7 @@
 ### 🟢 P2 — 可以延後
 - [x] Docker 一鍵部署（Dockerfile + docker-compose.yml）
 - [x] Windows 一鍵部署（deploy.ps1 + deploy.bat）
-- [ ] 微博、貼吧平台支援
+- [x] 微博、貼吧平台支援
 - [x] Golang 高性能版本
 
 ---
@@ -184,7 +184,7 @@
 | Docker 一鍵部署 | ✅ |
 | Windows 一鍵部署 | ✅ |
 | Golang 高性能版本 | ✅ Go殼+Python腦（sidecar_server.py + Go CLI + Go API Server） |
-| 微博、貼吧平台支援 | ❌ |
+| 微博、貼吧平台支援 | ✅ weibo_adapter.py + tieba_adapter.py（各 200+ 行，search/hot/detail/comment/user） |
 
 ---
 
@@ -373,6 +373,10 @@ smart-agent-pro/
 - 抖音 0條（需登錄態，Agent 降級正常）| 快手 0條（需登錄態，Agent 降級正常）
 - 5/5 平台 pipeline 無崩潰，零報錯中斷
 
+**2026-05-26 微博 + 貼吧適配器**：
+- 微博 search 1條 7/7 Agent ✅ | 貼吧 search 0條 7/7 Agent ✅（降級正常）
+- 兩個新適配器各 ~200 行，支持 search/hot/detail/comment/user
+
 ---
 
 ## 規則（所有 AI 工具遵守）
@@ -384,5 +388,5 @@ smart-agent-pro/
 
 ---
 
-*最後更新：2026-05-26 — P15 Go 高性能版本完成（Go 殼 + Python 腦，6.7MB 單二進制，Full Pipeline 72s）*
+*最後更新：2026-05-26 — 全平台驗證完成 + 微博/貼吧適配器（7 平台全部就緒）*
 

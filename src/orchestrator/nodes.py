@@ -18,6 +18,8 @@ _ADAPTER_MAP = {
     "douyin":       ("src.agents.douyin_adapter",       "DouyinAdapter"),
     "zhihu":        ("src.agents.zhihu_adapter",        "ZhihuAdapter"),
     "kuaishou":     ("src.agents.kuaishou_adapter",     "KuaishouAdapter"),
+    "weibo":        ("src.agents.weibo_adapter",        "WeiboAdapter"),
+    "tieba":        ("src.agents.tieba_adapter",        "TiebaAdapter"),
 }
 
 _DEFAULT_PLATFORMS = list(_ADAPTER_MAP.keys())

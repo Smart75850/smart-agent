@@ -7,6 +7,8 @@ class PlatformType(str, Enum):
     DOUYIN = "douyin"
     ZHIHU = "zhihu"
     KUAISHOU = "kuaishou"
+    WEIBO = "weibo"
+    TIEBA = "tieba"
 
 
 class CrawlType(str, Enum):

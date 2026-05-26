@@ -12,9 +12,15 @@
 - **Docker 一鍵部署 (P14)**：deploy-docker.ps1（5 步構建+啟動，支持 --WithMySQL）
 - **Agent 並行化 (P11)**：兩階段 Send fan-out（Level1: product/video/sentiment，Level2: copy/remix/pic）
 - **API pipeline 端點 (P0)**：POST /api/pipeline，非同步執行，GET 輪詢結果
+- **全平台 full pipeline 實戰驗證**：7/7 平台唔崩，B站/小紅書/知乎/微博有真實數據
+- **微博 + 貼吧適配器 (P16)**：weibo_adapter.py + tieba_adapter.py（search/hot/detail/comment/user）
 
 ### 修改
 - `src/orchestrator/graph.py` — 線性鏈改兩階段 fan-out + 條件路由 + Send API
+- `src/orchestrator/nodes.py` — ADAPTER_MAP 加 weibo/tieba
+- `src/aggregator.py` — 加 weibo/tieba 平台 ID 提取
+- `constant/platform.py` — PlatformType 加 WEIBO/TIEBA
+- `api/routers/platforms.py` — _PLATFORMS 加微博/貼吧
 - `docker-compose.yml` — 移除過時 version 字段
 - `STATUS.md` — 新增 P11-P15 驗證記錄 + Go 版架構文檔
 

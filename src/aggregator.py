@@ -27,6 +27,7 @@ def _normalize(item: dict, platform: str) -> dict:
     out["platform_id"] = (
         item.get("photo_id") or item.get("bvid") or item.get("aweme_id")
         or item.get("aid") or item.get("note_id") or item.get("question_id")
+        or item.get("weibo_id") or item.get("tid")
         or item.get("id") or ""
     )
     out["raw"] = item
