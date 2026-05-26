@@ -73,6 +73,26 @@ def parse_args(argv=None):
         "--resume", action="store_true",
         help="斷點續跑：跳過已完成任務",
     )
+    parser.add_argument(
+        "--llm-filter", action="store_true",
+        help="啟用 LLM 過濾打分（僅 --engine=langgraph 時有效）",
+    )
+    parser.add_argument(
+        "--stream", action="store_true",
+        help="啟用 SSE 流式輸出（僅 --engine=langgraph 時有效）",
+    )
+    parser.add_argument(
+        "--list-platforms", action="store_true",
+        help="列出支援平台",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="只顯示執行計劃，唔實際執行",
+    )
+    parser.add_argument(
+        "--schedule", type=str, default=None,
+        help="定時執行 (cron 表達式)",
+    )
     return parser.parse_args(argv)
 
 
@@ -152,6 +172,26 @@ def limit_results(data, n):
 
 async def main():
     args = parse_args()
+    # ── aggregate + langgraph 快速路徑 ───────────────────────
+    if args.type == "aggregate" and args.engine == "langgraph":
+        if args.stream:
+            from src.orchestrator import run_pipeline_stream
+            async for event in run_pipeline_stream(
+                keyword=args.keyword or "",
+                limit=args.limit or 30,
+                llm_filter=args.llm_filter,
+            ):
+                print(json.dumps(event, ensure_ascii=False))
+        else:
+            from src.orchestrator import run_pipeline
+            result = await run_pipeline(
+                keyword=args.keyword or "",
+                limit=args.limit or 30,
+                llm_filter=args.llm_filter,
+            )
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
 
     # ── engine ───────────────────────────────────────────────
     os.environ["BROWSER_ENGINE"] = args.engine
@@ -186,10 +226,16 @@ async def main():
             logger.info(f"--resume 模式：跳過 {skipped} 個已完成任務")
 
     try:
+        task_idx = 0
+        task_total = len(tasks)
+
         for platform, action, func, kwargs in tasks:
             key = f"{platform}_{action}"
             # 寫入 checkpoint（pending→running）
             ck.save_task(platform, action, args.keyword, status="running")
+
+            task_idx += 1
+            logger.info(f"[{task_idx}/{task_total}] {platform} {action}: {args.keyword or 'hot'}")
 
             try:
                 result = await func(**kwargs)
