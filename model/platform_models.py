@@ -17,6 +17,7 @@ class VideoItem:
     date: Optional[str] = None
     description: Optional[str] = None
     cover_url: Optional[str] = None
+    video_url: Optional[str] = None
     raw_data: dict = field(default_factory=dict)
 
 

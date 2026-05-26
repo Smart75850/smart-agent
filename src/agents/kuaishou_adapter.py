@@ -6,6 +6,19 @@ from base.platform_base import PlatformAdapter
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
+
+def _pick_best_cover(cover_urls: list) -> str:
+    """从快手 coverUrls 列表中选最佳 URL，优先 jpg > webp > avif。"""
+    if not cover_urls:
+        return ""
+    for fmt in ("jpg", "webp", "avif"):
+        for c in cover_urls:
+            url = c.get("url", "") if isinstance(c, dict) else str(c)
+            if f".{fmt}" in url.lower():
+                return url
+    c0 = cover_urls[0]
+    return c0.get("url", "") if isinstance(c0, dict) else str(c0)
+
 _SEARCH_JS = """\
 () => {
     const seen = new Set();
@@ -92,6 +105,7 @@ async def kuaishou_search(keyword: str, count: int = 40) -> str:
                                 "likes": str(photo.get("likeCount", "")),
                                 "photo_id": pid,
                                 "link": f"https://www.kuaishou.com/photo/{pid}",
+                                "cover_url": _pick_best_cover(photo.get("coverUrls", [])),
                             })
                     except Exception:
                         pass
@@ -144,6 +158,7 @@ async def kuaishou_hot() -> str:
                                 "likes": str(photo.get("likeCount", "")),
                                 "photo_id": pid,
                                 "link": f"https://www.kuaishou.com/photo/{pid}",
+                                "cover_url": _pick_best_cover(photo.get("coverUrls", [])),
                             })
                     except Exception:
                         pass

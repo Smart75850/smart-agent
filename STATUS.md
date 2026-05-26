@@ -7,9 +7,9 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P7 Agent + Camoufox + CookieBridge
-⬜ 進行中：附加模塊（P9）
-下一步：Video/Image Downloader（批量下載）
+✅ Phase 1 引擎全部 + Phase 2 LangGraph 骨架 + P1-P8 Agent + Camoufox + CookieBridge
+⬜ 進行中：附加模塊（全部完成）
+下一步：系統整合測試 + CLI 完善
 
 ---
 
@@ -50,9 +50,9 @@
 - CLI `--type aggregate --engine langgraph`
 - Review rounds 2 全部修復
 
-### ✅ 已完成 — 7 個專用 Agent
+### ✅ 已完成 — 8 個專用模塊
 
-| # | Agent | 文件 | Commit | 說明 |
+| # | 模塊 | 文件 | Commit | 說明 |
 |:--|-------|------|--------|------|
 | P1 | Trend Scout | `agents/trend_scout.py` | `951117a` | 爆款識別分析（viral_score / trend_reason） |
 | P2 | Product Miner | `agents/product_miner.py` | `82ae857` | 選品深入分析（monetization_potential / 競爭優勢） |
@@ -61,6 +61,7 @@
 | P5 | Copy Writer | `agents/copy_writer.py` | `f9f20cb` | 營銷文案生成（headline/short/medium/long） |
 | P6 | Content Remixer | `agents/content_remixer.py` | `f4f2134` | 數據分析/總結/改寫（summarize/analyze/rewrite） |
 | P7 | Pic Tactic | `agents/pic_tactic.py` | `11eb2fa` | 智能配圖策略（cover/social/trend） |
+| P8 | Media Downloader | `downloader/media_downloader.py` | — | 批量下載封面+視頻（httpx流式+瀏覽器輔助提取） |
 
 每個 Agent 均支持：
 - DeepSeek V4 Flash LLM 分析（無 API key 時自動降級為模板模式）
@@ -95,8 +96,7 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 ### ❌ 未開始
 
 ```
-第五優先（附加模塊）
-  P9 — Video/Image Downloader    批量下載
+（無 — 所有計劃模塊已完成）
 ```
 
 ---
@@ -204,4 +204,4 @@ Chrome Extension (MV3) + Python stdlib HTTP 服务器，一键同步浏览器登
 
 ---
 
-*最後更新：2026-05-26 — 市場分析報告寫入 STATUS.md*
+*最後更新：2026-05-26 — P8 MediaDownloader 批量下载完成*

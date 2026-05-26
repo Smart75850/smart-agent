@@ -31,6 +31,11 @@ class Settings:
     STORE_BACKEND: str = "json"
     OUTPUT_DIR: str = "output"
 
+    # 下載
+    DOWNLOAD_DIR: str = "downloads"
+    DOWNLOAD_MAX_CONCURRENT: int = 3
+    DOWNLOAD_MAX_FILE_MB: int = 500
+
     # LangGraph
     LANGGRAPH_CHECKPOINT_DB: str = "output/langgraph_checkpoint.db"
 
@@ -64,6 +69,9 @@ class Settings:
             COOKIE_DIR=environ.get("COOKIE_DIR", "browser_data"),
             STORE_BACKEND=environ.get("STORE_BACKEND", "json"),
             OUTPUT_DIR=environ.get("OUTPUT_DIR", "output"),
+            DOWNLOAD_DIR=environ.get("DOWNLOAD_DIR", "downloads"),
+            DOWNLOAD_MAX_CONCURRENT=int(environ.get("DOWNLOAD_MAX_CONCURRENT", "3")),
+            DOWNLOAD_MAX_FILE_MB=int(environ.get("DOWNLOAD_MAX_FILE_MB", "500")),
             MYSQL_HOST=environ.get("MYSQL_HOST", "localhost"),
             MYSQL_PORT=int(environ.get("MYSQL_PORT", "3306")),
             MYSQL_USER=environ.get("MYSQL_USER", "root"),

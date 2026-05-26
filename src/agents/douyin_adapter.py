@@ -66,6 +66,7 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
                             seen_aweme.add(aid)
                             author = info.get("author", {}) or {}
                             stat = info.get("statistics", {}) or {}
+                            video = info.get("video", {}) or {}
                             api_items.append({
                                 "title": info.get("desc", ""),
                                 "author": author.get("nickname", ""),
@@ -73,6 +74,7 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
                                 "likes": stat.get("digg_count", 0),
                                 "aweme_id": aid,
                                 "sec_uid": author.get("sec_uid", ""),
+                                "cover_url": (video.get("cover", {}) or {}).get("url_list", [""])[0],
                             })
                     except Exception:
                         pass

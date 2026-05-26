@@ -261,6 +261,7 @@ async def format_output(state: PipelineState) -> dict[str, Any]:
             "plays":       item.get("plays", ""),
             "likes":       item.get("likes", ""),
             "link":        item.get("link", ""),
+            "cover_url":   item.get("cover_url", ""),
         }
         if "score" in item:
             out["score"] = item["score"]
