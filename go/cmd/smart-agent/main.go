@@ -17,6 +17,7 @@ import (
 func main() {
 	serve := flag.Bool("serve", false, "启动 API 服务器")
 	keyword := flag.String("keyword", "", "搜索关键词")
+	platform := flag.String("platform", "", "指定平台 (bilibili/douyin/kuaishou/xiaohongshu/zhihu)，留空=全平台")
 	pipelineMode := flag.String("pipeline", "full", "管道模式: simple|full")
 	limit := flag.Int("limit", 10, "每平台搜索条数")
 	flag.Parse()
@@ -31,13 +32,19 @@ func main() {
 	if *keyword == "" {
 		fmt.Println("用法:")
 		fmt.Println("  smart-agent --serve                 启动 API 服务器")
-		fmt.Println("  smart-agent --keyword <关键词>       运行 pipeline (full 模式)")
+		fmt.Println("  smart-agent --keyword <关键词>       运行 pipeline (全平台)")
+		fmt.Println("  smart-agent --keyword <关键词> --platform bilibili  指定平台")
 		fmt.Println("  smart-agent --keyword <关键词> --pipeline simple  仅搜索+聚合")
 		fmt.Println("  smart-agent --keyword <关键词> --limit 20          指定数量")
 		os.Exit(1)
 	}
 
-	runCLI(*keyword, *pipelineMode, *limit)
+	platforms := []string{"bilibili", "douyin", "kuaishou", "xiaohongshu", "zhihu"}
+	if *platform != "" {
+		platforms = []string{*platform}
+	}
+
+	runCLI(*keyword, *pipelineMode, *limit, platforms)
 }
 
 func runServer(cfg *config.Settings) {
@@ -52,10 +59,10 @@ func runServer(cfg *config.Settings) {
 	}
 }
 
-func runCLI(keyword, mode string, limit int) {
+func runCLI(keyword, mode string, limit int, platforms []string) {
 	state := &models.PipelineState{
 		Keyword:      keyword,
-		Platforms:    []string{"bilibili", "douyin", "kuaishou", "xiaohongshu", "zhihu"},
+		Platforms:    platforms,
 		Limit:        limit,
 		PipelineMode: mode,
 	}

@@ -8,8 +8,8 @@
 ## 當前焦點
 
 ✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P15 全部完成
-⬜ 進行中：無（核心功能全部完成）
-**下一步：全平台 full pipeline 實戰驗證（抖音/快手/小紅書/知乎 各跑一次）**
+✅ 全平台 full pipeline 實戰驗證（5/5 平台唔崩，3/5 有數據）
+**下一步：微博、貼吧平台支援（P2 延後任務）**
 
 ---
 
@@ -91,7 +91,7 @@
 
 ### 🔴 P0 — 必須完成
 - [x] **API 層 pipeline 端點** — `POST /api/pipeline` 暴露 `run_pipeline()` 俾 WebUI 調用
-- [ ] **全平台 full pipeline 實戰驗證** — 5 平台各跑一次 `--pipeline full`，確認無報錯（已測 B站）
+- [x] **全平台 full pipeline 實戰驗證** — 5 平台各跑一次 `--pipeline full`，確認無報錯（B站✅ 小紅書✅ 知乎✅ 抖音⚠️需登錄 快手⚠️需登錄）
 
 ### 🟡 P1 — 應該完成
 - [x] **Agent 集成測試** — pytest 測試覆蓋 full pipeline 降級模式（23 tests）
@@ -367,6 +367,11 @@ smart-agent-pro/
 - 5 平台搜索 24s → TrendScout 9s → Level1 12s（product/video/sentiment 並行）
 - → Level2 27s（copy/remix/pic 並行）→ 總計 72s
 - 7/7 Agent 全部通過，Go 二進制 6.7MB（零外部依賴）
+
+**2026-05-26 全平台單獨 Full Pipeline 驗證**：
+- B站 3條 7/7 Agent ✅ | 小紅書 3條 7/7 Agent ✅ | 知乎 2條 7/7 Agent ✅
+- 抖音 0條（需登錄態，Agent 降級正常）| 快手 0條（需登錄態，Agent 降級正常）
+- 5/5 平台 pipeline 無崩潰，零報錯中斷
 
 ---
 
