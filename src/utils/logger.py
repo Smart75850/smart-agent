@@ -13,6 +13,7 @@ def setup_logger(name: str = "smart-agent", level: int = logging.INFO) -> loggin
         ))
         logger.addHandler(handler)
         logger.setLevel(level)
+        logger.propagate = False
     return logger
 
 

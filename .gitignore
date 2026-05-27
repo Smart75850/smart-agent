@@ -1,17 +1,13 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
 *.egg-info/
 dist/
 build/
 *.egg
-
-# Virtual env
+.venv
 venv/
-.venv/
 env/
-.env
 
 # IDE
 .vscode/
@@ -19,26 +15,26 @@ env/
 *.swp
 *.swo
 
-# Browser profiles (Chrome user data — large, machine-specific)
+# Browser profiles & data
 chrome_*/
 chrome_debug/
-
-# Browser data (cookies, sessions)
 browser_data/
 
-# OS
-.DS_Store
-Thumbs.db
+# Output & logs
+output/
+logs/
+*.log
 
-# Test artifacts
-*.png
-*.txt
-*.json
-!requirements.txt
-!test_all_platforms.py
-
-# pytest
+# Cache
+.cache_*/
+.claude/
 .pytest_cache/
 
-# Project specific
-platform_verify.txt
+# Environment
+.env
+.env.local
+
+# Go binaries
+*.exe
+go/smart-agent.exe
+smart-agent-go.exe

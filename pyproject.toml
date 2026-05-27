@@ -1,7 +1,7 @@
 [project]
 name = "smart-agent"
-version = "0.1.0"
-description = "Non-Commercial Learning License 1.0 — 純爬蟲，多平台內容採集 MCP Server"
+version = "1.0.0"
+description = "Smart Agent v1.0 — 多平台內容採集框架"
 requires-python = ">=3.11"
 authors = [{name = "Smart75850"}]
 license = {text = "NON-COMMERCIAL LEARNING LICENSE 1.0"}
