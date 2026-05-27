@@ -46,6 +46,19 @@ class Settings:
     DOWNLOAD_MAX_CONCURRENT: int = 3
     DOWNLOAD_MAX_FILE_MB: int = 500
 
+    # ── SignSrv 签名服务 ──
+    SIGN_SRV_ENABLED: bool = True
+    SIGN_SRV_PORT: int = 18501
+    SIGN_SRV_TIMEOUT: int = 10
+
+    # ── JS 收割 ──
+    HARVEST_ENABLED: bool = True
+    HARVEST_INTERVAL_HOURS: int = 6
+    HARVEST_ON_STARTUP: bool = False
+
+    # ── 平台签名开关 ──
+    SIGN_PLATFORM_ENABLED: str = "douyin,bilibili"
+
     # LangGraph
     LANGGRAPH_CHECKPOINT_DB: str = "output/langgraph_checkpoint.db"
 
@@ -88,6 +101,14 @@ class Settings:
             MYSQL_PASSWORD=environ.get("MYSQL_PASSWORD", ""),
             MYSQL_DATABASE=environ.get("MYSQL_DATABASE", "smart_agent"),
             LANGGRAPH_CHECKPOINT_DB=environ.get("LANGGRAPH_CHECKPOINT_DB", "output/langgraph_checkpoint.db"),
+            # SignSrv
+            SIGN_SRV_ENABLED=environ.get("SIGN_SRV_ENABLED", "true").lower() == "true",
+            SIGN_SRV_PORT=int(environ.get("SIGN_SRV_PORT", "18501")),
+            SIGN_SRV_TIMEOUT=int(environ.get("SIGN_SRV_TIMEOUT", "10")),
+            HARVEST_ENABLED=environ.get("HARVEST_ENABLED", "true").lower() == "true",
+            HARVEST_INTERVAL_HOURS=int(environ.get("HARVEST_INTERVAL_HOURS", "6")),
+            HARVEST_ON_STARTUP=environ.get("HARVEST_ON_STARTUP", "false").lower() == "true",
+            SIGN_PLATFORM_ENABLED=environ.get("SIGN_PLATFORM_ENABLED", "douyin,bilibili"),
             LLM_API_KEY=environ.get("LLM_API_KEY", ""),
             LLM_API_URL=environ.get("LLM_API_URL", ""),
             LLM_MODEL=environ.get("LLM_MODEL", "doubao-pro-32k"),

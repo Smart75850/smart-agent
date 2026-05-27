@@ -1,0 +1,13 @@
+{
+  "platform": "douyin",
+  "last_harvest": "2026-05-27T03:23:35Z",
+  "js_files": {
+    "a_bogus": {
+      "file": "a_bogus_20260527_112335.js",
+      "sha256": "b5dfcfb9d893df3a",
+      "size": 15588,
+      "source_url": "seed"
+    }
+  },
+  "test_result": {}
+}

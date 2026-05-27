@@ -1,8 +1,14 @@
 import asyncio
 import json
+import os
+import httpx
+import time
+import random
 from typing import Optional
+from urllib.parse import urlencode, quote
 
 from base.platform_base import PlatformAdapter
+from config.settings import settings
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
@@ -44,9 +50,165 @@ _USER_JS = """\
 }"""
 
 
+def _load_cookies(platform: str) -> list[dict]:
+    """从 CookieBridge 保存的文件加载 cookies。"""
+    path = os.path.join(settings.COOKIE_DIR, f"cookies_{platform}.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _find_cookie(cookies: list[dict], name: str) -> str:
+    for c in cookies:
+        if c.get("name") == name:
+            return c.get("value", "")
+    return ""
+
+
+def _build_cookie_str(cookies: list[dict]) -> str:
+    return "; ".join(f"{c['name']}={c['value']}" for c in cookies if c.get("name") and c.get("value"))
+
+
+async def _douyin_search_http(keyword: str, count: int = 40) -> str:
+    """SignSrv 直连模式：httpx + a_bogus 签名，不用浏览器。
+
+    需要 CookieBridge 同步过的 Cookies（browser_data/douyin_cookies.json）。
+    若无 Cookies，自动回退到 CDP 浏览器模式。
+    """
+    cookies = _load_cookies("douyin")
+    if not cookies:
+        logger.info("[douyin-http] 无 douyin cookies，回退浏览器模式")
+        return ""
+
+    ttwid = _find_cookie(cookies, "ttwid")
+    if not ttwid:
+        logger.info("[douyin-http] cookies 中无 ttwid，回退浏览器模式")
+        return ""
+
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    cookie_str = _build_cookie_str(cookies)
+    ms_token = "".join(random.choices("ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789=", k=107))
+
+    base_url = "https://www.douyin.com/aweme/v1/web/search/item/"
+    params = {
+        "device_platform": "webapp",
+        "aid": "6383",
+        "channel": "channel_pc_web",
+        "search_channel": "aweme_general",
+        "sort_type": "0",
+        "publish_time": "0",
+        "keyword": keyword,
+        "search_source": "normal_search",
+        "query_correct_type": "1",
+        "is_filter_search": "0",
+        "from_group_id": "",
+        "offset": "0",
+        "count": str(count),
+        "pc_client_type": "1",
+        "version_code": "190700",
+        "version_name": "19.7.0",
+        "cookie_enabled": "true",
+        "screen_width": "1920",
+        "screen_height": "1080",
+        "browser_language": "zh-CN",
+        "browser_platform": "Win32",
+        "browser_name": "Chrome",
+        "browser_version": "131.0.0.0",
+        "browser_online": "true",
+        "engine_name": "Blink",
+        "engine_version": "131.0.0.0",
+        "os_name": "Windows",
+        "os_version": "10",
+        "cpu_core_num": "16",
+        "device_memory": "8",
+        "platform": "PC",
+        "downlink": "10",
+        "effective_type": "4g",
+        "round_trip_time": "50",
+        "msToken": ms_token,
+    }
+    url = f"{base_url}?{urlencode(params)}"
+
+    # 调用 SignSrv 获取签名
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            sign_resp = await client.post(
+                f"http://127.0.0.1:{settings.SIGN_SRV_PORT}/sign/douyin",
+                json={"url": url, "user_agent": ua},
+            )
+            sign_data = sign_resp.json()
+        except Exception:
+            return ""
+
+    a_bogus = sign_data.get("a_bogus", "")
+    if not a_bogus:
+        logger.warning("[douyin-http] a_bogus 为空")
+        return ""
+
+    params["a_bogus"] = a_bogus
+    full_url = f"{base_url}?{urlencode(params)}"
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(
+            full_url,
+            headers={
+                "User-Agent": ua,
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "zh-CN,zh;q=0.9",
+                "Referer": f"https://www.douyin.com/search/{quote(keyword)}",
+                "Cookie": cookie_str,
+                "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not:A-Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"',
+            },
+        )
+        data = resp.json()
+
+    status_code = data.get("status_code", 0)
+    if status_code != 0:
+        logger.warning(f"[douyin-http] API 返回 status_code={status_code}: {data.get('status_msg', '')}")
+        return ""
+
+    items = []
+    for item in data.get("data", []) or []:
+        info = item.get("aweme_info", item)
+        if not info:
+            continue
+        author = info.get("author", {}) or {}
+        stat = info.get("statistics", {}) or {}
+        video = info.get("video", {}) or {}
+        items.append({
+            "title": info.get("desc", ""),
+            "author": author.get("nickname", ""),
+            "plays": stat.get("play_count", 0),
+            "likes": stat.get("digg_count", 0),
+            "aweme_id": str(info.get("aweme_id", "")),
+            "sec_uid": author.get("sec_uid", ""),
+            "cover_url": (video.get("cover", {}) or {}).get("url_list", [""])[0],
+        })
+
+    logger.info(f"[douyin-http] SignSrv 直连成功: {len(items)} 条")
+    return json.dumps(items, ensure_ascii=False)
+
+
 async def douyin_search(keyword: str, count: int = 40) -> str:
-    """抖音搜索 — Playwright CDP + 网络拦截搜索 API。"""
+    """抖音搜索 — SignSrv 直连优先，fallback 到 CDP 浏览器。"""
     logger.info(f"抖音搜索: keyword={keyword} count={count}")
+
+    # ── Path 1: SignSrv 直连（免浏览器）─────────────────────
+    if settings.SIGN_SRV_ENABLED and "douyin" in settings.SIGN_PLATFORM_ENABLED:
+        try:
+            result = await _douyin_search_http(keyword, count)
+            if result:
+                return result
+        except Exception as exc:
+            logger.warning(f"抖音 SignSrv 直连失败: {exc}，fallback 到浏览器")
+
+    # ── Path 2: CDP 浏览器（原有逻辑）──────────────────────
     try:
         page = await browser.new_page()
         try:
@@ -93,6 +255,35 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
 
             # 等待最后一批API响应
             await page.wait_for_timeout(3000)
+
+            # DOM 兜底：API 拦截无结果时尝试 DOM 提取
+            if not api_items:
+                logger.info("抖音搜索: API 拦截无结果，尝试 DOM 兜底")
+                try:
+                    dom_result = await page.evaluate(_SEARCH_JS)
+                    if dom_result:
+                        for item in dom_result:
+                            if item.get("title"):
+                                api_items.append({
+                                    "title": item.get("title", ""),
+                                    "author": item.get("author", ""),
+                                    "plays": item.get("plays", 0),
+                                    "likes": 0,
+                                    "aweme_id": item.get("link", "").split("/video/")[-1] if "/video/" in (item.get("link") or "") else "",
+                                    "sec_uid": "",
+                                    "cover_url": "",
+                                })
+                except Exception:
+                    pass
+
+            # 检查是否需要登录
+            if not api_items:
+                try:
+                    body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
+                    if "登录" in body_text and "抖音" in body_text:
+                        logger.warning("抖音搜索: 可能需要登录，请先手动登录抖音")
+                except Exception:
+                    pass
 
             result = api_items[:count]
             logger.info(f"抖音搜索完成: {len(result)} 条")

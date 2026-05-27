@@ -17,6 +17,7 @@ from pydantic import BaseModel
 # 确保项目根目录在 sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from config.settings import settings
 from src.utils.logger import logger
 from src.utils.browser_service import browser
 from src.orchestrator.nodes import _get_adapter, _retry
@@ -47,6 +48,20 @@ _AGENTS = {
 async def lifespan(app: FastAPI):
     logger.info("[sidecar] 启动浏览器服务...")
     await browser.start()
+
+    # SignSrv: 挂载签名服务子应用
+    if settings.SIGN_SRV_ENABLED:
+        try:
+            from sign_srv.server import create_app as create_sign_app, cache as sign_cache
+            sign_app = create_sign_app()
+            app.mount("/sign", sign_app)
+            logger.info("[sidecar] SignSrv 已挂载: /sign")
+
+            # 预装已验证的 a_bogus JS（如果缓存为空）
+            _seed_douyin_js(sign_cache)
+        except Exception as exc:
+            logger.warning(f"[sidecar] SignSrv 加载失败: {exc}")
+
     logger.info("[sidecar] Sidecar 就绪: http://localhost:18500")
     yield
     logger.info("[sidecar] 关闭浏览器服务...")
@@ -213,6 +228,29 @@ def _extract_items(data) -> list:
     if isinstance(data, list):
         return data
     return []
+
+
+def _seed_douyin_js(cache):
+    """预装已验证的抖音 a_bogus JS（从 yingzi4f/a_bogus 提取）。
+
+    仅在缓存为空时执行，避免覆盖已有 JS。
+    """
+    import os as _os
+    try:
+        if cache.has_valid_js("douyin", "a_bogus"):
+            return
+        js_path = _os.path.join(_os.path.dirname(__file__), "sign_srv", "js_seed", "a_bogus.js")
+        if not _os.path.exists(js_path):
+            # 尝试从测试目录复制
+            src = r"C:\tmp\a_bogus_test\utils\a_bogus.js"
+            if _os.path.exists(src):
+                cache.save_js("douyin", "a_bogus", open(src, encoding="utf-8").read(), "seed")
+                logger.info("[sidecar] 已预装 douyin a_bogus JS")
+        else:
+            cache.save_js("douyin", "a_bogus", open(js_path, encoding="utf-8").read(), "seed")
+            logger.info("[sidecar] 已预装 douyin a_bogus JS")
+    except Exception as exc:
+        logger.warning(f"[sidecar] 预装 douyin JS 失败: {exc}")
 
 
 # ── Main ────────────────────────────────────────────────────
