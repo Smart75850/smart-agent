@@ -23,7 +23,7 @@ class CrawlRequest(BaseModel):
     type: str = "search"
     keyword: str = ""
     limit: int = 20
-    engine: str = "playwright"
+    engine: str = "auto"
 
 
 def _lazy_init_adapters():

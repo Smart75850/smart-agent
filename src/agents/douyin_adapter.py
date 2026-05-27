@@ -196,10 +196,22 @@ async def _douyin_search_http(keyword: str, count: int = 40) -> str:
 
 
 async def douyin_search(keyword: str, count: int = 40) -> str:
-    """抖音搜索 — SignSrv 直连优先，fallback 到 CDP 浏览器。"""
+    """抖音搜索 — 纯 HTTP Session 优先 → SignSrv → CDP 浏览器 fallback。"""
     logger.info(f"抖音搜索: keyword={keyword} count={count}")
 
-    # ── Path 1: SignSrv 直连（免浏览器）─────────────────────
+    # ── Path 1: 纯 HTTP Session（零浏览器，毫秒级）─────────
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("douyin"):
+            from src.utils.douyin_http import search_all
+            items = await search_all(keyword, limit=count)
+            if items:
+                logger.info(f"[douyin-session] 纯HTTP直连成功: {len(items)} 条")
+                return json.dumps(items, ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"抖音 Session HTTP 失败: {exc}，尝试下一路径")
+
+    # ── Path 2: SignSrv 直连（备选）─────────────────────────
     if settings.SIGN_SRV_ENABLED and "douyin" in settings.SIGN_PLATFORM_ENABLED:
         try:
             result = await _douyin_search_http(keyword, count)
@@ -208,7 +220,7 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
         except Exception as exc:
             logger.warning(f"抖音 SignSrv 直连失败: {exc}，fallback 到浏览器")
 
-    # ── Path 2: CDP 浏览器（原有逻辑）──────────────────────
+    # ── Path 3: CDP 浏览器（最终兜底）──────────────────────
     try:
         page = await browser.new_page()
         try:

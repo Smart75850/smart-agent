@@ -55,7 +55,15 @@ async def zhihu_hot() -> str:
     try:
         await page.goto("https://www.zhihu.com/hot", wait_until="domcontentloaded")
         await page.wait_for_timeout(3000)
+        cur_url = page.url
+        if "signin" in cur_url or "login" in cur_url:
+            logger.warning("知乎熱榜: 檢測到登入牆 (URL 跳轉至 signin/login)，請先手動登入知乎")
+            return json.dumps([], ensure_ascii=False)
         result = await page.evaluate(_HOT_JS)
+        if not result:
+            body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
+            if "登录" in body_text and "注册" in body_text:
+                logger.warning("知乎熱榜: 檢測到登入牆 (頁面包含登入/註冊提示)，請先手動登入知乎")
         logger.info(f"知乎熱榜完成: {len(result)} 條結果")
         return json.dumps(result, ensure_ascii=False)
     finally:
@@ -179,8 +187,22 @@ class ZhihuAdapter(PlatformAdapter):
 
 
 async def zhihu_search(keyword: str) -> str:
-    """搜索知乎內容，需登入先有完整結果。回傳 JSON 字串。"""
+    """搜索知乎內容。Path 1: 纯 HTTP Session → Path 2: CDP Browser"""
     logger.info(f"知乎搜索: keyword={keyword}")
+
+    # Path 1: 纯 HTTP Session（零浏览器，毫秒级）
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("zhihu"):
+            from src.utils.zh_http import search_all
+            items = await search_all(keyword, limit=20)
+            if items:
+                logger.info(f"[zhihu-session] 纯HTTP直连成功: {len(items)} 条")
+                return json.dumps(items, ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"知乎 Session HTTP 失败: {exc}，尝试 CDP 浏览器路径")
+
+    # Path 2: CDP Browser
     page = await browser.new_page()
     try:
         await page.goto(
@@ -188,7 +210,15 @@ async def zhihu_search(keyword: str) -> str:
             wait_until="domcontentloaded",
         )
         await page.wait_for_timeout(5000)
+        cur_url = page.url
+        if "signin" in cur_url or "login" in cur_url:
+            logger.warning(f"知乎搜索: 檢測到登入牆 (URL 跳轉至 signin/login)，請先手動登入知乎")
+            return json.dumps([], ensure_ascii=False)
         result = await page.evaluate(_SEARCH_JS)
+        if not result:
+            body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
+            if "登录" in body_text and "注册" in body_text:
+                logger.warning("知乎搜索: 檢測到登入牆 (頁面包含登入/註冊提示)，請先手動登入知乎")
         logger.info(f"知乎搜索完成: {len(result)} 條結果")
         return json.dumps(result, ensure_ascii=False)
     finally:

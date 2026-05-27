@@ -72,7 +72,22 @@ async def weibo_hot() -> str:
 
 
 async def weibo_search(keyword: str) -> str:
+    """搜索微博。Path 1: 纯 HTTP Session → Path 2: CDP Browser"""
     logger.info(f"微博搜索: keyword={keyword}")
+
+    # Path 1: 纯 HTTP Session（零浏览器，毫秒级）
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("weibo"):
+            from src.utils.weibo_http import search_all
+            items = await search_all(keyword, limit=20)
+            if items:
+                logger.info(f"[weibo-session] 纯HTTP直连成功: {len(items)} 条")
+                return json.dumps(items, ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"微博 Session HTTP 失败: {exc}，尝试 CDP 浏览器路径")
+
+    # Path 2: CDP Browser
     page = await browser.new_page()
     try:
         await page.goto(

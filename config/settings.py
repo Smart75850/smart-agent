@@ -15,7 +15,7 @@ except ImportError:
 @dataclass
 class Settings:
     # 瀏覽器
-    BROWSER_ENGINE: str = "playwright"   # playwright / cdp / camoufox
+    BROWSER_ENGINE: str = "auto"   # auto / playwright / cdp / camoufox
     CDP_PORT: int = 9222
     PAGE_TIMEOUT: int = 30000
     SLEEP_AFTER_LOAD: int = 8            # SPA 等待秒數

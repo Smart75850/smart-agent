@@ -78,8 +78,22 @@ _HOT_JS = """\
 
 
 async def kuaishou_search(keyword: str, count: int = 40) -> str:
-    """搜索快手视频 — 拦截 search/feed API。"""
+    """搜索快手视频 — 纯 HTTP Session 优先，浏览器兜底。"""
     logger.info(f"快手搜索: keyword={keyword} count={count}")
+
+    # ── Path 1: 纯 HTTP Session（零浏览器）─────────────────
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("kuaishou"):
+            from src.utils.ks_http import search_all
+            items = await search_all(keyword, limit=count)
+            if items:
+                logger.info(f"[ks-session] 纯HTTP直连成功: {len(items)} 条")
+                return json.dumps(items, ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"快手 Session HTTP 失败: {exc}，回退浏览器")
+
+    # ── Path 2: CDP 浏览器（兜底）─────────────────────────
     try:
         page = await browser.new_page()
         try:
@@ -124,6 +138,32 @@ async def kuaishou_search(keyword: str, count: int = 40) -> str:
                 await page.wait_for_timeout(2500)
 
             await page.wait_for_timeout(2000)
+
+            # DOM 兜底：API 拦截无结果时尝试 DOM 提取
+            if not all_items:
+                logger.info("快手搜索: API 拦截无结果，尝试 DOM 兜底")
+                try:
+                    dom_result = await page.evaluate(_SEARCH_JS)
+                    if dom_result:
+                        for item in dom_result:
+                            title = item.get("title") or ""
+                            if not title or title in seen:
+                                continue
+                            seen.add(title)
+                            link = item.get("link", "")
+                            pid = link.split("/photo/")[-1] if "/photo/" in link else ""
+                            all_items.append({
+                                "title": title,
+                                "author": item.get("author", ""),
+                                "plays": str(item.get("plays", "")),
+                                "likes": "",
+                                "photo_id": pid,
+                                "link": link,
+                                "cover_url": "",
+                            })
+                except Exception:
+                    pass
+
             result = all_items[:count]
             logger.info(f"快手搜索完成: {len(result)} 条")
             return json.dumps(result, ensure_ascii=False)

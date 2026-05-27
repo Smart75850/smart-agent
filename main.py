@@ -22,6 +22,8 @@ from src.agents.xiaohongshu_adapter import XiaohongshuAdapter
 from src.agents.douyin_adapter import DouyinAdapter
 from src.agents.zhihu_adapter import ZhihuAdapter
 from src.agents.kuaishou_adapter import KuaishouAdapter
+from src.agents.weibo_adapter import WeiboAdapter
+from src.agents.tieba_adapter import TiebaAdapter
 
 _ADAPTERS = {
     "bilibili": BilibiliAdapter(),
@@ -29,14 +31,17 @@ _ADAPTERS = {
     "douyin": DouyinAdapter(),
     "zhihu": ZhihuAdapter(),
     "kuaishou": KuaishouAdapter(),
+    "weibo": WeiboAdapter(),
+    "tieba": TiebaAdapter(),
 }
 
 # all 模式：跑晒所有平台指定 type
-_ALL_SEARCH  = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
-_ALL_HOT     = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
-_ALL_DETAIL  = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
-_ALL_COMMENT = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
-_ALL_USER    = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
+_ALL_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
+_ALL_SEARCH  = _ALL_PLATFORMS
+_ALL_HOT     = _ALL_PLATFORMS
+_ALL_DETAIL  = _ALL_PLATFORMS
+_ALL_COMMENT = _ALL_PLATFORMS
+_ALL_USER    = _ALL_PLATFORMS
 
 
 def parse_args(argv=None):
@@ -45,7 +50,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--platform", default="bilibili",
-        choices=["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "all"],
+        choices=["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba", "all"],
         help="目標平台（預設 bilibili）",
     )
     parser.add_argument(
@@ -219,7 +224,7 @@ async def main():
 
     # ── list-platforms ────────────────────────────────────
     if args.list_platforms:
-        platforms = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
+        platforms = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
         print("支援平台:")
         for p in platforms:
             print(f"  {p}")

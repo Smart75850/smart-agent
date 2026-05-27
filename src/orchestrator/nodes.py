@@ -52,7 +52,7 @@ async def _retry(func, max_retries: int = 3, base_delay: float = 2.0):
 
 
 async def search_platform(keyword: str, platform: str, limit: int) -> dict:
-    """单平台搜索，带 3 次重试 + 指数退避，失败降级返回 error。"""
+    """单平台搜索，带 3 次重试 + 指数退避，0结果时 fallback 到 hot。"""
     try:
         adapter = _get_adapter(platform)
 
@@ -61,9 +61,26 @@ async def search_platform(keyword: str, platform: str, limit: int) -> dict:
 
         items = await _retry(_search)
         logger.info(f"[{platform}] 搜索完成: {len(items)} 条")
+        if len(items) < 3:
+            logger.info(f"[{platform}] 搜索结果不足 ({len(items)} 条)，尝试热榜 fallback")
+            try:
+                hot_items = await _retry(lambda: adapter.hot(limit=limit))
+                if hot_items and len(hot_items) > len(items):
+                    logger.info(f"[{platform}] 热榜 fallback 成功: {len(hot_items)} 条")
+                    return hot_items
+            except Exception as hot_exc:
+                logger.debug(f"[{platform}] 热榜 fallback 也失败: {hot_exc}")
         return items
     except Exception as exc:
-        logger.warning(f"[{platform}] 搜索失败 (已重试): {exc}")
+        logger.warning(f"[{platform}] 搜索失败 (已重试): {exc}，尝试热榜 fallback")
+        try:
+            adapter = _get_adapter(platform)
+            hot_items = await _retry(lambda: adapter.hot(limit=limit))
+            if hot_items:
+                logger.info(f"[{platform}] 搜索失败但热榜 fallback 成功: {len(hot_items)} 条")
+                return hot_items
+        except Exception as hot_exc:
+            logger.warning(f"[{platform}] 热榜 fallback 也失败: {hot_exc}")
         return {"error": str(exc)}
 
 

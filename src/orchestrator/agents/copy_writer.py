@@ -23,6 +23,8 @@ class CopyVariant:
     text: str = ""
     tone: str = ""
     target_platform: str = ""
+    hook: str = ""
+    cta: str = ""
 
 
 @dataclass
@@ -89,17 +91,21 @@ class CopyWriter(BaseAgent):
             context_parts.append(f"爆款鉤子: {', '.join(hooks)}")
 
         prompt = (
-            f"基於以下分析結果，生成多版本營銷文案：\n\n"
+            f"你是一個資深營銷文案專家，擅長短視頻標題、小紅書種草文案、B站稿件標題。\n"
+            f"請基於以下分析結果，生成 4 個版本的營銷文案（每個版本 80-200 字，要可直接發佈的質量）：\n\n"
             + "\n".join(context_parts) +
             f"\n\n請返回 JSON（不要 markdown 代碼塊）：\n"
-            f'{{"summary": "文案策略一句話", '
+            f'{{"summary": "文案策略總結（50字以上，含目標受眾+核心賣點+情感調性）", '
             f'"variants": [{{"variant": "headline/short/medium/long", '
-            f'"text": "文案內容", "tone": "語氣風格", '
-            f'"target_platform": "douyin/xiaohongshu/bilibili"}}]}}'
+            f'"text": "完整文案內容（headline 20字內/short 50-80字/medium 80-150字/long 150-300字）", '
+            f'"tone": "語氣風格（如：熱血/溫情/專業/幽默/懸念）", '
+            f'"target_platform": "douyin/xiaohongshu/bilibili", '
+            f'"hook": "開頭鉤子設計說明", '
+            f'"cta": "行動號召"}}]}}'
         )
 
         try:
-            content = await self._call_llm(prompt, temperature=0.7, json_mode=True)
+            content = await self._call_llm(prompt, temperature=0.7, json_mode=True, max_tokens=4000)
             parsed = self._parse_json(content)
 
             variants = [
@@ -108,6 +114,8 @@ class CopyWriter(BaseAgent):
                     text=v.get("text", ""),
                     tone=v.get("tone", ""),
                     target_platform=v.get("target_platform", ""),
+                    hook=v.get("hook", ""),
+                    cta=v.get("cta", ""),
                 )
                 for v in parsed.get("variants", [])
             ]

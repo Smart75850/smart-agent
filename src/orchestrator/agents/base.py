@@ -14,13 +14,13 @@ class BaseAgent:
         self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
         self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
 
-    async def _call_llm(self, prompt: str, temperature: float = 0.7, json_mode: bool = False) -> str:
+    async def _call_llm(self, prompt: str, temperature: float = 0.7, json_mode: bool = False, max_tokens: int = 2000) -> str:
         """调用 DeepSeek LLM，返回原始响应文本。"""
         body = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temperature,
-            "max_tokens": 2000,
+            "max_tokens": max_tokens,
         }
         if json_mode:
             body["response_format"] = {"type": "json_object"}

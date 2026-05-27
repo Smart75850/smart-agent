@@ -1,0 +1,8 @@
+{
+  "proxies": [
+    "http://user:pass@proxy1.example.com:8080",
+    "http://proxy2.example.com:3128",
+    "socks5://127.0.0.1:1080"
+  ],
+  "_说明": "支持 http/https/socks5 代理，留空数组则直连"
+}

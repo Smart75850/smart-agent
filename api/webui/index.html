@@ -428,19 +428,37 @@ function handlePipelineResult(result) {
 
     let detailHTML='';
     if(itemsArr.length){
-      itemsArr.slice(0,5).forEach(it=>{
-        const label=it.title||it.name||it.scene||it.topic||it.variant||'';
-        const desc=it.trend_reason||it.competitive_advantage||it.structure_template||it.key_insights||it.text||it.learnings||'';
+      itemsArr.slice(0,8).forEach(it=>{
+        const label=it.title||it.name||it.scene||it.topic||it.variant||it.target_platform||'';
+        let desc='';
+        // 按 Agent 类型选取最合适的描述字段
+        if(a.key==='copy'){
+          desc=[it.hook?'钩子: '+it.hook:'', it.cta?'CTA: '+it.cta:'', it.tone?'语气: '+it.tone:''].filter(Boolean).join(' | ');
+          if(it.text) desc=(desc?desc+'<br>':'')+String(it.text).substring(0,200);
+        }else if(a.key==='remix'){
+          desc=it.recommended_angles||it.competition_level||it.entry_barrier||it.key_insights||it.changes_summary||'';
+          if(it.rewritten) desc=(desc?desc+'<br>':'')+'改写: '+String(it.rewritten).substring(0,150);
+        }else if(a.key==='visual'){
+          desc=[it.style?'风格: '+it.style:'', it.color_palette?'配色: '+it.color_palette:'', it.composition?'构图: '+it.composition:'', it.rationale?'理由: '+it.rationale:''].filter(Boolean).join(' | ');
+          if(it.prompt) desc=(desc?desc+'<br>':'')+'Prompt: '+String(it.prompt).substring(0,200);
+        }else{
+          desc=it.trend_reason||it.competitive_advantage||it.structure_template||it.key_insights||it.text||it.learnings||it.audience_reaction||'';
+        }
         const score=it.viral_score||it.hook_effectiveness||it.monetization_potential||it.positive_pct||it.opportunity_score;
         if(label||desc){
           detailHTML+='<div class="detail-item">';
           if(label) detailHTML+='<strong>'+String(label).replace(/</g,'&lt;').substring(0,80)+'</strong>';
           if(score!==undefined) detailHTML+=' <span class="detail-score" style="color:'+a.color+'">'+score+'分</span>';
-          if(desc) detailHTML+='<div>'+String(desc).replace(/</g,'&lt;').substring(0,150)+'</div>';
+          if(desc) detailHTML+='<div>'+String(desc).replace(/</g,'&lt;').substring(0,400)+'</div>';
           detailHTML+='</div>';
         }
       });
     }
+    // 显示额外顶层字段 (recommendations, visual_trend 等)
+    const extraFields={remix:['recommendations'], visual:['visual_trend']};
+    (extraFields[a.key]||[]).forEach(f=>{
+      if(fullData[f]) detailHTML+='<div class="detail-item"><strong>'+f+'</strong><div>'+String(fullData[f]).replace(/</g,'&lt;').substring(0,300)+'</div></div>';
+    });
 
     cardsHTML+='<div class="agent-card" style="border-left-color:'+a.color+'">'+
       '<div class="agent-header"><span class="agent-icon">'+a.icon+'</span><span class="agent-name">'+a.name+'</span></div>'+

@@ -53,8 +53,23 @@ async def bilibili_rank(category: str = "all") -> str:
 
 
 async def bilibili_search(keyword: str, count: int = 40) -> str:
-    """搜索 B站 关键字，支持翻页拿更多结果。回傳 JSON 字串。"""
+    """搜索 B站 关键字 — 纯 HTTP Wbi 签名优先，CDP 浏览器兜底。"""
     logger.info(f"B站搜索: keyword={keyword} count={count}")
+
+    # ── Path 1: 纯 HTTP Wbi 签名（零浏览器）─────────────────
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("bilibili"):
+            from src.utils.bilibili_http import search_all
+            items = await search_all(keyword, limit=count)
+            if items:
+                links_normalized = _normalize_links(items)
+                logger.info(f"[bilibili-session] 纯HTTP直连成功: {len(items)} 条")
+                return json.dumps(links_normalized, ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"B站 HTTP 搜索失败: {exc}，回退 CDP 浏览器")
+
+    # ── Path 2: CDP 浏览器（兜底）─────────────────────────
     all_items = []
     seen_bvids = set()
     per_page = 42  # B站每页约 42 条

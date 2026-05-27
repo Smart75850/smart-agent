@@ -61,6 +61,22 @@ _PLATFORM_DEFAULTS = {
         "prompt": "bold and authentic, street style photography, kuaishou vibe, 9:16, warm tones, relatable",
         "rationale": "快手偏好真实感、接地气的视觉风格",
     },
+    "weibo": {
+        "scene": "social_post",
+        "style": "photography",
+        "color_palette": "红橙暖色 #E6162D #FF8200",
+        "composition": "1:1 方图或 3:4 竖版，文字叠加半透明遮罩，热搜话题风",
+        "prompt": "bold social media graphic, red and warm tones, weibo trending style, 1:1 aspect ratio, eye-catching typography overlay, viral content aesthetic",
+        "rationale": "微博偏好话题感强、有冲击力的视觉，红色系吸睛",
+    },
+    "tieba": {
+        "scene": "banner",
+        "style": "flat_illustration",
+        "color_palette": "蓝白清新 #3385FF #F0F4FA",
+        "composition": "16:9 横版，左侧 logo/图标 右侧大标题，论坛风格",
+        "prompt": "forum community banner, blue and white clean style, tieba aesthetic, 16:9 aspect ratio, flat design with bold title, community vibe",
+        "rationale": "贴吧偏好社区感、清爽的论坛风格",
+    },
 }
 
 _TREND_DEFAULT = "3D渲染 / 极简扁平 / 新中式 / Y2K复古 / 赛博朋克 — 基于文本推断（需 LLM 深度分析）"
@@ -158,21 +174,22 @@ class PicTactic(BaseAgent):
 
         mode_prompts = {
             "cover": (
-                f'{{"summary": "封面策略一句话", '
+                f'{{"summary": "封面策略总结（50字以上）", '
                 f'"tactics": [{{"scene": "cover", "target_platform": "{platform or "douyin"}", '
-                f'"style": "视觉风格", "color_palette": "配色方案+色号", '
-                f'"composition": "构图描述", '
-                f'"prompt": "英文AI生图提示词(Midjourney/Stable Diffusion通用)", '
-                f'"rationale": "推荐理由"}}]}}'
+                f'"style": "具体视觉风格（20字以上）", "color_palette": "详细配色方案+色号", '
+                f'"composition": "详细构图描述（30字以上，含比例+元素布局）", '
+                f'"prompt": "英文AI生图提示词（50字以上，Midjourney/Stable Diffusion通用）", '
+                f'"rationale": "推荐理由（30字以上）"}}]}}'
             ),
             "social": (
-                f'{{"summary": "多平台配图策略一句话", '
+                f'{{"summary": "多平台配图策略总结（100字以上，含整体视觉方向+差异化策略）", '
                 f'"tactics": [{{"scene": "cover/social_post/thumbnail", '
-                f'"target_platform": "douyin/xiaohongshu/bilibili/zhihu/kuaishou", '
-                f'"style": "视觉风格", "color_palette": "配色方案+色号", '
-                f'"composition": "构图描述", '
-                f'"prompt": "英文AI生图提示词", '
-                f'"rationale": "推荐理由"}}]}}'
+                f'"target_platform": "douyin/xiaohongshu/bilibili/zhihu/kuaishou/weibo/tieba", '
+                f'"style": "具体视觉风格（20字以上，如：极简扁平/3D渲染/纪实摄影/手绘插画）", '
+                f'"color_palette": "详细配色方案+色号（如：暖色渐变 #FF6B35→#FFD700，辅色 #FFF）", '
+                f'"composition": "详细构图描述（30字以上，含比例+元素布局+文字位置）", '
+                f'"prompt": "英文AI生图提示词（50字以上，Midjourney/Stable Diffusion通用，含风格关键词+构图+光照+画质）", '
+                f'"rationale": "推荐理由（30字以上，结合平台用户偏好+内容消费场景）"}}]}}'
             ),
             "trend": (
                 f'{{"summary": "视觉趋势一句话", "visual_trend": "当前流行视觉风格趋势描述", '
@@ -187,14 +204,14 @@ class PicTactic(BaseAgent):
         prompt = (
             f"你是一个视觉策略专家。模式: {mode}。\n"
             f"你精通 Midjourney、Stable Diffusion、DALL-E 等 AI 生图工具的提示词编写。\n"
-            f"你了解抖音/小红书/B站/知乎/快手等平台的视觉偏好和设计规范。\n\n"
+            f"你了解抖音/小红书/B站/知乎/快手/微博/贴吧等平台的视觉偏好和设计规范。\n\n"
             + "\n".join(context_parts)
             + f"\n\n请返回 JSON（不要 markdown 代码块）：\n"
             + mode_prompts.get(mode, mode_prompts["social"])
         )
 
         try:
-            content = await self._call_llm(prompt, temperature=0.7, json_mode=True)
+            content = await self._call_llm(prompt, temperature=0.7, json_mode=True, max_tokens=4000)
             parsed = self._parse_json(content)
 
             tactics = [

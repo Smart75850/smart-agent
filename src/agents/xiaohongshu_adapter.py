@@ -18,6 +18,7 @@ async def _setup_xhs_context():
 
     Camoufox 走 AsyncCamoufox persistent profile；
     Chromium 走 launch_persistent_context。
+    自动注入 CookieBridge 保存的 cookies。
     """
     engine = os.environ.get("BROWSER_ENGINE", "")
     from config.settings import settings
@@ -57,6 +58,10 @@ async def _setup_xhs_context():
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             args=["--no-sandbox"],
         )
+
+        # 注入 CookieBridge cookies
+        await _inject_cookies(context)
+
         page = context.pages[0] if context.pages else await context.new_page()
 
         async def cleanup():
@@ -64,6 +69,22 @@ async def _setup_xhs_context():
             await pw.stop()
 
         return page, cleanup
+
+
+async def _inject_cookies(context):
+    """从 CookieBridge JSON 文件注入 cookies 到上下文。"""
+    cookie_dir = Path("browser_data")
+    if not cookie_dir.exists():
+        return
+    for filepath in list(cookie_dir.glob("cookies_*.json")) + list(cookie_dir.glob("*_cookies.json")):
+        try:
+            cookies = json.loads(filepath.read_text(encoding="utf-8"))
+            if cookies:
+                await context.add_cookies(cookies)
+                platform = filepath.stem.replace("_cookies", "")
+                logger.info(f"XHS CookieBridge: {platform} 注入 {len(cookies)} 个 cookie")
+        except Exception:
+            pass
 
 _SEARCH_JS = """\
 () => {
@@ -113,8 +134,22 @@ _DETAIL_JS = """\
 
 
 async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
-    """搜索小紅薯筆記，scroll 翻頁，需登入。回傳 JSON 字串。"""
+    """搜索小紅薯筆記 — 纯 HTTP Session 优先，浏览器兜底。"""
     logger.info(f"小紅薯搜索: keyword={keyword} count={count}")
+
+    # ── Path 1: 纯 HTTP Session（零浏览器）─────────────────
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("xiaohongshu"):
+            from src.utils.xhs_http import search_all
+            items = await search_all(keyword, limit=count)
+            if items:
+                logger.info(f"[xhs-session] 纯HTTP直连成功: {len(items)} 条")
+                return json.dumps(items, ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"XHS Session HTTP 失败: {exc}，回退浏览器")
+
+    # ── Path 2: CDP 浏览器（兜底）─────────────────────────
 
     page, cleanup = await _setup_xhs_context()
 

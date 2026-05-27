@@ -1,5 +1,7 @@
 import asyncio
+import socket
 from os import environ
+from pathlib import Path
 
 from config.settings import settings
 from proxy.proxy_manager import ProxyManager
@@ -9,8 +11,23 @@ ENGINE = settings.BROWSER_ENGINE
 CDP_PORT = settings.CDP_PORT
 
 
+def _check_cdp(port: int) -> bool:
+    """检测 CDP 端口是否可用。"""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except (OSError, TimeoutError):
+        return False
+
+
 class BrowserService:
-    """Playwright 浏览器控制服务，全局单例。"""
+    """Playwright 浏览器控制服务，全局单例。
+
+    引擎选择:
+    - "auto": 自动检测 CDP 9222 → 有则用 CDP，无则 Playwright
+    - "cdp": 强制 CDP
+    - "playwright": 强制 Playwright
+    """
 
     def __init__(self):
         self._playwright = None
@@ -23,6 +40,9 @@ class BrowserService:
     async def start(self, cookies_dict: dict = None, proxy: str = None,
                     cookie_domain: str = ".douyin.com"):
         engine = environ.get("BROWSER_ENGINE") or ENGINE
+        if engine == "auto":
+            engine = "cdp" if _check_cdp(CDP_PORT) else "playwright"
+            logger.info(f"浏览器引擎自动选择: {engine} (CDP={'可用' if engine == 'cdp' else '不可用'})")
         self._engine = engine
         self._inject_cookies = cookies_dict or {}
         self._cookie_domain = cookie_domain
@@ -32,33 +52,36 @@ class BrowserService:
 
             self._playwright = await async_playwright().start()
             headless = environ.get("BROWSER_HEADLESS", "false").lower() == "true"
+
             launch_args: dict = {
                 "headless": headless,
                 "args": ["--no-sandbox"],
             }
-            if proxy:
-                launch_args["proxy"] = {"server": proxy}
-            else:
-                proxy_mgr = ProxyManager()
-                if proxy_mgr.enabled:
-                    launch_args["proxy"] = proxy_mgr.get_playwright_proxy()
 
-            try:
-                self._browser = await self._playwright.chromium.launch(**launch_args)
-            except BaseException:
-                await self._cleanup()
-                raise
-
-            self._context = await self._browser.new_context(
-                viewport={"width": 1280, "height": 800},
-                locale="zh-CN",
-                timezone_id="Asia/Shanghai",
-                user_agent=(
+            context_args: dict = {
+                "viewport": {"width": 1280, "height": 800},
+                "locale": "zh-CN",
+                "timezone_id": "Asia/Shanghai",
+                "user_agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/123.0.0.0 Safari/537.36"
                 ),
-            )
+            }
+            if proxy:
+                context_args["proxy"] = {"server": proxy}
+            else:
+                proxy_mgr = ProxyManager()
+                if proxy_mgr.enabled:
+                    context_args["proxy"] = proxy_mgr.get_playwright_proxy()
+
+            try:
+                self._browser = await self._playwright.chromium.launch(**launch_args)
+                self._context = await self._browser.new_context(**context_args)
+            except BaseException:
+                await self._cleanup()
+                raise
+
             try:
                 from playwright_stealth import Stealth
                 stealth = Stealth(
@@ -81,19 +104,19 @@ class BrowserService:
 
         elif engine == "cdp":
             from playwright.async_api import async_playwright
-            self._playwright = await async_playwright().start()
-            # 临时禁用代理，避免 127.0.0.1 走代理导致 502
+            # 必须在 playwright.start() 之前禁用代理，否则 localhost 走代理返回 502
             old_no_proxy = environ.get("no_proxy", "")
+            old_NO_PROXY = environ.get("NO_PROXY", "")
             environ["no_proxy"] = "127.0.0.1,localhost"
             environ["NO_PROXY"] = "127.0.0.1,localhost"
+            self._playwright = await async_playwright().start()
             try:
                 self._browser = await self._playwright.chromium.connect_over_cdp(
                     f"http://127.0.0.1:{CDP_PORT}"
                 )
             finally:
-                if old_no_proxy:
-                    environ["no_proxy"] = old_no_proxy
-                    environ["NO_PROXY"] = old_no_proxy
+                environ["no_proxy"] = old_no_proxy
+                environ["NO_PROXY"] = old_NO_PROXY
             self._context = self._browser.contexts[0] if self._browser.contexts else None
             if self._context and self._inject_cookies:
                 try:
@@ -134,6 +157,7 @@ class BrowserService:
 
             if settings.CAMOUFOX_USER_DATA_DIR:
                 cf_kwargs["user_data_dir"] = settings.CAMOUFOX_USER_DATA_DIR
+                cf_kwargs["persistent_context"] = True
 
             try:
                 self._browser = await AsyncNewBrowser(self._playwright, **cf_kwargs)
@@ -141,11 +165,15 @@ class BrowserService:
                 await self._cleanup()
                 raise
 
-            self._context = (
-                self._browser.contexts[0]
-                if self._browser.contexts
-                else await self._browser.new_context()
-            )
+            # persistent_context 返回 BrowserContext（已有內建 context）
+            if cf_kwargs.get("persistent_context"):
+                self._context = self._browser
+            else:
+                self._context = (
+                    self._browser.contexts[0]
+                    if self._browser.contexts
+                    else await self._browser.new_context()
+                )
 
             if self._inject_cookies:
                 try:
@@ -170,7 +198,7 @@ class BrowserService:
         if not cookie_dir.exists():
             return
 
-        for filepath in cookie_dir.glob("*_cookies.json"):
+        for filepath in list(cookie_dir.glob("cookies_*.json")) + list(cookie_dir.glob("*_cookies.json")):
             try:
                 cookies = json.loads(filepath.read_text(encoding="utf-8"))
                 if not cookies:
@@ -223,7 +251,8 @@ class BrowserService:
         except Exception:
             pass
         try:
-            if self._browser:
+            # persistent_context 時 _browser 即係 _context，避免 close 兩次
+            if self._browser and self._browser is not self._context:
                 await self._browser.close()
         finally:
             if self._playwright:

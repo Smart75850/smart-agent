@@ -77,7 +77,7 @@ class ContentRemixer(BaseAgent):
         raw_items = scored if scored else merged
 
         report = await self.run(RemixInput(
-            mode="summarize",
+            mode="analyze",
             topic=state.get("keyword", ""),
             raw_items=raw_items,
             trend_reports=state.get("trend_reports", {}),
@@ -119,11 +119,12 @@ class ContentRemixer(BaseAgent):
                 f'"platform_breakdown": {{"bilibili": 5, "douyin": 3}}}}'
             ),
             "analyze": (
-                f'{{"summary": "赛道总结", '
+                f'{{"summary": "赛道竞争格局总结（100-200字）", '
                 f'"track_insights": [{{"topic": "赛道名", "competition_level": "高/中/低", '
-                f'"entry_barrier": "门槛描述", "opportunity_score": 0-100, '
-                f'"recommended_angles": "建议切入角度"}}], '
-                f'"recommendations": "策略建议一句话"}}'
+                f'"entry_barrier": "具体门槛描述（30字以上）", "opportunity_score": 0-100, '
+                f'"recommended_angles": "2-3个具体切入角度（50字以上）"}}], '
+                f'"key_keywords": ["关键词1","关键词2","关键词3"], '
+                f'"recommendations": "具体可执行的策略建议（100字以上，含内容方向+发布节奏+目标受众）"}}'
             ),
             "rewrite": (
                 f'{{"summary": "改写说明", '
@@ -141,7 +142,7 @@ class ContentRemixer(BaseAgent):
         )
 
         try:
-            content = await self._call_llm(prompt, temperature=0.5, json_mode=True)
+            content = await self._call_llm(prompt, temperature=0.5, json_mode=True, max_tokens=4000)
             parsed = self._parse_json(content)
 
             insights = [
