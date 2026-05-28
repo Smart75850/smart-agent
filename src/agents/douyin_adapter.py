@@ -93,7 +93,7 @@ async def _douyin_search_http(keyword: str, count: int = 40) -> str:
     cookie_str = _build_cookie_str(cookies)
     ms_token = "".join(random.choices("ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789=", k=107))
 
-    base_url = "https://www.douyin.com/aweme/v1/web/search/item/"
+    base_url = "https://www.douyin.com/hotaweme/v1/web/search/item/"
     params = {
         "device_platform": "webapp",
         "aid": "6383",
@@ -159,7 +159,7 @@ async def _douyin_search_http(keyword: str, count: int = 40) -> str:
                 "User-Agent": ua,
                 "Accept": "application/json, text/plain, */*",
                 "Accept-Language": "zh-CN,zh;q=0.9",
-                "Referer": f"https://www.douyin.com/search/{quote(keyword)}",
+                "Referer": f"https://www.douyin.com/hotsearch/{quote(keyword)}",
                 "Cookie": cookie_str,
                 "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not:A-Brand";v="24"',
                 "sec-ch-ua-mobile": "?0",
@@ -189,7 +189,7 @@ async def _douyin_search_http(keyword: str, count: int = 40) -> str:
             "aweme_id": str(info.get("aweme_id", "")),
             "sec_uid": author.get("sec_uid", ""),
             "cover_url": (video.get("cover", {}) or {}).get("url_list", [""])[0],
-            "link": f"https://www.douyin.com/video/{info.get('aweme_id', '')}",
+            "link": f"https://www.douyin.com/hotvideo/{info.get('aweme_id', '')}",
         })
 
     logger.info(f"[douyin-http] SignSrv 直连成功: {len(items)} 条")
@@ -250,14 +250,14 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
                                 "aweme_id": aid,
                                 "sec_uid": author.get("sec_uid", ""),
                                 "cover_url": (video.get("cover", {}) or {}).get("url_list", [""])[0],
-                                "link": f"https://www.douyin.com/video/{aid}",
+                                "link": f"https://www.douyin.com/hotvideo/{aid}",
                             })
                     except Exception:
                         pass
 
             page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
 
-            await page.goto(f"https://www.douyin.com/search/{keyword}", wait_until="domcontentloaded", timeout=20000)
+            await page.goto(f"https://www.douyin.com/hotsearch/{keyword}", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(5000)
 
             max_scrolls = max((count // 10) + 3, 6)
@@ -320,86 +320,98 @@ async def douyin_hot() -> str:
             await page.goto("https://www.douyin.com/hot", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(6000)
 
-            # Step 1: JS fetch 拿热搜词榜
-            hot_items = await page.evaluate("""async () => {
-    const items = [];
-    const seen = new Set();
-    try {
-        const resp = await fetch('https://www.douyin.com/aweme/v1/web/hot/search/list/', {
-            credentials: 'include',
-        });
-        const body = await resp.json();
-        const data = body.data || {};
-        const wordList = data.word_list || [];
-        const trendingList = data.trending_list || [];
+            # 宽网拦截: 热搜关键词 + 任何含视频数据的 API 响应
+            hot_keywords = []
+            hot_videos = []
+            video_seen = set()
 
-        for (const item of wordList) {
-            const word = item.word || '';
-            if (!word || seen.has(word)) continue;
-            seen.add(word);
-            items.push({
-                title: word,
-                hot_value: item.hot_value || '',
-                position: item.position || '',
-                link: 'https://www.douyin.com/search/' + encodeURIComponent(word),
-            });
-        }
-        for (const item of trendingList) {
-            const word = item.word || '';
-            if (!word || seen.has(word)) continue;
-            seen.add(word);
-            items.push({
-                title: word,
-                hot_value: item.hot_value || '',
-                link: 'https://www.douyin.com/search/' + encodeURIComponent(word),
-                hot_value: item.hot_value || '',
-            });
-        }
-    } catch(e) {}
-    if (items.length === 0) {
-        document.querySelectorAll('[class*="hot"] [class*="title"], [class*="trend"] [class*="title"], [class*="Hot"] [class*="Title"], [class*="HotItem"]').forEach(el => {
-            const t = el.textContent.trim();
-            if (t.length > 3 && !seen.has(t)) {
-                seen.add(t);
-                items.push({ title: t, link: 'https://www.douyin.com/search/' + encodeURIComponent(t) });
-            }
-        });
-    }
-    return items;
-}""")
-
-            # Step 2: Python 层用 douyin_http 对 top10 热词做视频搜索增强
-            if hot_items:
+            async def on_response(resp):
+                if "json" not in (resp.headers.get("content-type", "")):
+                    return
                 try:
-                    from src.utils.douyin_http import search as dy_http_search
-                    seen = set()
-                    enriched = 0
-                    for item in hot_items[:10]:
-                        try:
-                            videos = await dy_http_search(item["title"], count=3)
-                            for v in videos:
-                                title = v.get("title", "")
-                                if title and title not in seen:
-                                    seen.add(title)
-                                    hot_items.append({
-                                        "title": title,
-                                        "author": v.get("author", ""),
-                                        "plays": v.get("plays", ""),
-                                        "likes": v.get("likes", ""),
-                                        "comments": v.get("comments", ""),
-                                        "cover_url": v.get("cover_url", ""),
-                                        "link": v.get("link", ""),
-                                        "platform_id": v.get("platform_id", ""),
-                                    })
-                                    enriched += 1
-                        except Exception:
-                            pass
-                    if enriched:
-                        logger.info(f"抖音熱榜: HTTP 增强 {enriched} 条视频")
-                except Exception as e:
-                    logger.debug(f"抖音熱榜 HTTP 增强失败: {e}")
+                    body = await resp.json()
+                except Exception:
+                    return
+                data = body.get("data", {}) if isinstance(body, dict) else {}
 
-            logger.info(f"抖音熱榜完成: {len(hot_items)} 條")
+                # 热搜关键词
+                if isinstance(data, dict) and ("word_list" in data or "trending_list" in data):
+                    for item in data.get("word_list", []):
+                        w = item.get("word", "")
+                        if w:
+                            hot_keywords.append({
+                                "title": w, "hot_value": item.get("hot_value", ""),
+                                "position": item.get("position", ""),
+                                "link": f"https://www.douyin.com/hotsearch/{quote(w)}",
+                            })
+                    for item in data.get("trending_list", []):
+                        w = item.get("word", "")
+                        if w:
+                            hot_keywords.append({
+                                "title": w, "hot_value": item.get("hot_value", ""),
+                                "link": f"https://www.douyin.com/hotsearch/{quote(w)}",
+                            })
+
+                # 视频数据: 从 aweme_list 或 data list 中提取
+                items = []
+                if isinstance(data, list):
+                    items = data
+                elif isinstance(data, dict):
+                    items = data.get("aweme_list", []) or data.get("list", []) or data.get("data", [])
+                    if not isinstance(items, list):
+                        items = []
+
+                for item in items:
+                    info = item.get("aweme_info", item)
+                    aid = str(info.get("aweme_id", ""))
+                    if not aid or aid in video_seen:
+                        continue
+                    video_seen.add(aid)
+                    stats = info.get("statistics", {}) or {}
+                    author_info = info.get("author", {}) or {}
+                    cover_list = ((info.get("cover", {}) or {}).get("url_list") if isinstance(info.get("cover"), dict) else [])
+                    hot_videos.append({
+                        "title": info.get("desc", ""),
+                        "author": author_info.get("nickname", ""),
+                        "plays": str(stats.get("play_count", "")),
+                        "likes": str(stats.get("digg_count", "")),
+                        "comments": str(stats.get("comment_count", "")),
+                        "cover_url": cover_list[0] if cover_list else "",
+                        "link": f"https://www.douyin.com/hotvideo/{aid}",
+                        "aweme_id": aid,
+                    })
+
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+            # 等待 API 加载 + 滚动触发更多
+            await page.wait_for_timeout(5000)
+            for _ in range(3):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000)
+
+            # 合并: 视频优先 + 关键词不含视频的
+            hot_items = list(hot_videos)
+            kw_seen = {v.get("title", "") for v in hot_videos}
+            for kw in hot_keywords:
+                if kw["title"] not in kw_seen:
+                    kw_seen.add(kw["title"])
+                    hot_items.append(kw)
+
+            # DOM 兜底
+            if not hot_items:
+                dom = await page.evaluate("""() => {
+    const items = document.querySelectorAll('[class*="hot"] [class*="title"], [class*="trend"] [class*="title"], [class*="HotItem"]');
+    const seen = new Set();
+    return Array.from(items).filter(el => {
+        const t = el.textContent.trim();
+        if (!t || t.length < 3 || seen.has(t)) return false;
+        seen.add(t);
+        return true;
+    }).map(el => ({ title: el.textContent.trim(), link: 'https://www.douyin.com/hotsearch/' + encodeURIComponent(el.textContent.trim()) }));
+}""")
+                hot_items = list(dom) if dom else []
+
+            logger.info(f"抖音熱榜完成: {len(hot_items)} 條 (视频{len(hot_videos)}+关键词{len(hot_keywords)})")
             return json.dumps(hot_items, ensure_ascii=False)
         finally:
             await page.close()
@@ -414,7 +426,7 @@ async def douyin_detail(video_id: str) -> str:
     try:
         page = await browser.new_page()
         try:
-            await page.goto(f"https://www.douyin.com/video/{video_id}", wait_until="domcontentloaded", timeout=20000)
+            await page.goto(f"https://www.douyin.com/hotvideo/{video_id}", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(5000)
             result = await page.evaluate("""() => {
     const titleEl = document.querySelector('[class*="title"], [class*="Title"], h1');
@@ -467,7 +479,7 @@ async def douyin_comment(video_id: str, count: int = 50) -> str:
 
             page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
 
-            await page.goto(f"https://www.douyin.com/video/{video_id}", wait_until="domcontentloaded", timeout=20000)
+            await page.goto(f"https://www.douyin.com/hotvideo/{video_id}", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(5000)
 
             # 滚动触发首頁评论加载
@@ -482,7 +494,7 @@ async def douyin_comment(video_id: str, count: int = 50) -> str:
                 cursor = page_num * 20
                 try:
                     more = await page.evaluate(f"""async () => {{
-                        const resp = await fetch("https://www.douyin.com/aweme/v1/web/comment/list/?device_platform=webapp&aid=6383&channel=channel_pc_web&aweme_id={video_id}&cursor={cursor}&count=20");
+                        const resp = await fetch("https://www.douyin.com/hotaweme/v1/web/comment/list/?device_platform=webapp&aid=6383&channel=channel_pc_web&aweme_id={video_id}&cursor={cursor}&count=20");
                         const data = await resp.json();
                         return (data.comments || []).map(c => ({{
                             user: (c.user || {{}}).nickname || '',
@@ -525,7 +537,7 @@ async def douyin_user_videos(user_id: str) -> str:
     try:
         page = await browser.new_page()
         try:
-            await page.goto(f"https://www.douyin.com/user/{user_id}", wait_until="domcontentloaded", timeout=20000)
+            await page.goto(f"https://www.douyin.com/hotuser/{user_id}", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(5000)
             for _ in range(2):
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")

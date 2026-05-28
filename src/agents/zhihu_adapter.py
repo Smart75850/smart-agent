@@ -72,8 +72,57 @@ _SEARCH_JS = """\
 
 
 async def zhihu_hot() -> str:
-    """爬取知乎熱榜 — fetch API 直取 hot-lists + DOM 兜底。"""
+    """爬取知乎熱榜 — HTTP session 直调 API + page.evaluate fetch 兜底。"""
     logger.info("知乎熱榜: 開始爬取")
+
+    # Path 1: HTTP session 直调热榜 API
+    try:
+        from src.utils.session_manager import check_health
+        if await check_health("zhihu"):
+            import httpx
+            from src.utils.zh_http import _load as zh_load
+            sess = zh_load()
+            headers = {
+                "cookie": sess.cookies_str,
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+                "x-api-version": "3.0.91",
+                "accept": "application/json",
+            }
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total",
+                    params={"limit": 50, "desktop": "true"},
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    body = resp.json()
+                    data = body.get("data", [])
+                    if data:
+                        items = []
+                        seen = set()
+                        for item in data:
+                            target = item.get("target", item)
+                            title = target.get("title", "") or target.get("title_area", {}).get("text", "")
+                            if not title or title in seen:
+                                continue
+                            seen.add(title)
+                            metrics = target.get("metrics", "") or target.get("metrics_area", {}).get("text", "")
+                            link = target.get("url", "") or target.get("link", "") or item.get("url", "")
+                            items.append({
+                                "title": title,
+                                "excerpt": target.get("excerpt", ""),
+                                "heat": str(metrics),
+                                "link": link if link.startswith("http") else f"https://www.zhihu.com{link}",
+                                "plays": str(metrics),
+                                "platform_id": str(target.get("id", "")),
+                                "rank": str(len(items) + 1),
+                            })
+                        logger.info(f"知乎熱榜 HTTP OK: {len(items)} 條")
+                        return json.dumps(items, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"知乎熱榜 HTTP 失败: {e}")
+
+    # Path 2: CDP 浏览器 + page.evaluate fetch（兜底）
     page = await browser.new_page()
     try:
         await page.goto("https://www.zhihu.com/hot", wait_until="domcontentloaded", timeout=20000)

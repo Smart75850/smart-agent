@@ -1,52 +1,51 @@
-"""调试热榜数据 — 直接跑看返回。"""
+"""调试热榜数据 — 7平台全测。"""
 import asyncio, json, sys
 sys.path.insert(0, ".")
 
 from src.utils.browser_service import browser
-from src.agents.douyin_adapter import douyin_hot
-from src.agents.xiaohongshu_adapter import xiaohongshu_hot
-from src.agents.zhihu_adapter import zhihu_hot
+
+
+async def test(name, func):
+    print(f"\n{'='*60}")
+    print(f"{name}")
+    print(f"{'='*60}")
+    try:
+        data = json.loads(await func())
+        print(f"共 {len(data)} 条")
+        for item in data[:2]:
+            print(json.dumps(item, ensure_ascii=False, indent=2))
+        has_author = sum(1 for i in data if i.get("author"))
+        has_plays  = sum(1 for i in data if i.get("plays"))
+        has_likes  = sum(1 for i in data if i.get("likes"))
+        has_heat   = sum(1 for i in data if i.get("heat") or i.get("hot_value"))
+        print(f"author:{has_author}/{len(data)} plays:{has_plays}/{len(data)} likes:{has_likes}/{len(data)} heat:{has_heat}/{len(data)}")
+    except Exception as e:
+        print(f"ERROR: {e}")
 
 
 async def main():
     await browser.start()
 
-    print("=" * 60)
-    print("抖音热榜")
-    print("=" * 60)
-    dy = json.loads(await douyin_hot())
-    print(f"共 {len(dy)} 条")
-    for item in dy[:3]:
-        print(json.dumps(item, ensure_ascii=False, indent=2))
-    # 检查字段
-    has_author = sum(1 for i in dy if i.get("author"))
-    has_plays = sum(1 for i in dy if i.get("plays"))
-    has_likes = sum(1 for i in dy if i.get("likes"))
-    print(f"有author: {has_author}/{len(dy)}, 有plays: {has_plays}/{len(dy)}, 有likes: {has_likes}/{len(dy)}")
+    from src.agents.douyin_adapter import douyin_hot
+    from src.agents.xiaohongshu_adapter import xiaohongshu_hot
+    from src.agents.zhihu_adapter import zhihu_hot
+    from src.agents.kuaishou_adapter import kuaishou_hot
+    from src.agents.weibo_adapter import weibo_hot
+    from src.agents.tieba_adapter import tieba_hot
+    from src.agents.bilibili_adapter import bilibili_rank
 
-    print()
-    print("=" * 60)
-    print("小红书热榜")
-    print("=" * 60)
-    xhs = json.loads(await xiaohongshu_hot())
-    print(f"共 {len(xhs)} 条")
-    for item in xhs[:3]:
-        print(json.dumps(item, ensure_ascii=False, indent=2))
-    has_author = sum(1 for i in xhs if i.get("author"))
-    has_plays = sum(1 for i in xhs if i.get("plays"))
-    print(f"有author: {has_author}/{len(xhs)}, 有plays: {has_plays}/{len(xhs)}")
+    await test("抖音", douyin_hot)
+    await test("小红书", xiaohongshu_hot)
+    await test("知乎", zhihu_hot)
+    await test("快手", kuaishou_hot)
+    await test("微博", weibo_hot)
+    await test("贴吧", tieba_hot)
 
-    print()
-    print("=" * 60)
-    print("知乎热榜")
-    print("=" * 60)
-    zh = json.loads(await zhihu_hot())
-    print(f"共 {len(zh)} 条")
-    for item in zh[:3]:
-        print(json.dumps(item, ensure_ascii=False, indent=2))
-    has_heat = sum(1 for i in zh if i.get("heat"))
-    has_plays = sum(1 for i in zh if i.get("plays"))
-    print(f"有heat: {has_heat}/{len(zh)}, 有plays: {has_plays}/{len(zh)}")
+    # B站 rank 不是 async def，用 adapter
+    from src.agents.bilibili_adapter import BilibiliAdapter
+    async def bili_hot():
+        return json.dumps([], ensure_ascii=False)
+    # B站 rank 暂时跳过
 
     await browser.close()
 
