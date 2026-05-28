@@ -316,9 +316,11 @@ async def xiaohongshu_hot() -> str:
     const seen = new Set();
     const out = [];
     document.querySelectorAll('a[href*="/explore/"], a[href*="/search_result/"]').forEach(a => {
-        const href = a.getAttribute('href') || '';
-        if (!href || seen.has(href)) return;
-        seen.add(href);
+        const rawHref = a.getAttribute('href') || '';
+        const href = rawHref.split('?')[0];
+        const fullLink = href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
+        if (!href || seen.has(fullLink)) return;
+        seen.add(fullLink);
         const parent = a.closest('section, [class*="note"], [class*="item"], div');
         const txt = (parent || a).textContent.trim();
         const title = txt.slice(0, 100);
@@ -330,7 +332,7 @@ async def xiaohongshu_hot() -> str:
             author: authorEl?.textContent?.trim() || '',
             likes: likesEl?.textContent?.trim() || '',
             plays: likesEl?.textContent?.trim() || '',
-            link: href,
+            link: fullLink,
             cover_url: img?.getAttribute('src') || img?.getAttribute('data-src') || '',
         });
     });

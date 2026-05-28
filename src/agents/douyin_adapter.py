@@ -312,7 +312,7 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
 
 
 async def douyin_hot() -> str:
-    """爬取抖音熱榜 — 页面内 fetch API 直取热搜词+热榜视频两条链路。"""
+    """爬取抖音熱榜 — JS拿热搜词 + Python douyin_http 搜索增强。"""
     logger.info("抖音熱榜: 開始爬取")
     try:
         page = await browser.new_page()
@@ -320,12 +320,10 @@ async def douyin_hot() -> str:
             await page.goto("https://www.douyin.com/hot", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(6000)
 
-            # 用 page.evaluate 调 fetch 直接拿 API 数据
-            result = await page.evaluate("""async () => {
-    const allItems = [];
-    const seenTitles = new Set();
-
-    // 链路1: 热搜词榜
+            # Step 1: JS fetch 拿热搜词榜
+            hot_items = await page.evaluate("""async () => {
+    const items = [];
+    const seen = new Set();
     try {
         const resp = await fetch('https://www.douyin.com/aweme/v1/web/hot/search/list/', {
             credentials: 'include',
@@ -337,91 +335,70 @@ async def douyin_hot() -> str:
 
         for (const item of wordList) {
             const word = item.word || '';
-            if (!word || seenTitles.has(word)) continue;
-            seenTitles.add(word);
-            allItems.push({
+            if (!word || seen.has(word)) continue;
+            seen.add(word);
+            items.push({
                 title: word,
                 hot_value: item.hot_value || '',
                 position: item.position || '',
                 link: 'https://www.douyin.com/search/' + encodeURIComponent(word),
                 plays: item.hot_value || '',
-                type: 'hot_keyword',
             });
         }
         for (const item of trendingList) {
             const word = item.word || '';
-            if (!word || seenTitles.has(word)) continue;
-            seenTitles.add(word);
-            allItems.push({
+            if (!word || seen.has(word)) continue;
+            seen.add(word);
+            items.push({
                 title: word,
                 hot_value: item.hot_value || '',
                 link: 'https://www.douyin.com/search/' + encodeURIComponent(word),
                 plays: item.hot_value || '',
-                type: 'trending_keyword',
             });
         }
     } catch(e) {}
-
-    // 链路2: 热榜视频 — 用搜索 API 对 top3 热词搜视频
-    const topWords = allItems.slice(0, 3);
-    for (const kw of topWords) {
-        try {
-            const word = kw.title;
-            const searchResp = await fetch(
-                'https://www.douyin.com/aweme/v1/web/general/search/single/?' +
-                'device_platform=webapp&aid=6383&channel=channel_pc_web' +
-                '&keyword=' + encodeURIComponent(word) +
-                '&search_channel=aweme_general&search_source=normal_search' +
-                '&query_correct_type=1&is_filter_search=0&offset=0&count=3' +
-                '&cookie_enabled=true&screen_width=1920&screen_height=1080' +
-                '&browser_language=zh-CN&browser_platform=Win32' +
-                '&browser_name=Chrome&browser_version=148.0.0.0' +
-                '&browser_online=true&engine_name=Blink&engine_version=148.0.0.0' +
-                '&os_name=Windows&os_version=10&cpu_core_num=16&device_memory=8' +
-                '&platform=PC&downlink=10&effective_type=4g&round_trip_time=50',
-                {credentials: 'include'}
-            );
-            const sbody = await searchResp.json();
-            const videos = (sbody.data || []).filter(v => v.aweme_info);
-            for (const v of videos.slice(0, 3)) {
-                const info = v.aweme_info || {};
-                const title = (info.desc || word).slice(0, 100);
-                if (seenTitles.has(title)) continue;
-                seenTitles.add(title);
-                const author = (info.author && info.author.nickname) || '';
-                const stats = info.statistics || {};
-                allItems.push({
-                    title: title,
-                    author: author,
-                    plays: String(stats.play_count || 0),
-                    likes: String(stats.digg_count || 0),
-                    comments: String(stats.comment_count || 0),
-                    cover_url: (info.cover && info.cover.url_list && info.cover.url_list[0]) || '',
-                    link: 'https://www.douyin.com/video/' + (info.aweme_id || ''),
-                    aweme_id: info.aweme_id || '',
-                    type: 'hot_video',
-                });
+    if (items.length === 0) {
+        document.querySelectorAll('[class*="hot"] [class*="title"], [class*="trend"] [class*="title"], [class*="Hot"] [class*="Title"], [class*="HotItem"]').forEach(el => {
+            const t = el.textContent.trim();
+            if (t.length > 3 && !seen.has(t)) {
+                seen.add(t);
+                items.push({ title: t, link: 'https://www.douyin.com/search/' + encodeURIComponent(t) });
             }
-        } catch(e) {}
+        });
     }
-
-    return allItems;
+    return items;
 }""")
-            hot_items = list(result) if result else []
 
-            # DOM 兜底（API 全部失败时）
-            if not hot_items:
-                dom = await page.evaluate("""() => {
-    const items = document.querySelectorAll('[class*="hot"] [class*="title"], [class*="trend"] [class*="title"], [class*="Hot"] [class*="Title"], [class*="HotItem"], [class*="hot-item"]');
-    const seen = new Set();
-    return Array.from(items).filter(el => {
-        const t = el.textContent.trim();
-        if (!t || t.length < 3 || seen.has(t)) return false;
-        seen.add(t);
-        return true;
-    }).map(el => ({ title: el.textContent.trim(), link: 'https://www.douyin.com/search/' + encodeURIComponent(el.textContent.trim()) }));
-}""")
-                hot_items = list(dom) if dom else []
+            # Step 2: Python 层用 douyin_http 对 top10 热词做视频搜索增强
+            if hot_items:
+                try:
+                    from src.utils.douyin_http import search as dy_http_search
+                    seen = set()
+                    enriched = 0
+                    for item in hot_items[:10]:
+                        try:
+                            videos = await dy_http_search(item["title"], count=3)
+                            for v in videos:
+                                title = v.get("title", "")
+                                if title and title not in seen:
+                                    seen.add(title)
+                                    hot_items.append({
+                                        "title": title,
+                                        "author": v.get("author", ""),
+                                        "plays": v.get("plays", ""),
+                                        "likes": v.get("likes", ""),
+                                        "comments": v.get("comments", ""),
+                                        "cover_url": v.get("cover_url", ""),
+                                        "link": v.get("link", ""),
+                                        "platform_id": v.get("platform_id", ""),
+                                    })
+                                    enriched += 1
+                        except Exception:
+                            pass
+                    if enriched:
+                        logger.info(f"抖音熱榜: HTTP 增强 {enriched} 条视频")
+                except Exception as e:
+                    logger.debug(f"抖音熱榜 HTTP 增强失败: {e}")
 
             logger.info(f"抖音熱榜完成: {len(hot_items)} 條")
             return json.dumps(hot_items, ensure_ascii=False)

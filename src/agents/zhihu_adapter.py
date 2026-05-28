@@ -91,6 +91,8 @@ async def zhihu_hot() -> str:
     const urls = [
         'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&desktop=true',
         'https://www.zhihu.com/api/v4/topstory/hot-lists?limit=50',
+        'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=10',
+        'https://www.zhihu.com/api/v4/hot-lists/total',
     ];
 
     for (const url of urls) {
