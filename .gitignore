@@ -25,6 +25,7 @@ browser_data/
 
 # Output & logs
 output/
+downloads/
 logs/
 *.log
 
