@@ -725,7 +725,7 @@ window.showDetail = function(idx) {
     ['播放量',fmtCount(item.plays)],['点赞',fmtCount(item.likes)],
     ['评论',fmtCount(item.comments||item.comment_count)],
     ['发布时间',item.publish_time||item.date||item.time],
-    ['描述',item.description||item.desc||item.caption],
+    ['描述',item.excerpt||item.description||item.desc||item.caption],
     ['链接',item.link?'<a href="'+item.link.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener">'+item.link+'</a>':''],
     ['平台ID',item.platform_id],
   ];
@@ -829,7 +829,7 @@ function renderFilteredResults(){
 
 // ═══════════ DOWNLOADS ═══════════
 function downloadJSON(data, name) {
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href);
 }
 function downloadCSV(rows, name) {

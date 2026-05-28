@@ -17,8 +17,25 @@ _FIELD_MAP = {
 }
 
 
+def _parse_cn_num(value) -> int:
+    """解析中文格式化数字如 '184.3万' '1.5亿' '4,567' 为整数。"""
+    s = str(value or 0).replace(",", "").replace("，", "").strip()
+    if not s:
+        return 0
+    for unit, multiplier in [("亿", 100000000), ("万", 10000), ("w", 10000), ("k", 1000)]:
+        if unit in s.lower():
+            try:
+                return int(float(s.lower().replace(unit, "")) * multiplier)
+            except ValueError:
+                pass
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return 0
+
+
 def _normalize(item: dict, platform: str) -> dict:
-    """归一化单个条目到统一字段。含 heat→plays fallback。"""
+    """归一化单个条目到统一字段。含中文数字→整数 + heat→plays fallback。"""
     out = {"platform": platform}
     for target, sources in _FIELD_MAP.items():
         for src in sources:
@@ -28,6 +45,12 @@ def _normalize(item: dict, platform: str) -> dict:
                 break
         if target not in out:
             out[target] = ""
+
+    # 中文数字转整数 (plays/likes/comments/duration 字段)
+    for num_field in ("plays", "likes", "comments"):
+        raw = out.get(num_field, "")
+        if raw and any(c in str(raw) for c in "亿万wk,，"):
+            out[num_field] = str(_parse_cn_num(raw))
 
     # plays fallback: heat / replies (不含 hot_value — 热搜热度值≠播放量)
     if not out.get("plays") or out["plays"] == "0":

@@ -179,7 +179,7 @@ async def _run_crawl(task_id: str, req: CrawlRequest):
                 data = data[:req.limit]
 
             # 归一化字段名（统一各平台差异）
-            if isinstance(data, list) and action in ("search", "hot"):
+            if isinstance(data, list) and action in ("search", "hot", "comment"):
                 from src.aggregator import _normalize
                 data = [_normalize(it, platform) for it in data if isinstance(it, dict)]
 
