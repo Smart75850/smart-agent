@@ -72,21 +72,77 @@ _SEARCH_JS = """\
 
 
 async def zhihu_hot() -> str:
-    """爬取知乎熱榜，需登入先有內容（未登入跳轉 signin）。回傳 JSON 字串。"""
+    """爬取知乎熱榜 — fetch API 直取 hot-lists + DOM 兜底。"""
     logger.info("知乎熱榜: 開始爬取")
     page = await browser.new_page()
     try:
-        await page.goto("https://www.zhihu.com/hot", wait_until="domcontentloaded")
-        await page.wait_for_timeout(3000)
+        await page.goto("https://www.zhihu.com/hot", wait_until="domcontentloaded", timeout=20000)
+        await page.wait_for_timeout(4000)
         cur_url = page.url
         if "signin" in cur_url or "login" in cur_url:
-            logger.warning("知乎熱榜: 檢測到登入牆 (URL 跳轉至 signin/login)，請先手動登入知乎")
+            logger.warning("知乎熱榜: 檢測到登入牆")
             return json.dumps([], ensure_ascii=False)
-        result = await page.evaluate(_HOT_JS)
+
+        # fetch API 直取
+        result = await page.evaluate("""async () => {
+    const allItems = [];
+    const seen = new Set();
+
+    const urls = [
+        'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&desktop=true',
+        'https://www.zhihu.com/api/v4/topstory/hot-lists?limit=50',
+    ];
+
+    for (const url of urls) {
+        try {
+            const resp = await fetch(url, {credentials: 'include'});
+            const body = await resp.json();
+            let items = [];
+            const data = body.data || body;
+            if (Array.isArray(data)) {
+                items = data;
+            } else if (data.data && Array.isArray(data.data)) {
+                items = data.data;
+            } else if (data.list && Array.isArray(data.list)) {
+                items = data.list;
+            }
+
+            for (const item of items) {
+                const target = item.target || item;
+                const title = target.title || target.title_area?.text || item.title || '';
+                const excerpt = target.excerpt || target.excerpt_area?.text || item.excerpt || '';
+                const metrics = target.metrics || target.metrics_area?.text || item.metrics || '';
+                const heat = target.heat || item.heat || '';
+                const link = target.url || target.link || item.url || item.link || '';
+                const id = target.id || item.id || '';
+
+                if (!title || seen.has(title)) continue;
+                seen.add(title);
+
+                allItems.push({
+                    title: title,
+                    excerpt: excerpt,
+                    heat: metrics || heat || '',
+                    link: link.startsWith('http') ? link : 'https://www.zhihu.com' + link,
+                    plays: metrics || heat || '',
+                    platform_id: String(id),
+                    rank: String(allItems.length + 1),
+                });
+            }
+            if (allItems.length > 0) break;
+        } catch(e) {}
+    }
+    return allItems;
+}""")
+
+        if not result:
+            result = await page.evaluate(_HOT_JS)
+
         if not result:
             body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
             if "登录" in body_text and "注册" in body_text:
-                logger.warning("知乎熱榜: 檢測到登入牆 (頁面包含登入/註冊提示)，請先手動登入知乎")
+                logger.warning("知乎熱榜: 檢測到登入牆")
+
         logger.info(f"知乎熱榜完成: {len(result)} 條結果")
         return json.dumps(result, ensure_ascii=False)
     finally:

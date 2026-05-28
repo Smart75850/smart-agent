@@ -254,30 +254,92 @@ async def xiaohongshu_comment(note_id: str) -> str:
 
 
 async def xiaohongshu_hot() -> str:
-    """爬取小紅薯推薦 feed（近似熱榜），需登入先有內容。回傳 JSON 字串。"""
+    """爬取小紅薯推薦 feed — 拦截 homefeed API + DOM 兜底。"""
     logger.info("小紅薯熱榜: 開始爬取")
     page = await browser.new_page()
     try:
-        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
-    const items = document.querySelectorAll('.note-item, [class*="note-item"], [class*="feed"] [class*="item"], [class*="NoteItem"]');
+        # 拦截 homefeed API 响应
+        api_items = []
+
+        async def on_response(resp):
+            if "/homefeed" in resp.url or "/feed" in resp.url:
+                try:
+                    body = await resp.json()
+                    items = body.get("data", {}).get("items", []) or body.get("data", [])
+                    if not isinstance(items, list):
+                        items = []
+                    for item in items:
+                        note = item.get("note_card") or item.get("note") or item
+                        if not isinstance(note, dict):
+                            continue
+                        title = note.get("display_title", "") or note.get("title", "")
+                        author_info = note.get("user", {}) or note.get("author", {})
+                        author = author_info.get("nickname", "") or author_info.get("name", "")
+                        likes = note.get("interact_info", {}).get("liked_count", "") or note.get("likes", "")
+                        cover = ""
+                        covers = note.get("cover", {}) or {}
+                        cover_list = covers.get("url_list", []) if isinstance(covers, dict) else []
+                        if cover_list and isinstance(cover_list, list):
+                            cover = cover_list[0] or ""
+                        if not cover:
+                            cover = note.get("cover_url", "") or note.get("cover", "")
+                        if isinstance(cover, dict):
+                            cover = cover.get("url_list", [{}])[0] if cover.get("url_list") else ""
+                        note_id = note.get("note_id", "") or item.get("id", "")
+                        link = f"https://www.xiaohongshu.com/explore/{note_id}" if note_id else ""
+                        if title and title not in {i["title"] for i in api_items}:
+                            api_items.append({
+                                "title": str(title)[:100],
+                                "author": str(author),
+                                "likes": str(likes),
+                                "plays": str(likes),
+                                "link": link,
+                                "cover_url": str(cover),
+                                "note_id": str(note_id),
+                            })
+                except Exception:
+                    pass
+
+        page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(6000)
+
+        # 滚动触发更多加载
+        for _ in range(3):
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2000)
+
+        # 如果 API 没截到数据，DOM 兜底
+        if not api_items:
+            result = await page.evaluate("""() => {
     const seen = new Set();
-    return Array.from(items).map(el => {
-        const linkEl = el.tagName === 'A' ? el : el.querySelector('a[href*="/explore/"], a[href*="/search_result/"]');
-        const href = linkEl?.getAttribute('href') || '';
-        const title = el.querySelector('.title, [class*="title"], [class*="note-title"], span')?.textContent?.trim() || '';
-        const author = el.querySelector('.author, .name, [class*="author"], [class*="name"], [class*="nickname"]')?.textContent?.trim() || '';
-        const likes = el.querySelector('.like, [class*="like"], [class*="count"], [class*="engage"]')?.textContent?.trim() || '';
-        const cover = el.querySelector('img')?.getAttribute('src') || el.querySelector('img')?.getAttribute('data-src') || '';
-        const key = href || title;
-        if (!key || key.length < 3 || seen.has(key)) return null;
-        seen.add(key);
-        return {title, author, likes, link: href, cover_url: cover, plays: likes};
-    }).filter(Boolean).slice(0, 30);
+    const out = [];
+    document.querySelectorAll('a[href*="/explore/"], a[href*="/search_result/"]').forEach(a => {
+        const href = a.getAttribute('href') || '';
+        if (!href || seen.has(href)) return;
+        seen.add(href);
+        const parent = a.closest('section, [class*="note"], [class*="item"], div');
+        const txt = (parent || a).textContent.trim();
+        const title = txt.slice(0, 100);
+        const authorEl = (parent || a).querySelector('[class*="author"], [class*="name"], [class*="nickname"]');
+        const likesEl = (parent || a).querySelector('[class*="like"], [class*="count"], [class*="engage"]');
+        const img = (parent || a).querySelector('img');
+        out.push({
+            title: title,
+            author: authorEl?.textContent?.trim() || '',
+            likes: likesEl?.textContent?.trim() || '',
+            plays: likesEl?.textContent?.trim() || '',
+            link: href,
+            cover_url: img?.getAttribute('src') || img?.getAttribute('data-src') || '',
+        });
+    });
+    return out.slice(0, 30);
 }""")
-        logger.info(f"小紅薯熱榜完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
+            api_items = list(result) if result else []
+
+        logger.info(f"小紅薯熱榜完成: {len(api_items)} 條 (API: {len(api_items) > 0 and 'homefeed' in str(api_items[0].get('link',''))})")
+        return json.dumps(api_items[:30], ensure_ascii=False)
     finally:
         await page.close()
 
