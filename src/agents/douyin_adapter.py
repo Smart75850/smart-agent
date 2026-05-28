@@ -342,7 +342,6 @@ async def douyin_hot() -> str:
                 hot_value: item.hot_value || '',
                 position: item.position || '',
                 link: 'https://www.douyin.com/search/' + encodeURIComponent(word),
-                plays: item.hot_value || '',
             });
         }
         for (const item of trendingList) {
@@ -353,7 +352,7 @@ async def douyin_hot() -> str:
                 title: word,
                 hot_value: item.hot_value || '',
                 link: 'https://www.douyin.com/search/' + encodeURIComponent(word),
-                plays: item.hot_value || '',
+                hot_value: item.hot_value || '',
             });
         }
     } catch(e) {}

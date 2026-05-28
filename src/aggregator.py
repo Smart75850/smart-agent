@@ -29,9 +29,9 @@ def _normalize(item: dict, platform: str) -> dict:
         if target not in out:
             out[target] = ""
 
-    # plays fallback: heat / hot_value / replies
+    # plays fallback: heat / replies (不含 hot_value — 热搜热度值≠播放量)
     if not out.get("plays") or out["plays"] == "0":
-        for fb in ("heat", "hot_value", "replies", "reply_count", "reads_count"):
+        for fb in ("heat", "replies", "reply_count", "reads_count"):
             v = item.get(fb, "")
             if v and str(v).strip():
                 out["plays"] = str(v).strip()
