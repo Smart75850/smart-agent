@@ -860,6 +860,7 @@ $('filter-text').addEventListener('input',debounce(applyFilters,300));
 $('filter-platform').addEventListener('change',applyFilters);
 $('modal-close').addEventListener('click',()=>$('detail-modal').classList.remove('active'));
 $('detail-modal').addEventListener('click',(e)=>{if(e.target===$('detail-modal'))$('detail-modal').classList.remove('active');});
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape')$('detail-modal').classList.remove('active');});
 $('clear-history').addEventListener('click',()=>{localStorage.removeItem('crawl_history');renderHistory();});
 
 loadPlatforms(); connectWs(); renderHistory();
