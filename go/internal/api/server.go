@@ -134,13 +134,13 @@ func (s *Server) handleWebUI(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePlatforms(w http.ResponseWriter, r *http.Request) {
 	platforms := []map[string]any{
-		{"id": "bilibili", "name": "B站", "need_login": false, "types": []string{"search", "rank", "detail", "comment", "user"}},
-		{"id": "xiaohongshu", "name": "小紅書", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
-		{"id": "douyin", "name": "抖音", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
-		{"id": "zhihu", "name": "知乎", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
-		{"id": "kuaishou", "name": "快手", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
-		{"id": "weibo", "name": "微博", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
-		{"id": "tieba", "name": "貼吧", "need_login": false, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "bilibili", "name": "B站", "hot_type": "rank", "hot_label": "排行榜", "need_login": false, "types": []string{"search", "rank", "detail", "comment", "user"}},
+		{"id": "xiaohongshu", "name": "小紅書", "hot_type": "feed", "hot_label": "推薦熱門", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "douyin", "name": "抖音", "hot_type": "keyword", "hot_label": "熱搜關鍵詞", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "zhihu", "name": "知乎", "hot_type": "question", "hot_label": "熱榜問題", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "kuaishou", "name": "快手", "hot_type": "video", "hot_label": "熱播視頻", "need_login": false, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "weibo", "name": "微博", "hot_type": "topic", "hot_label": "熱搜話題", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
+		{"id": "tieba", "name": "貼吧", "hot_type": "post", "hot_label": "熱門帖子", "need_login": false, "types": []string{"search", "hot", "detail", "comment", "user"}},
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"platforms": platforms})
 }

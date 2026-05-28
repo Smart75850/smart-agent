@@ -291,6 +291,15 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
   <div id="stats-card" class="card" style="display:none">
     <div class="stats-bar" id="stats-bar"></div>
   </div>
+  <div class="card" id="history-card-pl">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">分析历史</h2>
+      <button class="btn-sm" id="clear-history-pl">清空</button>
+    </div>
+    <div class="history-list" id="history-list-pl">
+      <div class="empty-state" style="padding:12px;font-size:12px">暂无分析历史</div>
+    </div>
+  </div>
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <h2 style="margin:0">搜索结果 <span style="font-weight:400;font-size:12px;color:var(--text-dim)" id="results-note-pl">尚未分析</span></h2>
@@ -511,6 +520,55 @@ window.deleteHistory = function(idx) {
   renderHistory();
 };
 
+// ─── Pipeline History ───────────────────────────────
+function savePipelineHistory(keyword, platforms, count, mode, result) {
+  let history = JSON.parse(localStorage.getItem("pipeline_history")||"[]");
+  history.unshift({keyword, platforms, count, mode, time: new Date().toISOString(), result});
+  if(history.length > 20) history = history.slice(0, 20);
+  localStorage.setItem("pipeline_history", JSON.stringify(history));
+  renderPipelineHistory();
+}
+function loadPipelineHistory() { return JSON.parse(localStorage.getItem("pipeline_history")||"[]"); }
+function renderPipelineHistory() {
+  const history = loadPipelineHistory();
+  const container = $("history-list-pl");
+  if(!container) return;
+  if(!history.length) { container.innerHTML = "<div class=\"empty-state\" style=\"padding:12px;font-size:12px\">暂无分析历史</div>"; return; }
+  const names = {bilibili:"B站",xiaohongshu:"小红书",douyin:"抖音",zhihu:"知乎",kuaishou:"快手",weibo:"微博",tieba:"贴吧"};
+  const modeNames = {simple:"简单搜索",full:"全链路分析",download:"搜索+下载",sentiment:"舆情分析",account:"对标账号"};
+  container.innerHTML = history.map((h, i) => {
+    const dt = new Date(h.time);
+    const timeStr = (dt.getMonth()+1)+"/"+dt.getDate()+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");
+    const platNames = h.platforms.map(p => names[p]||p).join(" ");
+    return "<div class=\"history-item\" onclick=\"window.viewPipelineHistory("+i+")\">"+
+      "<span class=\"hi-keyword\">"+String(h.keyword).replace(/</g,"&lt;")+"</span>"+
+      "<span class=\"hi-meta\">"+platNames+" · "+(modeNames[h.mode]||h.mode)+" · "+timeStr+" · "+h.count+"条</span>"+
+      "<button class=\"hi-delete\" onclick=\"event.stopPropagation();window.deletePipelineHistory("+i+")\">&times;</button>"+
+      "</div>";
+  }).join("");
+}
+window.viewPipelineHistory = function(idx) {
+  const history = loadPipelineHistory(), entry = history[idx];
+  if(!entry) return;
+  if(entry.result && entry.result.final_output) {
+    renderResults(entry.result.final_output, "results-area-pl", "results-note-pl");
+  }
+  addLog("log-container-pl", "已加载历史: "+entry.keyword+" ("+entry.count+"条)", "ok");
+  $('tab-pipeline').classList.add('active');
+  $('tab-crawl').classList.remove('active');
+};
+window.deletePipelineHistory = function(idx) {
+  let history = loadPipelineHistory();
+  history.splice(idx, 1);
+  localStorage.setItem("pipeline_history", JSON.stringify(history));
+  renderPipelineHistory();
+};
+$("clear-history-pl").addEventListener("click", ()=>{
+  localStorage.removeItem("pipeline_history");
+  renderPipelineHistory();
+});
+renderPipelineHistory();
+
 async function startPipeline() {
   const keyword=$('pl-keyword').value.trim();
   const plats=Array.from($('pl-platforms').querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
@@ -581,6 +639,11 @@ function handlePipelineResult(result) {
 
   // Results table
   if(items.length) renderResults(items,'results-area-pl','results-note-pl');
+
+  // Save to pipeline history
+  const kw = $('pl-keyword').value.trim() || result.keyword || '';
+  const plats = Array.from($('pl-platforms').querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
+  if(kw && items.length) savePipelineHistory(kw, plats.length?plats:(result.platforms||[]), items.length, full.pipeline_mode||'simple', full);
 
   // Agent reports — 清晰文字报告，唔系 JSON
   const agents=[
@@ -750,6 +813,7 @@ function renderFilteredResults(){
       '<td class="col-count">'+fmtCount(it.plays)+'</td>'+
       '<td class="col-count">'+fmtCount(it.likes)+'</td>'+
       '<td class="col-link">'+(link?'<a href="'+link.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">查看</a>':'—')+'</td>'+
+      '<td class="col-link"><button class="btn-sm" onclick="event.stopPropagation();window.loadComments('+(currentPage*pageSize+i)+')" title="加载评论">💬</button></td>'+
     '</tr>';
   });
   html+='</tbody></table>';
