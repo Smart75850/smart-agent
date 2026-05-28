@@ -332,6 +332,8 @@ let _allItems = [], _filteredItems = [], currentPage = 0, pageSize = 50;
 let sortKey = null, sortDir = 'asc';
 let _currentKeyword = '', _currentPlatforms = [];
 const typeLabels = { search:'搜索', hot:'热榜', rank:'排行榜', detail:'详情', user:'用户' };
+const platformHotLabels = { bilibili:'排行榜', douyin:'热搜关键词', xiaohongshu:'推荐热门', zhihu:'热榜问题', kuaishou:'热播视频', weibo:'热搜话题', tieba:'热门帖子' };
+function getHotLabel(platformId) { return platformHotLabels[platformId] || '热榜'; }
 
 // ─── Helpers ──────────────────────────────────────
 function fmtCount(v) {
@@ -442,6 +444,8 @@ async function pollCrawl(taskId) {
         else if(Array.isArray(data.result)) lastResults=data.result;
         else lastResults=[];
       }
+      const hotLabel = type==='hot'&&plats.length===1 ? getHotLabel(plats[0]) : typeLabels[type]||type;
+      $('results-note').textContent = plats.length===1 ? hotLabel : (plats.length+' 平台');
       renderResults(lastResults,'results-area','results-note');
       if(lastResults.length) saveToHistory(_currentKeyword,_currentPlatforms,lastResults.length,lastResults);
       addLog('log-container','采集完成: '+lastResults.length+' 条','ok');finishCrawl();
