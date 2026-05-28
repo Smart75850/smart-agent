@@ -7,14 +7,35 @@ from src.utils.logger import logger
 
 _HOT_JS = """\
 () => {
-    const items = document.querySelectorAll('.HotItem');
-    return Array.from(items).map(item => ({
-        rank: item.querySelector('.HotItem-rank')?.textContent?.trim() || '',
-        title: item.querySelector('.HotItem-title')?.textContent?.trim() || '',
-        excerpt: item.querySelector('.HotItem-excerpt')?.textContent?.trim() || '',
-        heat: item.querySelector('.HotItem-metrics')?.textContent?.trim()?.replace(/\\s+/g, '') || '',
-        link: item.querySelector('a')?.getAttribute('href') || '',
-    }));
+    const items = document.querySelectorAll('.HotItem, .HotList-item');
+    if (items.length === 0) {
+        const cards = document.querySelectorAll('[class*="HotList"] [class*="item"], [class*="Topstory"] [class*="Hot"] [class*="item"]');
+        return Array.from(cards).map((item, i) => {
+            const a = item.querySelector('a');
+            const href = a?.getAttribute('href') || '';
+            return {
+                rank: String(i + 1),
+                title: item.querySelector('[class*="title"], h2, h3')?.textContent?.trim() || item.textContent.trim().slice(0, 80),
+                excerpt: item.querySelector('[class*="excerpt"], [class*="metrics"]')?.textContent?.trim() || '',
+                heat: item.querySelector('[class*="metrics"], [class*="count"], [class*="num"]')?.textContent?.trim()?.replace(/\\s+/g, '') || '',
+                link: href.startsWith('http') ? href : 'https://www.zhihu.com' + href,
+                plays: item.querySelector('[class*="metrics"], [class*="count"], [class*="num"]')?.textContent?.trim()?.replace(/\\s+/g, '') || '',
+            };
+        }).filter(x => x.title.length > 3);
+    }
+    return Array.from(items).map(item => {
+        const a = item.querySelector('a');
+        const href = a?.getAttribute('href') || '';
+        const heatStr = item.querySelector('.HotItem-metrics')?.textContent?.trim()?.replace(/\\s+/g, '') || '';
+        return {
+            rank: item.querySelector('.HotItem-rank')?.textContent?.trim() || '',
+            title: item.querySelector('.HotItem-title')?.textContent?.trim() || '',
+            excerpt: item.querySelector('.HotItem-excerpt')?.textContent?.trim() || '',
+            heat: heatStr,
+            link: href.startsWith('http') ? href : 'https://www.zhihu.com' + href,
+            plays: heatStr,
+        };
+    });
 }"""
 
 _SEARCH_JS = """\

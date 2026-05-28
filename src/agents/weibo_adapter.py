@@ -17,14 +17,23 @@ async () => {
             heat: item.num || '',
             category: item.category || '',
             link: 'https://s.weibo.com/weibo?q=' + encodeURIComponent(item.word || item.note || ''),
+            plays: item.num || '',
+            platform_id: 'hot_' + (item.word || item.note || ''),
         }));
     } catch {
         const items = document.querySelectorAll('.hot_list .data, .hot_ranklist [class*="item"], .UG_rank_item');
-        return Array.from(items).map((el, i) => ({
+        const seen = new Set();
+        return Array.from(items).filter(el => {
+            const t = el.textContent.trim();
+            if (!t || t.length < 3 || seen.has(t)) return false;
+            seen.add(t);
+            return true;
+        }).map((el, i) => ({
             rank: String(i + 1),
-            title: el.querySelector('.title, a, [class*="text"]')?.textContent?.trim() || '',
+            title: el.querySelector('.title, a, [class*="text"]')?.textContent?.trim() || el.textContent.trim().slice(0, 80),
             heat: el.querySelector('.num, [class*="count"], [class*="hot"]')?.textContent?.trim() || '',
             link: el.querySelector('a')?.getAttribute('href') || '',
+            plays: el.querySelector('.num, [class*="count"], [class*="hot"]')?.textContent?.trim() || '',
         }));
     }
 }"""

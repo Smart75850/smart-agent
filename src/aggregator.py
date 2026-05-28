@@ -18,7 +18,7 @@ _FIELD_MAP = {
 
 
 def _normalize(item: dict, platform: str) -> dict:
-    """归一化单个条目到统一字段。"""
+    """归一化单个条目到统一字段。含 heat→plays fallback。"""
     out = {"platform": platform}
     for target, sources in _FIELD_MAP.items():
         for src in sources:
@@ -28,11 +28,37 @@ def _normalize(item: dict, platform: str) -> dict:
                 break
         if target not in out:
             out[target] = ""
+
+    # plays fallback: heat / hot_value / replies
+    if not out.get("plays") or out["plays"] == "0":
+        for fb in ("heat", "hot_value", "replies", "reply_count", "reads_count"):
+            v = item.get(fb, "")
+            if v and str(v).strip():
+                out["plays"] = str(v).strip()
+                break
+
+    # link fallback: 构造搜索链接
+    if not out.get("link") or out["link"] == "":
+        title = out.get("title", "")
+        if title:
+            import urllib.parse
+            q = urllib.parse.quote(title)
+            link_tpl = {
+                "douyin": f"https://www.douyin.com/search/{q}",
+                "xiaohongshu": f"https://www.xiaohongshu.com/search_result?keyword={q}",
+                "zhihu": f"https://www.zhihu.com/search?type=content&q={q}",
+                "weibo": f"https://s.weibo.com/weibo?q={q}",
+                "kuaishou": f"https://www.kuaishou.com/search/video?searchKey={q}",
+                "bilibili": f"https://search.bilibili.com/all?keyword={q}",
+                "tieba": f"https://tieba.baidu.com/f/search/res?qw={q}",
+            }
+            out["link"] = link_tpl.get(platform, "")
+
     out["platform_id"] = (
         item.get("photo_id") or item.get("bvid") or item.get("aweme_id")
         or item.get("aid") or item.get("note_id") or item.get("question_id")
         or item.get("weibo_id") or item.get("tid")
-        or item.get("id") or ""
+        or item.get("platform_id") or item.get("id") or ""
     )
     out["raw"] = item
     return out

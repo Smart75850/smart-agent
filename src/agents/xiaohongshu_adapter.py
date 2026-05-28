@@ -261,18 +261,20 @@ async def xiaohongshu_hot() -> str:
         await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded")
         await page.wait_for_timeout(5000)
         result = await page.evaluate("""() => {
-    const items = document.querySelectorAll('.note-item, [class*="note-item"], [class*="feed"] [class*="item"]');
+    const items = document.querySelectorAll('.note-item, [class*="note-item"], [class*="feed"] [class*="item"], [class*="NoteItem"]');
     const seen = new Set();
-    return Array.from(items).filter(el => {
-        const t = el.textContent.trim();
-        if (!t || t.length < 5 || seen.has(t)) return false;
-        seen.add(t);
-        return true;
-    }).slice(0, 30).map(el => ({
-        title: el.querySelector('.title, [class*="title"]')?.textContent?.trim() || '',
-        likes: el.querySelector('.like, [class*="like"], [class*="count"]')?.textContent?.trim() || '',
-        link: el.querySelector('a')?.getAttribute('href') || '',
-    }));
+    return Array.from(items).map(el => {
+        const linkEl = el.tagName === 'A' ? el : el.querySelector('a[href*="/explore/"], a[href*="/search_result/"]');
+        const href = linkEl?.getAttribute('href') || '';
+        const title = el.querySelector('.title, [class*="title"], [class*="note-title"], span')?.textContent?.trim() || '';
+        const author = el.querySelector('.author, .name, [class*="author"], [class*="name"], [class*="nickname"]')?.textContent?.trim() || '';
+        const likes = el.querySelector('.like, [class*="like"], [class*="count"], [class*="engage"]')?.textContent?.trim() || '';
+        const cover = el.querySelector('img')?.getAttribute('src') || el.querySelector('img')?.getAttribute('data-src') || '';
+        const key = href || title;
+        if (!key || key.length < 3 || seen.has(key)) return null;
+        seen.add(key);
+        return {title, author, likes, link: href, cover_url: cover, plays: likes};
+    }).filter(Boolean).slice(0, 30);
 }""")
         logger.info(f"小紅薯熱榜完成: {len(result)} 條")
         return json.dumps(result, ensure_ascii=False)

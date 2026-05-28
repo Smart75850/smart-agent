@@ -7,24 +7,72 @@ from src.utils.logger import logger
 
 _HOT_JS = """\
 () => {
-    const items = document.querySelectorAll('.threadlist_title, .j_thread_list, [class*="thread"]');
-    if (items.length === 0) {
-        const cards = document.querySelectorAll('[class*="card"], [class*="item"], li');
-        return Array.from(cards).slice(0, 30).map((el, i) => ({
-            rank: String(i + 1),
-            title: el.querySelector('a[class*="title"], a[href*="/p/"], a')?.textContent?.trim() || '',
+    const seen = new Set();
+    const seenLinks = new Set();
+    const result = [];
+
+    // 热榜页专用: .topic-list 列表
+    const topicItems = document.querySelectorAll('.topic-list [class*="item"], [class*="topic"] [class*="item"], [class*="hot-list"] li, [class*="hotTopic"] [class*="item"]');
+    for (const el of topicItems) {
+        const a = el.querySelector('a[href*="/p/"], a[href*="/f?kw="], a');
+        const href = a?.getAttribute('href') || '';
+        const title = a?.textContent?.trim() || el.textContent.trim().slice(0, 80);
+        const key = href || title;
+        if (!key || key.length < 2 || seen.has(key) || seenLinks.has(href)) continue;
+        seen.add(key);
+        if (href) seenLinks.add(href);
+        result.push({
+            title,
             author: el.querySelector('[class*="author"], [class*="user"], [class*="name"]')?.textContent?.trim() || '',
             replies: el.querySelector('[class*="reply"], [class*="count"], [class*="num"]')?.textContent?.trim() || '',
-            link: el.querySelector('a[href*="/p/"]')?.getAttribute('href') || '',
-        })).filter(x => x.title.length > 2);
+            link: href.startsWith('http') ? href : 'https://tieba.baidu.com' + href,
+            plays: el.querySelector('[class*="reply"], [class*="count"], [class*="num"]')?.textContent?.trim() || '',
+        });
     }
-    return Array.from(items).slice(0, 30).map((el, i) => ({
-        rank: String(i + 1),
-        title: el.querySelector('.threadlist_title a, a[class*="title"], a[href*="/p/"]')?.textContent?.trim() || el.querySelector('a')?.textContent?.trim() || '',
-        author: el.querySelector('.threadlist_author, .frs-author-name, [class*="author"]')?.textContent?.trim() || '',
-        replies: el.querySelector('.threadlist_rep_num, [class*="reply"]')?.textContent?.trim() || '',
-        link: el.querySelector('a[href*="/p/"]')?.getAttribute('href') || '',
-    })).filter(x => x.title.length > 2);
+
+    // 兜底: threadlist 表格样式
+    if (result.length < 5) {
+        const threads = document.querySelectorAll('.threadlist_title, .j_thread_list, [class*="thread"]');
+        for (const el of threads) {
+            const a = el.querySelector('.threadlist_title a, a[class*="title"], a[href*="/p/"]') || el.querySelector('a');
+            const href = a?.getAttribute('href') || '';
+            const title = a?.textContent?.trim() || '';
+            const key = href || title;
+            if (!key || key.length < 2 || seen.has(key) || seenLinks.has(href)) continue;
+            seen.add(key);
+            if (href) seenLinks.add(href);
+            result.push({
+                title,
+                author: el.querySelector('.threadlist_author, .frs-author-name, [class*="author"]')?.textContent?.trim() || '',
+                replies: el.querySelector('.threadlist_rep_num, [class*="reply"]')?.textContent?.trim() || '',
+                link: href.startsWith('http') ? href : 'https://tieba.baidu.com' + href,
+                plays: el.querySelector('.threadlist_rep_num, [class*="reply"]')?.textContent?.trim() || '',
+            });
+        }
+    }
+
+    // 兜底2: 任意卡片
+    if (result.length < 5) {
+        const cards = document.querySelectorAll('[class*="card"], [class*="item"], li');
+        for (const el of cards) {
+            const a = el.querySelector('a[href*="/p/"], a[href*="/f?kw="], a');
+            const href = a?.getAttribute('href') || '';
+            const title = a?.textContent?.trim() || el.textContent.trim().slice(0, 80);
+            const key = href || title;
+            if (!key || key.length < 3 || seen.has(key) || seenLinks.has(href)) continue;
+            seen.add(key);
+            if (href) seenLinks.add(href);
+            result.push({
+                title,
+                author: el.querySelector('[class*="author"], [class*="user"], [class*="name"]')?.textContent?.trim() || '',
+                replies: el.querySelector('[class*="reply"], [class*="count"], [class*="num"]')?.textContent?.trim() || '',
+                link: href.startsWith('http') ? href : 'https://tieba.baidu.com' + href,
+                plays: el.querySelector('[class*="reply"], [class*="count"], [class*="num"]')?.textContent?.trim() || '',
+            });
+        }
+    }
+
+    return result.slice(0, 30);
 }"""
 
 _SEARCH_JS = """\

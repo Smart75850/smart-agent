@@ -312,7 +312,7 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
 
 
 async def douyin_hot() -> str:
-    """爬取抖音熱榜 — 拦截 hot/search/list API。"""
+    """爬取抖音熱榜 — 拦截 hot/search/list API → 对 top 热词搜索增强。"""
     logger.info("抖音熱榜: 開始爬取")
     try:
         page = await browser.new_page()
@@ -333,6 +333,8 @@ async def douyin_hot() -> str:
                                     "title": word,
                                     "hot_value": item.get("hot_value", ""),
                                     "position": item.get("position", ""),
+                                    "link": f"https://www.douyin.com/search/{word}",
+                                    "plays": item.get("hot_value", ""),
                                 })
                         for item in trending_list:
                             word = item.get("word", "")
@@ -340,6 +342,8 @@ async def douyin_hot() -> str:
                                 hot_items.append({
                                     "title": word,
                                     "hot_value": item.get("hot_value", ""),
+                                    "link": f"https://www.douyin.com/search/{word}",
+                                    "plays": item.get("hot_value", ""),
                                 })
                     except Exception:
                         pass
@@ -349,7 +353,7 @@ async def douyin_hot() -> str:
             await page.goto("https://www.douyin.com/hot", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(8000)
 
-            # 也用 DOM 兜底
+            # DOM 兜底
             if not hot_items:
                 result = await page.evaluate("""() => {
     const items = document.querySelectorAll('[class*="hot"] [class*="title"], [class*="trend"] [class*="title"], [class*="Hot"] [class*="Title"], [class*="HotItem"], [class*="hot-item"]');
@@ -359,9 +363,33 @@ async def douyin_hot() -> str:
         if (!t || t.length < 3 || seen.has(t)) return false;
         seen.add(t);
         return true;
-    }).map(el => ({ title: el.textContent.trim() }));
+    }).map(el => ({ title: el.textContent.trim(), link: 'https://www.douyin.com/search/' + encodeURIComponent(el.textContent.trim()) }));
 }""")
                 hot_items = list(result) if result else []
+
+            # 对 top 5 热词做 HTTP 搜索增强，拿到实际视频数据
+            if hot_items:
+                try:
+                    from src.utils.douyin_http import search as dy_http_search
+                    enriched_count = 0
+                    for item in hot_items[:5]:
+                        try:
+                            videos = await dy_http_search(item["title"], count=3)
+                            if videos:
+                                # 用第一条视频的 author/plays/likes 补充
+                                first = videos[0]
+                                item["author"] = first.get("author", "")
+                                item["plays"] = first.get("plays", "") or item.get("hot_value", "")
+                                item["likes"] = first.get("likes", "")
+                                item["cover_url"] = first.get("cover_url", "")
+                                item["link"] = first.get("link", "") or item.get("link", "")
+                                enriched_count += 1
+                        except Exception:
+                            pass
+                    if enriched_count > 0:
+                        logger.info(f"抖音熱榜: HTTP 搜索增强 {enriched_count}/{min(5, len(hot_items))} 条")
+                except Exception as e:
+                    logger.debug(f"抖音熱榜 HTTP 增强失败: {e}")
 
             logger.info(f"抖音熱榜完成: {len(hot_items)} 條")
             return json.dumps(hot_items, ensure_ascii=False)
