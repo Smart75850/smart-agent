@@ -426,7 +426,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 async function startCrawl() {
   const plats = Array.from($('crawl-platforms').querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
   const type=$('type').value, keyword=$('keyword').value.trim(), limit=parseInt($('limit').value)||20;
-  if(type==='search'&&!keyword){addLog('log-container','请输入关键词','warn');return;}
+  if(!keyword && (type==='search'||type==='detail'||type==='comment'||type==='user')){const hints={search:'关键词',detail:'视频/帖子ID',comment:'视频/帖子ID',user:'用户ID'};addLog('log-container','请输入'+((hints)[type]||'关键词'),'warn');return;}
   if(!plats.length){addLog('log-container','请至少选择一个平台','warn');return;}
   _currentKeyword=keyword; _currentPlatforms=[...plats];
   const btn=$('crawl-btn'); btn.classList.add('loading'); btn.disabled=true;

@@ -103,10 +103,14 @@ async def watcher_stop():
         return {"message": "watcher 已停止"}
     return {"message": "watcher 未在运行"}
 
-# Serve WebUI static files (after API routers to avoid route conflict)
+# Serve WebUI — 用显式路由而非 mount 避免拦截 /docs
 WEBUI_DIR = Path(__file__).parent / "webui"
-if WEBUI_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(WEBUI_DIR), html=True), name="webui")
+_INDEX_HTML = (WEBUI_DIR / "index.html").read_text(encoding="utf-8") if (WEBUI_DIR / "index.html").exists() else ""
+
+@app.get("/")
+async def serve_webui():
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=_INDEX_HTML)
 
 
 if __name__ == "__main__":

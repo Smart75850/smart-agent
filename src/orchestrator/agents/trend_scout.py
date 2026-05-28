@@ -50,9 +50,15 @@ class TrendScout(BaseAgent):
         platform: str = "bilibili",
         keyword: str = "",
         limit: int = 20,
+        items: list[dict] | None = None,
     ) -> TrendReport:
-        """主入口：採集 + 分析，返回 TrendReport。"""
-        items = await self._collect(platform, keyword, limit)
+        """主入口：採集 + 分析，返回 TrendReport。
+
+        items 参数可选 — 如果提供则直接使用（跳过 _collect），
+        用于 Pipeline 中复用已搜索数据避免 CDP 重搜超时。
+        """
+        if items is None:
+            items = await self._collect(platform, keyword, limit)
         if not items:
             logger.warning(f"TrendScout: [{platform}] 無數據，跳過分析")
             return TrendReport(platform=platform, keyword=keyword, total_candidates=0)
@@ -64,13 +70,19 @@ class TrendScout(BaseAgent):
         return report
 
     async def as_node(self, state: dict) -> dict:
-        """LangGraph 節點接口。"""
+        """LangGraph 節點接口 — 优先用 merged_items 避免重搜。"""
         keyword = state.get("keyword", "")
         platforms = state.get("platforms", ["bilibili"])
+        merged = state.get("merged_items", [])
 
         all_reports = {}
         for p in platforms:
-            report = await self.run(platform=p, keyword=keyword, limit=state.get("limit", 20))
+            # 从 pipeline 已搜索数据中提取该平台条目
+            plat_items = [it for it in merged if it.get("platform") == p]
+            if plat_items:
+                report = await self.run(platform=p, keyword=keyword, items=plat_items, limit=state.get("limit", 20))
+            else:
+                report = await self.run(platform=p, keyword=keyword, limit=state.get("limit", 20))
             all_reports[p] = asdict(report)
 
         return {"trend_reports": all_reports}
