@@ -55,7 +55,8 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
     if not sess.is_valid(): return []
     params = {"gk_version": "gz-gaokao", "t": "general", "q": keyword, "correction": "1", "offset": str(offset), "limit": str(min(count, 20)), "lc_idx": "0", "show_all_topics": "0", "search_source": "Normal"}
     headers = {"accept": "application/json", "cookie": sess.cookies_str, "referer": f"https://www.zhihu.com/search?type=content&q={quote(keyword)}", "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36", "x-api-version": "3.0.91"}
-    async with httpx.AsyncClient(timeout=15) as client:
+    from src.utils.http_client import create_httpx_client
+    async with create_httpx_client(15) as client:
         resp = await client.get(SEARCH_URL, params=params, headers=headers)
         data = resp.json()
     results = []
@@ -63,7 +64,12 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
         obj = item.get("object", {}) or {}
         if item.get("type") != "search_result": continue
         q = obj.get("question", {}) or {}
-        results.append({"title": obj.get("title", "") or q.get("name", ""), "excerpt": obj.get("excerpt", ""), "url": obj.get("url", ""), "votes": obj.get("voteup_count", 0) or 0, "comments": obj.get("comment_count", 0) or 0, "question_id": str(obj.get("id", "")), "author": (obj.get("author", {}) or {}).get("name", ""),})
+        url = obj.get("url", "")
+        if url:
+            url = url.replace("api.zhihu.com", "www.zhihu.com")
+            if not url.startswith("https://"):
+                url = "https://www.zhihu.com" + (url if url.startswith("/") else "/" + url)
+        results.append({"title": obj.get("title", "") or q.get("name", ""), "excerpt": obj.get("excerpt", ""), "url": url, "votes": obj.get("voteup_count", 0) or 0, "comments": obj.get("comment_count", 0) or 0, "question_id": str(obj.get("id", "")), "author": (obj.get("author", {}) or {}).get("name", ""),})
     return results
 
 async def search_all(keyword: str, limit: int = 40) -> list[dict]:

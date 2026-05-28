@@ -96,7 +96,8 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
 
     headers = _build_headers(session, keyword, search_id)
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    from src.utils.http_client import create_httpx_client
+    async with create_httpx_client(15) as client:
         resp = await client.get(SEARCH_URL, params=params, headers=headers)
         resp.raise_for_status()
         body = resp.json()
@@ -124,11 +125,15 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
         results.append({
             "title": info.get("desc", ""),
             "author": info.get("author", {}).get("nickname", ""),
-            "plays": statistics.get("play_count", 0) or 0,
+            "plays": statistics.get("play_count", 0) or statistics.get("share_count", 0) or 0,
             "likes": statistics.get("digg_count", 0) or 0,
+            "comments": statistics.get("comment_count", 0) or 0,
+            "shares": statistics.get("share_count", 0) or 0,
+            "collects": statistics.get("collect_count", 0) or 0,
             "aweme_id": aweme_id,
             "sec_uid": info.get("author", {}).get("sec_uid", ""),
             "cover_url": (info.get("video", {}).get("cover", {}).get("url_list", [""]) or [""])[0],
+            "link": f"https://www.douyin.com/video/{aweme_id}" if aweme_id else "",
         })
 
     return results

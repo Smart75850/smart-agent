@@ -21,13 +21,16 @@ class DouyinSession:
     webid: str = ""
     odin_tt: str = ""
     passport_csrf_token: str = ""
+    cookies_str: str = ""
     harvested_at: str = ""
     source_port: int = 0
 
     def is_valid(self) -> bool:
-        return bool(self.sessionid and self.ttwid and self.uifid)
+        return bool(self.ttwid)  # ttwid 是最关键的，sessionid/uifid 新版可能不存在
 
     def to_cookie_header(self) -> str:
+        if self.cookies_str:
+            return self.cookies_str
         pairs = []
         if self.sessionid:
             pairs.append(f"sessionid={self.sessionid}")
@@ -81,7 +84,10 @@ class SessionStore:
         if SESSION_FILE.exists():
             try:
                 data = json.loads(SESSION_FILE.read_text("utf-8"))
-                return DouyinSession.from_dict(data)
+                sess = DouyinSession.from_dict(data)
+                # 补充 cookies_str
+                sess.cookies_str = data.get("cookies_str", "")
+                return sess
             except (json.JSONDecodeError, KeyError):
                 pass
         # fallback: 尝试从完整收割文件提取
@@ -98,6 +104,25 @@ class SessionStore:
                     passport_csrf_token=cookies.get("passport_csrf_token", ""),
                     harvested_at=data.get("harvested_at", ""),
                 )
+            except (json.JSONDecodeError, KeyError):
+                pass
+        # fallback 2: 从 douyin_http_session.json 读完整 cookies 字符串
+        http_session_file = SESSION_FILE.parent / "douyin_http_session.json"
+        if http_session_file.exists():
+            try:
+                data = json.loads(http_session_file.read_text("utf-8"))
+                cookies_str = data.get("cookies_str", "")
+                sess = DouyinSession()
+                sess.cookies_str = cookies_str
+                # 尝试从 cookies_str 提取关键字段
+                for part in cookies_str.split("; "):
+                    if "=" in part:
+                        k, v = part.split("=", 1)
+                        if k == "ttwid": sess.ttwid = v
+                        elif k == "sessionid": sess.sessionid = v
+                        elif k == "uifid": sess.uifid = v
+                        elif k == "odin_tt": sess.odin_tt = v
+                return sess
             except (json.JSONDecodeError, KeyError):
                 pass
         return DouyinSession()

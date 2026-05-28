@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
@@ -139,6 +139,40 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
 .empty-state .empty-icon { font-size: 40px; margin-bottom: 10px; }
 
+/* Filter */
+.hidden { display: none !important; }
+#filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+#filter-text { flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface2); color: var(--text); font-family: inherit; }
+#filter-platform { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface2); color: var(--text); }
+#filter-text:focus, #filter-platform:focus { border-color: var(--accent); outline: none; }
+.result-table th.sortable { cursor: pointer; user-select: none; }
+.result-table th.sortable:hover { color: var(--accent); }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal-box { background: var(--surface); border-radius: var(--radius); max-width: 640px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 24px; position: relative; box-shadow: 0 8px 32px rgba(0,0,0,.15); }
+.modal-close { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-dim); line-height: 1; }
+.modal-close:hover { color: var(--text); }
+.modal-field { margin-bottom: 10px; }
+.modal-field-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600; letter-spacing: .3px; }
+.modal-field-value { font-size: 13px; color: var(--text); margin-top: 2px; word-break: break-all; }
+.modal-cover { max-width: 100%; max-height: 240px; border-radius: 6px; margin-bottom: 12px; display: block; }
+.result-table tbody tr { cursor: pointer; }
+
+/* Pagination */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0; }
+.pagination span { font-size: 13px; color: var(--text-dim); }
+
+/* History */
+.history-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+.history-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+.history-item:hover { border-color: var(--accent); background: #eef1ff; }
+.history-item .hi-keyword { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.history-item .hi-meta { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.history-item .hi-delete { margin-left: auto; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+.history-item .hi-delete:hover { color: var(--red); background: #fde8e8; }
+
 @media (max-width: 700px) {
   header { padding: 10px 14px; }
   main { padding: 12px 14px; gap: 10px; }
@@ -161,7 +195,7 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
 </header>
 
 <div id="tab-bar">
-  <button class="tab-btn active" data-tab="crawl">单平台采集</button>
+  <button class="tab-btn active" data-tab="crawl">多平台采集</button>
   <button class="tab-btn" data-tab="pipeline">全流程分析</button>
 </div>
 
@@ -170,12 +204,23 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
 <div class="tab-content active" id="tab-crawl">
   <div class="card">
     <h2>采集设置</h2>
+    <div class="control-row" style="margin-bottom:8px">
+      <div class="control-group" style="width:100%"><label>目标平台</label><div class="platform-checks" id="crawl-platforms"></div></div>
+    </div>
     <div class="control-row">
-      <div class="control-group"><label>平台</label><select id="platform"></select></div>
-      <div class="control-group"><label>类型</label><select id="type"></select></div>
-      <div class="control-group" style="flex:1;min-width:140px"><label>关键词</label><input id="keyword" type="text" placeholder="输入搜索关键词…"></div>
+      <div class="control-group"><label>类型</label><select id="type"><option value="search">搜索</option><option value="hot">热榜</option><option value="detail">详情</option><option value="comment">评论</option><option value="user">用户</option></select></div>
+      <div class="control-group" style="flex:1;min-width:140px"><label id="keyword-label">关键词</label><input id="keyword" type="text" placeholder="输入搜索关键词…"></div>
       <div class="control-group"><label>数量</label><input id="limit" type="number" value="20" min="1" max="500"></div>
       <button class="btn-primary" id="crawl-btn"><span class="spinner"></span><span>开始采集</span></button>
+    </div>
+  </div>
+  <div class="card" id="history-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">搜索历史</h2>
+      <button class="btn-sm" id="clear-history">清空</button>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="empty-state" style="padding:12px;font-size:12px">暂无搜索历史</div>
     </div>
   </div>
   <div class="card">
@@ -185,6 +230,10 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
         <button class="btn-sm" id="dl-json" disabled>导出 JSON</button>
         <button class="btn-sm" id="dl-csv" disabled>导出 CSV</button>
       </div>
+    </div>
+    <div id="filter-bar" class="hidden">
+      <input id="filter-text" type="text" placeholder="筛选标题/作者…">
+      <select id="filter-platform"><option value="">全部平台</option></select>
     </div>
     <div id="results-area">
       <div class="empty-state"><div class="empty-icon">📋</div>选择平台和关键词，点击「开始采集」</div>
@@ -201,7 +250,18 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
   <div class="card">
     <h2>分析设置</h2>
     <div class="control-row" style="margin-bottom:8px">
-      <div class="control-group" style="flex:1;min-width:200px"><label>分析关键词</label><input id="pl-keyword" type="text" placeholder="输入要分析的关键词…"></div>
+      <div class="control-group" style="width:100%">
+        <label>分析模式</label>
+        <div class="mode-radios">
+          <label><input type="radio" name="pl-analysis-mode" value="keyword" checked> 关键词分析</label>
+          <label><input type="radio" name="pl-analysis-mode" value="account"> 对标账号（基础）</label>
+          <label><input type="radio" name="pl-analysis-mode" value="account_deep"> 深度对标（下载+分析）</label>
+          <label><input type="radio" name="pl-analysis-mode" value="sentiment"> 舆情分析（评论采集）</label>
+        </div>
+      </div>
+    </div>
+    <div class="control-row" style="margin-bottom:8px">
+      <div class="control-group" style="flex:1;min-width:200px"><label id="pl-input-label">分析关键词</label><input id="pl-keyword" type="text" placeholder="输入要分析的关键词…"></div>
       <div class="control-group"><label>每平台数量</label><input id="pl-limit" type="number" value="10" min="1" max="100"></div>
     </div>
     <div class="control-row" style="margin-bottom:8px">
@@ -212,6 +272,7 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
         <label>分析深度</label>
         <div class="mode-radios">
           <label><input type="radio" name="pl-mode" value="full" checked> 深度分析（7 个 AI Agent）</label>
+          <label><input type="radio" name="pl-mode" value="download"> 采集+下载（搜索→下载视频/封面）</label>
           <label><input type="radio" name="pl-mode" value="simple"> 快速搜索（仅采集）</label>
         </div>
       </div>
@@ -251,6 +312,14 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
 </div>
 </main>
 
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-box">
+    <button class="modal-close" id="modal-close">&times;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
 <script>
 (function(){
 'use strict';
@@ -259,6 +328,9 @@ function fmtTime() { const d = new Date(); return String(d.getHours()).padStart(
 
 // ─── State ────────────────────────────────────────
 let platforms = [], lastResults = null, lastPipeline = null, ws = null, pollTimer = null;
+let _allItems = [], _filteredItems = [], currentPage = 0, pageSize = 50;
+let sortKey = null, sortDir = 'asc';
+let _currentKeyword = '', _currentPlatforms = [];
 const typeLabels = { search:'搜索', hot:'热榜', rank:'排行榜', detail:'详情', user:'用户' };
 
 // ─── Helpers ──────────────────────────────────────
@@ -302,20 +374,32 @@ async function loadPlatforms() {
   try {
     const data = await (await fetch('/api/platforms')).json();
     platforms = data.platforms||[];
-    $('platform').innerHTML = platforms.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-    if(platforms.length) populateTypes(platforms[0].id);
+    // Crawl tab checkboxes
+    $('crawl-platforms').innerHTML = platforms.map(p=>
+      `<label class="checked"><input type="checkbox" value="${p.id}" checked> ${p.name}</label>`
+    ).join('');
+    $('crawl-platforms').querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.addEventListener('change',()=>cb.parentElement.classList.toggle('checked',cb.checked));
+    });
+    // Pipeline tab checkboxes
     $('pl-platforms').innerHTML = platforms.map(p=>
       `<label class="checked"><input type="checkbox" value="${p.id}" checked> ${p.name}</label>`
     ).join('');
     $('pl-platforms').querySelectorAll('input[type=checkbox]').forEach(cb=>{
       cb.addEventListener('change',()=>cb.parentElement.classList.toggle('checked',cb.checked));
     });
+    // Filter dropdown
+    $('filter-platform').innerHTML = '<option value="">全部平台</option>'+
+      platforms.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   } catch(e) { addLog('log-container','无法加载平台列表: '+e.message,'err'); }
 }
-function populateTypes(pid) {
-  const p = platforms.find(x=>x.id===pid), types = p?p.types:['search'];
-  $('type').innerHTML = types.map(t=>`<option value="${t}">${typeLabels[t]||t}</option>`).join('');
-}
+
+// ─── 类型切换 ──────────────────────────────────────
+const typeHints={search:{label:'关键词',placeholder:'输入搜索关键词…'},hot:{label:'平台',placeholder:'可选分类'},detail:{label:'视频/帖子ID',placeholder:'输入bvid/aweme_id/note_id…'},comment:{label:'视频/帖子ID',placeholder:'输入视频/帖子ID查看评论…'},user:{label:'用户ID',placeholder:'输入uid/mid…'}};
+$('type').addEventListener('change',()=>{
+  const t=$('type').value, h=typeHints[t]||typeHints.search;
+  $('keyword-label').textContent=h.label; $('keyword').placeholder=h.placeholder;
+});
 
 // ─── Tabs ─────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -329,31 +413,53 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 
 // ═══════════ CRAWL ═══════════
 async function startCrawl() {
-  const platform=$('platform').value, type=$('type').value, keyword=$('keyword').value.trim(), limit=parseInt($('limit').value)||20;
+  const plats = Array.from($('crawl-platforms').querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
+  const type=$('type').value, keyword=$('keyword').value.trim(), limit=parseInt($('limit').value)||20;
   if(type==='search'&&!keyword){addLog('log-container','请输入关键词','warn');return;}
+  if(!plats.length){addLog('log-container','请至少选择一个平台','warn');return;}
+  _currentKeyword=keyword; _currentPlatforms=[...plats];
   const btn=$('crawl-btn'); btn.classList.add('loading'); btn.disabled=true;
-  $('dl-json').disabled=true; $('dl-csv').disabled=true; lastResults=null;
+  $('dl-json').disabled=true; $('dl-csv').disabled=true; lastResults=null; _allItems=[];
+  $('filter-bar').classList.add('hidden');
   $('results-area').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>采集中…</div>';
   try {
-    const res=await fetch('/api/crawl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform,type,keyword,limit})});
+    const body={type,keyword,limit,platforms:plats};
+    if(plats.length===1) body.platform=plats[0];
+    const res=await fetch('/api/crawl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await res.json();
-    if(data.task_id){addLog('log-container','任务已提交,等待完成…','');pollCrawl(data.task_id,platform);}
+    if(data.task_id){addLog('log-container','任务 '+data.task_id.slice(0,8)+' 已启动 ('+plats.length+' 平台)','');pollCrawl(data.task_id);}
     else{handleCrawlResult(data);}
   } catch(e){addLog('log-container','提交失败: '+e.message,'err');finishCrawl();}
 }
-async function pollCrawl(taskId,platform) {
+async function pollCrawl(taskId) {
   try {
     const res=await fetch('/api/crawl/'+taskId);
-    if(!res.ok){const d=await(await fetch('/api/data/'+platform)).json();lastResults=d.data||[];renderResults(lastResults,'results-area','results-note');finishCrawl();return;}
     const data=await res.json();
-    if(data.status==='done'){const d=await(await fetch('/api/data/'+platform)).json();lastResults=d.data||[];renderResults(lastResults,'results-area','results-note');addLog('log-container','采集完成: '+lastResults.length+' 条','ok');finishCrawl();}
-    else if(data.status==='error'){addLog('log-container','任务失败: '+(data.error||'未知'),'err');finishCrawl();}
-    else{pollTimer=setTimeout(()=>pollCrawl(taskId,platform),2000);}
-  } catch(e){addLog('log-container','轮询失败: '+e.message,'err');pollTimer=setTimeout(()=>pollCrawl(taskId,platform),2000);}
+    if(data.status==='done') {
+      if(data.result){
+        if(data.result.items) lastResults=data.result.items;
+        else if(data.result.search_results){lastResults=Object.values(data.result.search_results).flat().filter(it=>!it.error);}
+        else if(Array.isArray(data.result)) lastResults=data.result;
+        else lastResults=[];
+      }
+      renderResults(lastResults,'results-area','results-note');
+      if(lastResults.length) saveToHistory(_currentKeyword,_currentPlatforms,lastResults.length,lastResults);
+      addLog('log-container','采集完成: '+lastResults.length+' 条','ok');finishCrawl();
+    } else if(data.status==='error'){addLog('log-container','任务失败: '+(data.error||'未知'),'err');finishCrawl();}
+    else{pollTimer=setTimeout(()=>pollCrawl(taskId),2000);}
+  } catch(e){addLog('log-container','轮询失败: '+e.message,'err');pollTimer=setTimeout(()=>pollCrawl(taskId),2000);}
 }
 function handleCrawlResult(data) {
-  if(Array.isArray(data)) lastResults=data; else if(data.data) lastResults=data.data; else if(data.items) lastResults=data.items; else lastResults=[data];
+  if(data.result){
+    if(data.result.items) lastResults=data.result.items;
+    else if(Array.isArray(data.result)) lastResults=data.result;
+    else lastResults=[data.result];
+  } else if(Array.isArray(data)) lastResults=data;
+  else if(data.data) lastResults=data.data;
+  else if(data.items) lastResults=data.items;
+  else lastResults=[data];
   renderResults(lastResults,'results-area','results-note');
+  if(lastResults.length) saveToHistory(_currentKeyword,_currentPlatforms,lastResults.length,lastResults);
   addLog('log-container','采集完成: '+lastResults.length+' 条','ok');
   finishCrawl();
 }
@@ -363,21 +469,67 @@ function finishCrawl() {
 }
 
 // ═══════════ PIPELINE ═══════════
+// ═══════════ HISTORY ═══════════
+function saveToHistory(keyword, platforms, count, items) {
+  let history = JSON.parse(localStorage.getItem("crawl_history")||"[]");
+  history.unshift({keyword, platforms, count, time: new Date().toISOString(), items});
+  if(history.length > 20) history = history.slice(0, 20);
+  localStorage.setItem("crawl_history", JSON.stringify(history));
+  renderHistory();
+}
+function loadHistory() { return JSON.parse(localStorage.getItem("crawl_history")||"[]"); }
+function renderHistory() {
+  const history = loadHistory();
+  const container = $("history-list");
+  if(!history.length) { container.innerHTML = "<div class=\"empty-state\" style=\"padding:12px;font-size:12px\">暂无搜索历史</div>"; return; }
+  container.innerHTML = history.map((h, i) => {
+    const dt = new Date(h.time);
+    const timeStr = (dt.getMonth()+1)+"/"+dt.getDate()+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");
+    const names = {bilibili:"B站",xiaohongshu:"小红书",douyin:"抖音",zhihu:"知乎",kuaishou:"快手",weibo:"微博",tieba:"贴吧"};
+    const platNames = h.platforms.map(p => names[p]||p).join(" ");
+    return "<div class=\"history-item\" onclick=\"window.viewHistory("+i+")\">"+
+      "<span class=\"hi-keyword\">"+String(h.keyword).replace(/</g,"&lt;")+"</span>"+
+      "<span class=\"hi-meta\">"+platNames+" · "+timeStr+" · "+h.count+"条</span>"+
+      "<button class=\"hi-delete\" onclick=\"event.stopPropagation();window.deleteHistory("+i+")\">&times;</button>"+
+      "</div>";
+  }).join("");
+}
+window.viewHistory = function(idx) {
+  const history = loadHistory(), entry = history[idx];
+  if(!entry) return;
+  renderResults(entry.items, "results-area", "results-note");
+  addLog("log-container", "已加载历史: "+entry.keyword+" ("+entry.count+"条)", "ok");
+};
+window.deleteHistory = function(idx) {
+  let history = loadHistory();
+  history.splice(idx, 1);
+  localStorage.setItem("crawl_history", JSON.stringify(history));
+  renderHistory();
+};
+
 async function startPipeline() {
   const keyword=$('pl-keyword').value.trim();
   const plats=Array.from($('pl-platforms').querySelectorAll('input[type=checkbox]:checked')).map(cb=>cb.value);
   const mode=document.querySelector('input[name="pl-mode"]:checked')?.value||'full';
+  const analysisMode=document.querySelector('input[name="pl-analysis-mode"]:checked')?.value||'keyword';
   const limit=parseInt($('pl-limit').value)||10;
-  if(!keyword){addLog('log-container-pl','请输入分析关键词','warn');return;}
+  const labels={account:'对标账号', account_deep:'深度对标', sentiment:'舆情分析', keyword:'分析关键词'};
+  const modeLabel=labels[analysisMode]||'分析关键词';
+  if(!keyword){addLog('log-container-pl','请输入'+modeLabel,'warn');return;}
   if(!plats.length){addLog('log-container-pl','请至少选择一个平台','warn');return;}
   const btn=$('pl-btn'); btn.classList.add('loading'); btn.disabled=true;
   $('dl-json-pl').disabled=true; $('dl-csv-pl').disabled=true; lastPipeline=null;
   $('agent-reports').classList.remove('visible'); $('agent-cards').innerHTML='';
   $('stats-card').style.display='none'; $('results-area-pl').innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div>分析中…</div>';
-  $('pl-progress').classList.add('visible'); $('pl-progress-text').textContent='正在提交任务 ('+plats.length+' 个平台, '+(mode==='full'?'深度分析':'快速搜索')+')…';
-  addLog('log-container-pl','启动分析: '+keyword+' ['+plats.join(',')+'] '+mode,'');
+  let effectiveMode=mode;
+  if(analysisMode==='account_deep') effectiveMode='full';
+  if(analysisMode==='sentiment') effectiveMode='sentiment';
+  const descs={full:'深度分析', simple:'快速搜索', download:'采集下载', sentiment:'舆情采集'};
+  const taskDesc=analysisMode!=='keyword'?modeLabel+' ':'';
+  $('pl-progress').classList.add('visible'); $('pl-progress-text').textContent='正在提交任务 ('+plats.length+' 个平台, '+(descs[effectiveMode]||effectiveMode)+')…';
+  addLog('log-container-pl','启动'+taskDesc+'分析: '+keyword+' ['+plats.join(',')+'] '+effectiveMode,'');
   try {
-    const res=await fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword,platforms:plats,limit,pipeline_mode:mode})});
+    const res=await fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword,platforms:plats,limit,pipeline_mode:effectiveMode,analysis_mode:analysisMode})});
     const data=await res.json();
     if(data.task_id){addLog('log-container-pl','任务 '+data.task_id.slice(0,8)+' 已启动','');pollPipeline(data.task_id);}
     else{handlePipelineResult(data);}
@@ -402,6 +554,24 @@ function handlePipelineResult(result) {
   const count=items.length;
   let statsHTML=`<div class="stat-item">搜索结果 <strong>${count}</strong> 条</div>`;
   if(result.search_count!==undefined) statsHTML=`<div class="stat-item">搜索结果 <strong>${result.search_count}</strong> 条</div>`+statsHTML.slice(0,0);
+
+  // 下载结果
+  const dlResults=full.download_results||result.download_results||[];
+  if(dlResults.length>0){
+    statsHTML+=`<div class="stat-item">已下载 <strong>${dlResults.length}</strong> 个文件</div>`;
+    // 在结果区前展示下载列表
+    const dlArea=document.createElement('div');
+    dlArea.className='download-list';
+    dlArea.innerHTML='<strong>📥 下载文件:</strong><br>'+dlResults.map(f=>{
+      const name=f.split(/[\\/]/).pop();
+      return `<span style="font-size:12px;color:#10b981">✔ ${name}</span>`;
+    }).join('<br>');
+    const resultsArea=$('results-area-pl');
+    if(resultsArea&&resultsArea.parentNode){
+      resultsArea.parentNode.insertBefore(dlArea,resultsArea);
+    }
+  }
+
   $('stats-bar').innerHTML=statsHTML;
   $('stats-card').style.display='block';
 
@@ -479,34 +649,114 @@ function finishPipeline() {
   if(pollTimer){clearTimeout(pollTimer);pollTimer=null;}
 }
 
+// ═══════════ DETAIL MODAL ═══════════
+window.showDetail = function(idx) {
+  const item = window._allItems[idx];
+  if(!item) return;
+  const fields=[
+    ['标题',item.title],['平台',platformName(item.platform)],['作者',item.author],
+    ['播放量',fmtCount(item.plays)],['点赞',fmtCount(item.likes)],
+    ['评论',fmtCount(item.comments||item.comment_count)],
+    ['发布时间',item.publish_time||item.date||item.time],
+    ['描述',item.description||item.desc||item.caption],
+    ['链接',item.link?'<a href="'+item.link.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener">'+item.link+'</a>':''],
+    ['平台ID',item.platform_id],
+  ];
+  let html='';
+  if(item.cover_url||item.cover){
+    html+='<img class="modal-cover" src="'+(item.cover_url||item.cover)+'" alt="" onerror="this.style.display=\'none\'">';
+  }
+  fields.forEach(([label,value])=>{
+    if(value!==undefined&&value!==null&&value!=='') html+='<div class="modal-field"><div class="modal-field-label">'+label+'</div><div class="modal-field-value">'+value+'</div></div>';
+  });
+  $('modal-content').innerHTML=html;
+  $('detail-modal').classList.add('active');
+};
+function platformName(p){
+  return ({bilibili:'B站',xiaohongshu:'小红书',douyin:'抖音',zhihu:'知乎',kuaishou:'快手',weibo:'微博',tieba:'贴吧'})[p]||p;
+}
+
+// ═══════════ FILTER / SORT / PAGINATION ═══════════
+window.setSort = function(key) {
+  if(sortKey===key) sortDir=sortDir==='asc'?'desc':'asc';
+  else{sortKey=key;sortDir='asc';}
+  applyFilters();
+};
+function debounce(fn,ms){let t;return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms);};}
+function applyFilters(){
+  const text=($('filter-text')?.value||'').toLowerCase();
+  const plat=$('filter-platform')?.value||'';
+  let items=[..._allItems];
+  if(text) items=items.filter(it=>(it.title||'').toLowerCase().includes(text)||(it.author||'').toLowerCase().includes(text));
+  if(plat) items=items.filter(it=>it.platform===plat);
+  if(sortKey){
+    items.sort((a,b)=>{
+      const va=a[sortKey]||'', vb=b[sortKey]||'';
+      const na=parseFloat(String(va).replace(/[,，万]/g,''));
+      const nb=parseFloat(String(vb).replace(/[,，万]/g,''));
+      if(!isNaN(na)&&!isNaN(nb)) return (na-nb)*(sortDir==='asc'?1:-1);
+      return String(va).localeCompare(String(vb))*(sortDir==='asc'?1:-1);
+    });
+  }
+  _filteredItems=items; currentPage=0;
+  renderFilteredResults();
+}
+window.changePage = function(dir){
+  const totalPages=Math.ceil(_filteredItems.length/pageSize)||1;
+  currentPage=Math.max(0,Math.min(currentPage+dir,totalPages-1));
+  renderFilteredResults();
+};
+
 // ═══════════ RESULTS TABLE ═══════════
+let _currentAreaId='results-area', _currentNoteId='results-note';
 function renderResults(items, areaId, noteId) {
-  if(!items||!items.length){$(areaId).innerHTML='<div class="empty-state"><div class="empty-icon">📭</div>无结果</div>';if(noteId)$(noteId).textContent='0 条';return;}
+  _allItems=items; window._allItems=items; _filteredItems=[...items]; currentPage=0; sortKey=null; sortDir='asc';
+  _currentAreaId=areaId; _currentNoteId=noteId;
+  if(!items||!items.length){$('filter-bar').classList.add('hidden');$(areaId).innerHTML='<div class="empty-state"><div class="empty-icon">📭</div>无结果</div>';if(noteId)$(noteId).textContent='0 条';return;}
+  $('filter-bar').classList.remove('hidden');
+  if(noteId) $(noteId).textContent=items.length+' 条结果';
+  renderFilteredResults();
+  $('dl-json').disabled=false; $('dl-csv').disabled=false;
+  $('dl-json-pl').disabled=false; $('dl-csv-pl').disabled=false;
+}
+function renderFilteredResults(){
+  const areaId=_currentAreaId, noteId=_currentNoteId;
+  const totalPages=Math.ceil(_filteredItems.length/pageSize)||1;
+  if(currentPage>=totalPages) currentPage=Math.max(0,totalPages-1);
+  const pageItems=_filteredItems.slice(currentPage*pageSize,(currentPage+1)*pageSize);
+  const sortArrow=(k)=>sortKey===k?(sortDir==='asc'?' ▲':' ▼'):'';
 
-  let html=`<table class="result-table"><thead><tr>
-    <th class="col-platform">平台</th><th class="col-title">标题</th><th class="col-author">作者</th>
-    <th class="col-count">播放量</th><th class="col-count">点赞</th><th class="col-link">链接</th>
-  </tr></thead><tbody>`;
+  let html='<table class="result-table"><thead><tr>'+
+    '<th class="col-platform sortable" onclick="setSort(\'platform\')">平台'+sortArrow('platform')+'</th>'+
+    '<th class="col-title sortable" onclick="setSort(\'title\')">标题'+sortArrow('title')+'</th>'+
+    '<th class="col-author sortable" onclick="setSort(\'author\')">作者'+sortArrow('author')+'</th>'+
+    '<th class="col-count sortable" onclick="setSort(\'plays\')">播放量'+sortArrow('plays')+'</th>'+
+    '<th class="col-count sortable" onclick="setSort(\'likes\')">点赞'+sortArrow('likes')+'</th>'+
+    '<th class="col-link">查看</th><th class="col-link">评论</th>'+
+    '</tr></thead><tbody>';
 
-  items.slice(0,100).forEach(it=>{
+  pageItems.forEach((it,i)=>{if(it.user!==undefined||it.content!==undefined){html+='<tr><td>'+platformTag(it.platform||'')+'</td><td colspan=3><strong>'+(it.user||it.author||'匿名')+'</strong>: '+(it.content||it.text||'').replace(/</g,'&lt;').substring(0,200)+'</td><td class=col-count>'+(it.likes||it.like_count||'')+'</td><td class=col-link>-</td><td class=col-link>-</td></tr>';return;}
     const title=String(it.title||'').replace(/</g,'&lt;');
     const author=String(it.author||'').replace(/</g,'&lt;').substring(0,20);
     const link=it.link||'';
-    html+=`<tr>
-      <td>${platformTag(it.platform)}</td>
-      <td>${title||'—'}</td>
-      <td class="col-author">${author||'—'}</td>
-      <td class="col-count">${fmtCount(it.plays)}</td>
-      <td class="col-count">${fmtCount(it.likes)}</td>
-      <td class="col-link">${link?`<a href="${link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener">查看</a>`:'—'}</td>
-    </tr>`;
+    html+='<tr onclick="window.showDetail('+(currentPage*pageSize+i)+')" title="点击查看详情">'+
+      '<td>'+platformTag(it.platform)+'</td>'+
+      '<td>'+(title||'—')+'</td>'+
+      '<td class="col-author">'+(author||'—')+'</td>'+
+      '<td class="col-count">'+fmtCount(it.plays)+'</td>'+
+      '<td class="col-count">'+fmtCount(it.likes)+'</td>'+
+      '<td class="col-link">'+(link?'<a href="'+link.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">查看</a>':'—')+'</td>'+
+    '</tr>';
   });
   html+='</tbody></table>';
-  if(items.length>100) html+='<div style="text-align:center;padding:12px;color:var(--text-dim);font-size:12px">仅显示前 100 条，共 '+items.length+' 条</div>';
+
+  html+='<div class="pagination">'+
+    '<button class="btn-sm" onclick="changePage(-1)"'+(currentPage<=0?' disabled':'')+'>上一页</button>'+
+    '<span>第 '+(currentPage+1)+' 页 / 共 '+totalPages+' 页 ('+_filteredItems.length+' 条)</span>'+
+    '<button class="btn-sm" onclick="changePage(1)"'+(currentPage>=totalPages-1?' disabled':'')+'>下一页</button>'+
+    '</div>';
+
   $(areaId).innerHTML=html;
-  if(noteId) $(noteId).textContent=items.length+' 条结果';
-  $('dl-json').disabled=false; $('dl-csv').disabled=false;
-  $('dl-json-pl').disabled=false; $('dl-csv-pl').disabled=false;
 }
 
 // ═══════════ DOWNLOADS ═══════════
@@ -524,19 +774,66 @@ function downloadCSV(rows, name) {
 }
 
 // ─── Events ───────────────────────────────────────
-$('platform').addEventListener('change',()=>populateTypes($('platform').value));
 $('crawl-btn').addEventListener('click',startCrawl);
 $('pl-btn').addEventListener('click',startPipeline);
-$('dl-json').addEventListener('click',()=>lastResults&&downloadJSON(lastResults,'采集结果.json'));
-$('dl-csv').addEventListener('click',()=>lastResults&&downloadCSV(lastResults,'采集结果.csv'));
+document.querySelectorAll('input[name="pl-analysis-mode"]').forEach(r=>r.addEventListener('change',()=>{
+  const isAccount=r.value==='account';
+  $('pl-input-label').textContent=isAccount?'对标账号名':'分析关键词';
+  $('pl-keyword').placeholder=isAccount?'输入对标账号名，如 李佳琦':'输入要分析的关键词…';
+}));
+$('dl-json').addEventListener('click',()=>_allItems.length&&downloadJSON(_allItems,'采集结果.json'));
+$('dl-csv').addEventListener('click',()=>_allItems.length&&downloadCSV(_allItems,'采集结果.csv'));
 $('dl-json-pl').addEventListener('click',()=>lastPipeline&&downloadJSON(lastPipeline,'分析报告.json'));
 $('dl-csv-pl').addEventListener('click',()=>{
   const items=(lastPipeline||{}).full_result?.final_output||lastPipeline?.final_output||[];
   downloadCSV(items,'搜索结果.csv');
 });
+$('filter-text').addEventListener('input',debounce(applyFilters,300));
+$('filter-platform').addEventListener('change',applyFilters);
+$('modal-close').addEventListener('click',()=>$('detail-modal').classList.remove('active'));
+$('detail-modal').addEventListener('click',(e)=>{if(e.target===$('detail-modal'))$('detail-modal').classList.remove('active');});
+$('clear-history').addEventListener('click',()=>{localStorage.removeItem('crawl_history');renderHistory();});
 
-loadPlatforms(); connectWs();
+loadPlatforms(); connectWs(); renderHistory();
 })();
+
+window.loadComments = async function(idx) {
+  const item = window._allItems[idx];
+  if(!item) return;
+  const pid = item.platform_id||item.bvid||item.aweme_id||item.photo_id||item.note_id||item.mid||item.tid||'';
+  if(!pid) { alert('无有效ID，无法获取评论'); return; }
+  const modal = document.getElementById('detail-modal');
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = '<div style="text-align:center;padding:40px">加载评论中...</div>';
+  modal.classList.add('active');
+  try {
+    const res = await fetch('/api/crawl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:item.platform,type:'comment',keyword:pid,limit:30})});
+    const data = await res.json();
+    let commentHtml = '<h3>评论 ['+data.task_id.substring(0,8)+']</h3>';
+    // poll for result
+    for(let i=0;i<30;i++) {
+      await new Promise(r=>setTimeout(r,2000));
+      const tr = await fetch('/api/crawl/'+data.task_id);
+      const td = await tr.json();
+      if(td.status==='done'||td.status==='error') {
+        const comments = td.result||[];
+        if(comments.length>0) {
+          comments.forEach(c => {
+            commentHtml += '<div style="border-bottom:1px solid #eee;padding:8px 0"><strong style="color:#333">'+(c.user||c.author||'匿名')+'</strong><p style="margin:4px 0;color:#555;font-size:13px">'+(c.content||c.text||'无内容')+'</p><span style="font-size:11px;color:#999">点赞 '+(c.likes||c.like_count||'0')+'</span></div>';
+          });
+        } else {
+          commentHtml += '<p style="color:#999">暂无评论数据</p>';
+        }
+        mc.innerHTML = commentHtml;
+        return;
+      }
+    }
+    mc.innerHTML = '<p style="color:#999">评论加载超时</p>';
+  } catch(e) {
+    mc.innerHTML = '<p style="color:red">加载评论失败: '+e.message+'</p>';
+  }
+};
+
 </script>
 </body>
 </html>

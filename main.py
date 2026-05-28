@@ -83,8 +83,12 @@ def parse_args(argv=None):
         help="啟用 LLM 過濾打分（僅 --engine=langgraph 時有效）",
     )
     parser.add_argument(
-        "--pipeline", default="simple", choices=["simple", "full"],
-        help="管道模式: simple=搜索合并, full=完整Agent分析链 (仅 --type=aggregate 时有效)",
+        "--pipeline", default="simple", choices=["simple", "full", "download", "sentiment"],
+        help="管道模式: simple=搜索合并, full=完整Agent分析链+下载, download=搜索+下载, sentiment=舆情采集 (仅 --type=aggregate 时有效)",
+    )
+    parser.add_argument(
+        "--download", action="store_true",
+        help="搜索后自动下载视频/封面 (仅 --type=search 时有效)",
     )
     parser.add_argument(
         "--stream", action="store_true",
@@ -363,6 +367,24 @@ async def main():
                 all_results[key] = {"error": err_msg}
                 logger.error(f"[{platform}] {action}: ERROR — {err_msg}")
                 ck.mark_failed(platform, action, args.keyword, error_msg=err_msg)
+
+        # ── download ──────────────────────────────────────────
+        if args.download and all_results:
+            from src.downloader.media_downloader import MediaDownloader
+            dl = MediaDownloader()
+            all_items = []
+            for key, data in all_results.items():
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict):
+                            if "platform" not in item:
+                                item["platform"] = key.split("_")[0]
+                            all_items.append(item)
+            if all_items:
+                dl_results = await dl.download_items(all_items, topic=args.keyword or "general")
+                await dl.close()
+                paths = [r.filepath for r in dl_results if r.status == "success"]
+                logger.info(f"下载完成: {len(paths)}/{len(dl_results)} 个文件")
 
         # ── final stats ──────────────────────────────────────
         tasks_summary = ck.get_all_tasks()

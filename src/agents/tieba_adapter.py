@@ -125,16 +125,16 @@ async def tieba_hot() -> str:
         await page.close()
 
 
-async def tieba_search(keyword: str) -> str:
+async def tieba_search(keyword: str, count: int = 40) -> str:
     """搜索贴吧。Path 1: 纯 HTTP Session → Path 2: CDP Browser"""
-    logger.info(f"贴吧搜索: keyword={keyword}")
+    logger.info(f"贴吧搜索: keyword={keyword} count={count}")
 
     # Path 1: 纯 HTTP Session（curl_cffi 绕过百度安全验证）
     try:
         from src.utils.session_manager import ensure_session
         if await ensure_session("tieba"):
             from src.utils.tieba_http import search_all
-            items = await search_all(keyword, limit=20)
+            items = await search_all(keyword, limit=count)
             if items:
                 logger.info(f"[tieba-session] 纯HTTP直连成功: {len(items)} 条")
                 return json.dumps(items, ensure_ascii=False)
@@ -144,19 +144,33 @@ async def tieba_search(keyword: str) -> str:
     # Path 2: CDP Browser
     page = await browser.new_page()
     try:
-        await page.goto(
-            f"https://tieba.baidu.com/f/search/res?qw={keyword}",
-            wait_until="domcontentloaded",
-        )
-        await page.wait_for_timeout(5000)
-        # 检测安全验证
-        cur_title = await page.title()
-        if "安全验证" in cur_title:
-            logger.warning("贴吧搜索: 触发百度安全验证，请先在浏览器中手动访问贴吧完成验证")
-            return json.dumps([], ensure_ascii=False)
-        result = await page.evaluate(_SEARCH_JS)
-        logger.info(f"贴吧搜索完成: {len(result)} 条结果")
-        return json.dumps(result, ensure_ascii=False)
+        all_items = []
+        seen = set()
+        max_pages = max(count // 20 + 3, 5)
+        for pn in range(0, max_pages):
+            url = f"https://tieba.baidu.com/f/search/res?qw={keyword}" if pn == 0 else f"https://tieba.baidu.com/f/search/res?qw={keyword}&pn={pn * 20}"
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(3000)
+            cur_title = await page.title()
+            if "安全验证" in cur_title:
+                logger.warning("贴吧搜索: 触发百度安全验证，请先在浏览器中手动访问贴吧完成验证")
+                break
+            result = await page.evaluate(_SEARCH_JS)
+            if not result:
+                break
+            new_count = 0
+            for item in result:
+                key = item.get("link", "") or item.get("title", "")
+                if key and key not in seen:
+                    seen.add(key)
+                    all_items.append(item)
+                    new_count += 1
+            if new_count == 0:
+                break
+            if len(all_items) >= count:
+                break
+        logger.info(f"贴吧搜索完成: {len(all_items)} 条结果")
+        return json.dumps(all_items[:count], ensure_ascii=False)
     finally:
         await page.close()
 
@@ -243,8 +257,10 @@ class TiebaAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return False
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await tieba_search(keyword))
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
+        data = json.loads(await tieba_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:

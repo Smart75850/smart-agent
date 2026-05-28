@@ -10,7 +10,7 @@ _PLATFORMS = [
     {"id": "xiaohongshu", "name": "小紅書", "need_login": True, "types": ["search", "hot", "detail", "comment", "user"]},
     {"id": "douyin", "name": "抖音", "need_login": True, "types": ["search", "hot", "detail", "comment", "user"]},
     {"id": "zhihu", "name": "知乎", "need_login": True, "types": ["search", "hot", "detail", "comment", "user"]},
-    {"id": "kuaishou", "name": "快手", "need_login": True, "types": ["search", "hot", "detail", "comment", "user"]},
+    {"id": "kuaishou", "name": "快手", "need_login": False, "types": ["search", "hot", "detail", "comment", "user"]},
     {"id": "weibo", "name": "微博", "need_login": True, "types": ["search", "hot", "detail", "comment", "user"]},
     {"id": "tieba", "name": "貼吧", "need_login": False, "types": ["search", "hot", "detail", "comment", "user"]},
 ]

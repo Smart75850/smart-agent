@@ -1,11 +1,40 @@
 import asyncio
+import atexit
+import signal
 import socket
+import sys
 from os import environ
 from pathlib import Path
 
 from config.settings import settings
 from proxy.proxy_manager import ProxyManager
 from src.utils.logger import logger
+
+_cleanup_registered = False
+
+
+def _register_cleanup():
+    """注册 atexit + signal 清理，确保浏览器进程不会残留。"""
+    global _cleanup_registered
+    if _cleanup_registered:
+        return
+    _cleanup_registered = True
+
+    def _sync_cleanup():
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(browser.close())
+        except Exception:
+            pass
+
+    atexit.register(_sync_cleanup)
+
+    if sys.platform == "win32":
+        try:
+            signal.signal(signal.SIGBREAK, lambda *_: sys.exit(0))
+        except Exception:
+            pass
 
 ENGINE = settings.BROWSER_ENGINE
 CDP_PORT = settings.CDP_PORT
@@ -188,6 +217,8 @@ class BrowserService:
             raise ValueError(f"不支持的浏览器引擎: {engine}")
 
         await self._load_platform_cookies()
+        _register_cleanup()
+        asyncio.create_task(self._watchdog())
 
     async def _load_platform_cookies(self):
         """从 browser_data/{platform}_cookies.json 加载 cookies 并注入上下文。"""
@@ -210,6 +241,39 @@ class BrowserService:
                     logger.info(f"CookieBridge: {platform} 注入 {len(cookies)} 个 cookie")
             except Exception:
                 pass
+
+    @property
+    def is_running(self) -> bool:
+        return self._browser is not None
+
+    def is_connected(self) -> bool:
+        """检查浏览器是否真正连接（非 None 且未断开）。"""
+        if not self._browser:
+            return False
+        try:
+            return self._browser.is_connected()
+        except Exception:
+            return False
+
+    async def restart(self):
+        """重启浏览器：清理 → 重新启动。"""
+        logger.warning("浏览器断开，正在重启...")
+        await self._cleanup()
+        await asyncio.sleep(2)
+        try:
+            await self.start()
+            logger.info("浏览器重启成功")
+            return True
+        except Exception as e:
+            logger.error(f"浏览器重启失败: {e}")
+            return False
+
+    async def _watchdog(self, interval: int = 15):
+        """后台监控浏览器连接，断开时自动重启。"""
+        while True:
+            await asyncio.sleep(interval)
+            if not self.is_connected():
+                await self.restart()
 
     @property
     def is_running(self) -> bool:

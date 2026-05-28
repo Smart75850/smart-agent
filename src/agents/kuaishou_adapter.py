@@ -316,7 +316,9 @@ class KuaishouAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return False
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
         data = json.loads(await kuaishou_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 

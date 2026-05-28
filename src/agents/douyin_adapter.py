@@ -189,6 +189,7 @@ async def _douyin_search_http(keyword: str, count: int = 40) -> str:
             "aweme_id": str(info.get("aweme_id", "")),
             "sec_uid": author.get("sec_uid", ""),
             "cover_url": (video.get("cover", {}) or {}).get("url_list", [""])[0],
+            "link": f"https://www.douyin.com/video/{info.get('aweme_id', '')}",
         })
 
     logger.info(f"[douyin-http] SignSrv 直连成功: {len(items)} 条")
@@ -249,6 +250,7 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
                                 "aweme_id": aid,
                                 "sec_uid": author.get("sec_uid", ""),
                                 "cover_url": (video.get("cover", {}) or {}).get("url_list", [""])[0],
+                                "link": f"https://www.douyin.com/video/{aid}",
                             })
                     except Exception:
                         pass
@@ -276,14 +278,16 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
                     if dom_result:
                         for item in dom_result:
                             if item.get("title"):
+                                dom_link = item.get("link", "")
                                 api_items.append({
                                     "title": item.get("title", ""),
                                     "author": item.get("author", ""),
                                     "plays": item.get("plays", 0),
                                     "likes": 0,
-                                    "aweme_id": item.get("link", "").split("/video/")[-1] if "/video/" in (item.get("link") or "") else "",
+                                    "aweme_id": dom_link.split("/video/")[-1] if "/video/" in (dom_link or "") else "",
                                     "sec_uid": "",
                                     "cover_url": "",
+                                    "link": dom_link,
                                 })
                 except Exception:
                     pass
@@ -509,7 +513,9 @@ class DouyinAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return True
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
         data = json.loads(await douyin_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 

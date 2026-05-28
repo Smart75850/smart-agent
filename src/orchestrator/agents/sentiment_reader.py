@@ -71,7 +71,7 @@ class SentimentReader(BaseAgent):
             items = report_dict.get("items", [])
             if items:
                 raw_items = [it.get("raw", {}) for it in items if isinstance(it, dict)]
-                report = await self.run(items=raw_items[:3], platform=p, fetch_comments=False)
+                report = await self.run(items=raw_items[:3], platform=p, fetch_comments=True)
                 all_sentiments.extend(report.items)
                 if report.summary:
                     summaries.append(report.summary)

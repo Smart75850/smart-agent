@@ -1,8 +1,23 @@
 """贴吧纯 HTTP 搜索 — 使用 curl_cffi 模拟 Chrome TLS 指纹。"""
-import json, logging, asyncio
+import hashlib, json, logging, asyncio
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import quote as urlquote
 from curl_cffi import requests as curl_requests
+
+PC_SIGN_SECRET = "36770b1f34c9bbf2e7d1a99d2b82fa9e"
+
+def _tieba_sign(params: dict) -> str:
+    """贴吧 PC API MD5 签名。"""
+    parts = []
+    for k in sorted(params.keys()):
+        if k in ("sign", "sig"):
+            continue
+        v = params[k]
+        if v is None:
+            continue
+        parts.append(f"{k}={v}")
+    return hashlib.md5(("".join(parts) + PC_SIGN_SECRET).encode()).hexdigest()
 
 logger = logging.getLogger(__name__)
 SEARCH_URL = "https://tieba.baidu.com/mo/q/search/multsearch"
@@ -61,7 +76,16 @@ def _search_sync(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
         "x-requested-with": "XMLHttpRequest",
     }
     params = {"rn": str(min(count, 20)), "st": "1", "word": keyword, "needbrand": "1", "sug_type": "2", "pn": str(page), "come_from": "search", "subapp_type": "pc", "_client_type": "20"}
-    resp = curl_requests.get(SEARCH_URL, params=params, headers=headers, impersonate="chrome124", timeout=15)
+    params["sign"] = _tieba_sign(params)
+    kwargs = {"params": params, "headers": headers, "impersonate": "chrome124", "timeout": 15}
+    try:
+        from src.utils.http_client import create_curl_cffi_proxy
+        proxy = create_curl_cffi_proxy()
+        if proxy:
+            kwargs["proxies"] = proxy
+    except Exception:
+        pass
+    resp = curl_requests.get(SEARCH_URL, **kwargs)
     data = resp.json()
     if data.get("no") != 0 and data.get("error") != "success":
         return []
@@ -81,11 +105,14 @@ def _search_sync(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
         # Type 1: Thread card — directly has tid, title, content
         if "tid" in inner and "title" in inner:
             user = inner.get("user") or {}
+            replies = inner.get("post_num", 0)
             results.append({
                 "title": inner.get("title", ""),
                 "excerpt": (inner.get("content", "") or "")[:200],
                 "url": f"https://tieba.baidu.com/p/{inner.get('tid', '')}",
-                "replies": inner.get("post_num", 0),
+                "replies": replies,
+                "plays": replies,  # 贴吧用回复数代理热度
+                "likes": 0,
                 "author": user.get("user_name", "") or user.get("show_nickname", ""),
                 "forum": inner.get("forum_name", ""),
                 "tid": str(inner.get("tid", "")),
@@ -98,7 +125,7 @@ def _search_sync(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
             results.append({
                 "title": em.get("forum_name_show", "") or em.get("forum_name", ""),
                 "excerpt": f"贴吧: {em.get('forum_name_show', em.get('forum_name', ''))} (帖子数: {em.get('post_num_ori', 0)})",
-                "url": f"https://tieba.baidu.com/f?kw={em.get('forum_name', '')}",
+                "url": f"https://tieba.baidu.com/f?kw={urlquote(em.get('forum_name', ''))}",
                 "replies": em.get("post_num_ori", 0),
                 "author": "",
                 "forum": em.get("forum_name_show", "") or em.get("forum_name", ""),
@@ -106,11 +133,14 @@ def _search_sync(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
             })
             for t in em.get("thread_list", []) or []:
                 author = t.get("author", {}) or {}
+                replies = t.get("reply_num", 0)
                 results.append({
                     "title": t.get("title", ""),
                     "excerpt": (t.get("abstract", "") or "")[:200],
                     "url": f"https://tieba.baidu.com/p/{t.get('tid', '')}",
-                    "replies": t.get("reply_num", 0),
+                    "replies": replies,
+                    "plays": replies,
+                    "likes": 0,
                     "author": author.get("name", ""),
                     "forum": t.get("fname", ""),
                     "tid": str(t.get("tid", "")),
@@ -125,7 +155,7 @@ async def search_all(keyword: str, limit: int = 40) -> list[dict]:
     while len(all_results) < limit:
         items = await search(keyword, count=20, page=page)
         if not items: break
-        new = [i for i in items if i.get("tid", i["title"]) not in seen]
+        new = [i for i in items if i.get("tid", i["title"]) not in seen and i.get("url", "")]
         for i in new: seen.add(i.get("tid", i["title"]))
         all_results.extend(new)
         page += 1

@@ -43,17 +43,31 @@ class WebSocketLogHandler(logging.Handler):
     def __init__(self, broadcaster: LogBroadcaster, level=logging.INFO):
         super().__init__(level)
         self._broadcaster = broadcaster
+        self._main_loop: asyncio.AbstractEventLoop | None = None
+
+    def capture_loop(self):
+        try:
+            self._main_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
 
     def emit(self, record: logging.LogRecord):
+        loop = self._main_loop
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+                self._main_loop = loop
+            except RuntimeError:
+                return
         try:
             data = {
                 "time": datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
                 "level": record.levelname,
                 "message": record.getMessage(),
             }
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self._broadcaster.broadcast(data))
+            asyncio.run_coroutine_threadsafe(
+                self._broadcaster.broadcast(data), loop
+            )
         except Exception:
             self.handleError(record)
 
@@ -68,6 +82,7 @@ logging.getLogger().addHandler(_log_handler)
 @router.websocket("/api/ws")
 async def log_websocket(ws: WebSocket):
     await ws.accept()
+    _log_handler.capture_loop()
     broadcaster.add(ws)
     try:
         # Send initial connection confirmation

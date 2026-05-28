@@ -98,7 +98,8 @@ async def search(keyword: str, count: int = 20, pcursor: str = "") -> tuple[list
         "searchSessionId": ''.join(random.choices('0123456789abcdef', k=32)),
     }
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    from src.utils.http_client import create_httpx_client
+    async with create_httpx_client(15) as client:
         resp = await client.post(SEARCH_URL, headers=headers, json=body)
         resp.raise_for_status()
         data = resp.json()
@@ -110,14 +111,16 @@ async def search(keyword: str, count: int = 20, pcursor: str = "") -> tuple[list
     for f in feeds:
         photo = f.get("photo", {}) or {}
         author = f.get("user", {}) or {}
+        pid = photo.get("id", "")
         results.append({
             "title": photo.get("caption", ""),
             "author": author.get("name", ""),
             "likes": photo.get("likeCount", 0) or 0,
-            "views": photo.get("viewCount", 0) or 0,
-            "photo_id": photo.get("id", ""),
+            "plays": photo.get("viewCount", 0) or 0,
+            "photo_id": pid,
             "duration": photo.get("duration", 0),
             "cover_url": (photo.get("coverUrls", []) or [{}])[0].get("url", ""),
+            "link": f"https://www.kuaishou.com/short-video/{pid}" if pid else "",
         })
 
     return results, str(next_pcursor) if next_pcursor else ""

@@ -33,6 +33,7 @@ _SEARCH_JS = """\
         return {
             title: item.querySelector('.bili-video-card__info--tit')?.textContent?.trim(),
             author: item.querySelector('.bili-video-card__info--author')?.textContent?.trim(),
+            author_link: item.querySelector('.bili-video-card__info--author')?.getAttribute('href') || '',
             play_count: statItems[0]?.textContent?.trim(),
             likes: statItems[1]?.textContent?.trim(),
             duration: item.querySelector('.bili-video-card__stats__duration')?.textContent?.trim(),
@@ -58,14 +59,14 @@ async def bilibili_search(keyword: str, count: int = 40) -> str:
 
     # ── Path 1: 纯 HTTP Wbi 签名（零浏览器）─────────────────
     try:
-        from src.utils.session_manager import ensure_session
-        if await ensure_session("bilibili"):
-            from src.utils.bilibili_http import search_all
-            items = await search_all(keyword, limit=count)
-            if items:
-                links_normalized = _normalize_links(items)
-                logger.info(f"[bilibili-session] 纯HTTP直连成功: {len(items)} 条")
-                return json.dumps(links_normalized, ensure_ascii=False)
+        from src.utils.bilibili_http import search_all
+        items = await search_all(keyword, limit=count)
+        if items:
+            links_normalized = _normalize_links(items)
+            logger.info(f"[bilibili-session] 纯HTTP直连成功: {len(items)} 条")
+            return json.dumps(links_normalized, ensure_ascii=False)
+        else:
+            logger.info(f"[bilibili-session] HTTP搜索返回空，回退 CDP")
     except Exception as exc:
         logger.warning(f"B站 HTTP 搜索失败: {exc}，回退 CDP 浏览器")
 
@@ -80,7 +81,7 @@ async def bilibili_search(keyword: str, count: int = 40) -> str:
         else:
             url = f"https://search.bilibili.com/all?keyword={quote(keyword)}&page={page_num}"
 
-        result = await browser.evaluate(url, _SEARCH_JS, wait_selector=".bili-video-card")
+        result = await browser.evaluate(url, _SEARCH_JS)
         if not result:
             break
 
@@ -208,29 +209,45 @@ async def bilibili_detail(bvid: str) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
-async def bilibili_user(uid: str) -> str:
-    """爬取 B站 用戶主頁視頻列表，回傳 JSON 字串。"""
-    logger.info(f"B站用戶: uid={uid}")
+async def _bilibili_user_cdp(uid: str) -> list[dict]:
+    """CDP 方式获取用户视频，一次加载 + reload 重试。"""
     page = await browser.new_page()
     try:
-        await page.goto(f"https://space.bilibili.com/{uid}/video", wait_until="domcontentloaded")
-        await page.wait_for_timeout(4000)
-        # 多次滚动触发懒加载
-        for _ in range(4):
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        for attempt in range(2):
+            if attempt == 0:
+                await page.goto(f"https://space.bilibili.com/{uid}/video", wait_until="domcontentloaded", timeout=30000)
+            else:
+                logger.warning(f"B站用戶 {uid}: CDP 第1次0条，reload 重试")
+                await page.reload(wait_until="domcontentloaded", timeout=30000)
+
+            # 等 .bili-video-card 出现（最多 8s，比固定等待更精准）
+            try:
+                await page.wait_for_selector(".bili-video-card", timeout=8000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(2000)
+
+            # 滚动触发懒加载
+            for _ in range(3):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(1000)
             await page.wait_for_timeout(1500)
-        # 滚回顶部再滚一遍确保触发
-        await page.evaluate("window.scrollTo(0, 0)")
-        await page.wait_for_timeout(500)
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await page.wait_for_timeout(2000)
-        result = await page.evaluate("""() => {
-    // 多重选择器 fallback
+
+            result = await page.evaluate(_USER_JS)
+            if result and len(result) > 0:
+                return result
+
+        return []
+    finally:
+        await page.close()
+
+
+# 提取用户视频的 JS
+_USER_JS = """() => {
     let cards = document.querySelectorAll('.bili-video-card');
     if (cards.length === 0) cards = document.querySelectorAll('.cube-item');
     if (cards.length === 0) cards = document.querySelectorAll('.small-item');
     if (cards.length === 0) cards = document.querySelectorAll('[class*="video-card"]');
-    // 终极 fallback: 从页面中所有 BV 链接向上找容器
     if (cards.length === 0) {
         const bvLinks = document.querySelectorAll('a[href*="/video/BV"]');
         const parents = new Set();
@@ -262,11 +279,27 @@ async def bilibili_user(uid: str) -> str:
             link,
         };
     }).filter(Boolean);
-}""")
-        logger.info(f"B站用戶完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+}"""
+
+
+async def bilibili_user(uid: str) -> str:
+    """爬取 B站 用戶主頁視頻列表 — HTTP API 优先，CDP 兜底。"""
+    logger.info(f"B站用戶: uid={uid}")
+
+    # Path 1: 纯 HTTP API（零浏览器）
+    try:
+        from src.utils.bilibili_http import fetch_user_videos
+        items = await fetch_user_videos(uid, limit=40)
+        if items:
+            logger.info(f"B站用戶 HTTP: {len(items)} 條")
+            return json.dumps(_normalize_links(items), ensure_ascii=False)
+    except Exception as exc:
+        logger.warning(f"B站用戶 HTTP 失败: {exc}，回退 CDP")
+
+    # Path 2: CDP 浏览器兜底
+    result = await _bilibili_user_cdp(uid)
+    logger.info(f"B站用戶 CDP: {len(result)} 條")
+    return json.dumps(result, ensure_ascii=False)
 
 
 class BilibiliAdapter(PlatformAdapter):
@@ -278,7 +311,9 @@ class BilibiliAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return False
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
         data = json.loads(await bilibili_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 

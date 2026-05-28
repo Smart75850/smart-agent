@@ -38,11 +38,13 @@ _SEARCH_JS = """\
         const title = titleEl?.textContent?.trim() || '';
         if (!title || title.length < 3 || seen.has(title)) return null;
         seen.add(title);
+        const authorEl = card.querySelector('[class*="author"], [class*="Author"], [class*="name"], [class*="Name"], [itemprop="name"]');
         return {
             title,
             excerpt: excerptEl?.textContent?.trim()?.slice(0, 300) || '',
             votes: metaEl?.textContent?.trim() || '',
             link: linkEl?.getAttribute('href') || '',
+            author: authorEl?.textContent?.trim() || '',
         };
     }).filter(Boolean);
 }"""
@@ -166,8 +168,10 @@ class ZhihuAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return True
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await zhihu_search(keyword))
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
+        data = json.loads(await zhihu_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:
@@ -186,16 +190,16 @@ class ZhihuAdapter(PlatformAdapter):
         return data[:limit] if limit else data
 
 
-async def zhihu_search(keyword: str) -> str:
+async def zhihu_search(keyword: str, count: int = 40) -> str:
     """搜索知乎內容。Path 1: 纯 HTTP Session → Path 2: CDP Browser"""
-    logger.info(f"知乎搜索: keyword={keyword}")
+    logger.info(f"知乎搜索: keyword={keyword} count={count}")
 
     # Path 1: 纯 HTTP Session（零浏览器，毫秒级）
     try:
         from src.utils.session_manager import ensure_session
         if await ensure_session("zhihu"):
             from src.utils.zh_http import search_all
-            items = await search_all(keyword, limit=20)
+            items = await search_all(keyword, limit=count)
             if items:
                 logger.info(f"[zhihu-session] 纯HTTP直连成功: {len(items)} 条")
                 return json.dumps(items, ensure_ascii=False)
@@ -214,12 +218,34 @@ async def zhihu_search(keyword: str) -> str:
         if "signin" in cur_url or "login" in cur_url:
             logger.warning(f"知乎搜索: 檢測到登入牆 (URL 跳轉至 signin/login)，請先手動登入知乎")
             return json.dumps([], ensure_ascii=False)
-        result = await page.evaluate(_SEARCH_JS)
-        if not result:
+
+        all_items = []
+        seen = set()
+        for offset in range(0, count, 20):
+            if offset > 0:
+                await page.goto(
+                    f"https://www.zhihu.com/search?type=content&q={keyword}&offset={offset}",
+                    wait_until="domcontentloaded",
+                )
+                await page.wait_for_timeout(3000)
+            result = await page.evaluate(_SEARCH_JS)
+            if not result:
+                break
+            new_count = 0
+            for item in result:
+                key = item.get("link", "") or item.get("title", "")
+                if key and key not in seen:
+                    seen.add(key)
+                    all_items.append(item)
+                    new_count += 1
+            if new_count == 0:
+                break
+
+        if not all_items:
             body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
             if "登录" in body_text and "注册" in body_text:
                 logger.warning("知乎搜索: 檢測到登入牆 (頁面包含登入/註冊提示)，請先手動登入知乎")
-        logger.info(f"知乎搜索完成: {len(result)} 條結果")
-        return json.dumps(result, ensure_ascii=False)
+        logger.info(f"知乎搜索完成: {len(all_items)} 條結果")
+        return json.dumps(all_items[:count], ensure_ascii=False)
     finally:
         await page.close()

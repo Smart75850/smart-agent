@@ -229,7 +229,96 @@ async def ensure_session(platform: str, port: int = 9222) -> bool:
     except Exception as exc:
         logger.error(f"[session-manager] {platform} 收割失败: {exc}")
 
+    # 3. CDP 不可用/收割失败：尝试多账号轮换
+    try:
+        from src.utils.session_router import SessionRouter
+        router = SessionRouter(platform)
+        alt = router.get_session()
+        if alt and alt.get("cookies_str"):
+            cfg["cached_cookies"] = alt["cookies_str"]
+            cfg["cached_at"] = __import__("time").time()
+            logger.info(f"[session-manager] {platform} 使用备用账号: {alt.get('account_name', '?')}")
+            return True
+    except Exception as exc:
+        logger.debug(f"[session-manager] {platform} 账号轮换也无可用: {exc}")
+
     return False
+
+
+def mark_rate_limited(platform: str, cooldown_minutes: int = 30):
+    """平台 HTTP 请求被限流时调用，标记当前账号并切换到下一个。"""
+    try:
+        from src.utils.session_router import SessionRouter
+        router = SessionRouter(platform)
+        router.mark_rate_limited(cooldown_minutes)
+    except Exception:
+        pass
+
+
+_refresh_task = None
+_last_health: dict[str, dict] = {}
+
+
+def get_health_status() -> dict:
+    """返回所有平台会话健康状态。"""
+    import time as _time
+    result = {}
+    for platform, cfg in _PLATFORMS.items():
+        status = _last_health.get(platform, {})
+        result[platform] = {
+            "healthy": status.get("healthy", False),
+            "last_check": status.get("last_check", ""),
+            "last_ok": status.get("last_ok", ""),
+            "error": status.get("error", ""),
+        }
+    return result
+
+
+async def _session_guardian(interval_minutes: int = 15):
+    """后台会话守护：定期巡检，过期自动收割。"""
+    logger.info(f"[session-guardian] 启动，间隔 {interval_minutes} 分钟")
+    # 首次立即执行
+    await _run_health_check()
+    while True:
+        await asyncio.sleep(interval_minutes * 60)
+        await _run_health_check()
+
+
+async def _run_health_check():
+    """执行一次全平台健康检查并更新状态。"""
+    import time as _time
+    for platform in _PLATFORMS:
+        try:
+            healthy = await check_health(platform)
+            if not healthy:
+                healthy = await ensure_session(platform)
+            _last_health[platform] = {
+                "healthy": healthy,
+                "last_check": _time.strftime("%H:%M:%S"),
+                "last_ok": _time.strftime("%H:%M:%S") if healthy else _last_health.get(platform, {}).get("last_ok", ""),
+                "error": "" if healthy else "session expired",
+            }
+        except Exception as e:
+            _last_health[platform] = {
+                "healthy": False, "last_check": _time.strftime("%H:%M:%S"),
+                "error": str(e)[:100],
+            }
+    ok_count = sum(1 for v in _last_health.values() if v.get("healthy"))
+    logger.info(f"[session-guardian] {ok_count}/{len(_PLATFORMS)} 平台健康")
+
+
+def start_session_guardian(interval_minutes: int = 15):
+    """启动后台会话守护任务。"""
+    global _refresh_task
+    if _refresh_task is not None:
+        return
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            _refresh_task = asyncio.create_task(_session_guardian(interval_minutes))
+            logger.info("[session-guardian] 守护任务已启动")
+    except Exception:
+        pass
 
 
 async def harvest_all(port: int = 9222) -> dict[str, bool]:

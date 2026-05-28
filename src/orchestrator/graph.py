@@ -10,10 +10,14 @@ from langgraph.checkpoint.memory import InMemorySaver
 from src.orchestrator.state import PipelineState
 from src.orchestrator.nodes import (
     search_platform,
+    fetch_account_content,
     merge_results,
     llm_filter,
     llm_score,
     format_output,
+    download_selected,
+    account_deep_analyze,
+    comment_harvest,
 )
 from src.orchestrator.edges import route_after_merge as _route_simple
 from src.utils.logger import logger
@@ -24,10 +28,11 @@ def _fanout_to_searchers(state: PipelineState) -> list[Send]:
     keyword = state["keyword"]
     limit = state.get("limit", 30)
     platforms = state.get("platforms", [])
+    node = "search_account_one" if state.get("analysis_mode") == "account" else "search_one"
     sends = []
     for p in platforms:
-        sends.append(Send("search_one", {"platform": p, "keyword": keyword, "limit": limit}))
-    logger.info(f"fanout -> {len(sends)} 平台并行")
+        sends.append(Send(node, {"platform": p, "keyword": keyword, "limit": limit}))
+    logger.info(f"fanout -> {len(sends)} 平台并行 (mode={state.get('analysis_mode', 'keyword')})")
     return sends
 
 
@@ -36,7 +41,19 @@ async def _search_one(state: PipelineState) -> dict:
     p = state.get("platform", "")
     keyword = state.get("keyword", "")
     limit = state.get("limit", 30)
-    raw = await search_platform(keyword, p, limit)
+    st = state.get("sort_type", 0)
+    pt = state.get("publish_time", 0)
+    ch = state.get("search_channel", "")
+    raw = await search_platform(keyword, p, limit, sort_type=st, publish_time=pt, search_channel=ch)
+    return {"search_results": {p: raw}}
+
+
+async def _search_account_one(state: PipelineState) -> dict:
+    """对标账号采集节点 — 搜索→提取user_id→拉用户主页。"""
+    p = state.get("platform", "")
+    keyword = state.get("keyword", "")
+    limit = state.get("limit", 30)
+    raw = await fetch_account_content(keyword, p, limit)
     return {"search_results": {p: raw}}
 
 
@@ -78,8 +95,16 @@ def _make_agent_node(agent_name: str):
 # ── 路由函数 ────────────────────────────────────────────────
 
 def _route_after_merge(state: PipelineState) -> str:
-    """merge 后的路由：full 模式进 Agent 链，simple 模式走原有逻辑。"""
-    if state.get("pipeline_mode") == "full":
+    """merge 后的路由。"""
+    mode = state.get("pipeline_mode", "simple")
+    analysis = state.get("analysis_mode", "keyword")
+    if analysis == "account_deep":
+        return "account_deep_analyze"
+    if mode == "download":
+        return "download_selected"
+    if mode == "sentiment":
+        return "comment_harvest"
+    if mode == "full":
         return "trend_scout"
     return _route_simple(state)
 
@@ -116,10 +141,14 @@ def build_graph() -> StateGraph:
 
     # Phase 1 节点
     builder.add_node("search_one", _search_one)
+    builder.add_node("search_account_one", _search_account_one)
     builder.add_node("merge_results", merge_results)
     builder.add_node("llm_filter", llm_filter)
     builder.add_node("llm_score", llm_score)
     builder.add_node("format_output", format_output)
+    builder.add_node("download_selected", download_selected)
+    builder.add_node("account_deep_analyze", account_deep_analyze)
+    builder.add_node("comment_harvest", comment_harvest)
 
     # Phase 2 Agent 节点（容错包装）
     for name in _AGENT_FACTORY:
@@ -131,19 +160,26 @@ def build_graph() -> StateGraph:
     # ── 边 ──────────────────────────────────────────────────
 
     # START → fanout search (5平台并行)
-    builder.add_conditional_edges(START, _fanout_to_searchers, path_map=["search_one"])
+    builder.add_conditional_edges(START, _fanout_to_searchers, path_map=["search_one", "search_account_one"])
     builder.add_edge("search_one", "merge_results")
+    builder.add_edge("search_account_one", "merge_results")
 
-    # merge → (trend_scout for full) or (llm_filter/format_output for simple)
+    # merge → 多模式路由
     builder.add_conditional_edges(
         "merge_results",
         _route_after_merge,
         {
+            "account_deep_analyze": "account_deep_analyze",
+            "download_selected": "download_selected",
+            "comment_harvest": "comment_harvest",
             "trend_scout": "trend_scout",
             "llm_filter": "llm_filter",
             "format_output": "format_output",
         },
     )
+    builder.add_edge("account_deep_analyze", "format_output")
+    builder.add_edge("download_selected", "format_output")
+    builder.add_edge("comment_harvest", "format_output")
 
     # Phase 2: 两阶段并行 Agent 链
     # Stage 1: trend_scout → fanout (product_miner | video_analyst | sentiment_reader)

@@ -69,7 +69,8 @@ async def search(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
         "server-version": "v2026.05.25.1",
     }
     params = {"q": keyword, "page": str(page), "count": str(min(count, 20))}
-    async with httpx.AsyncClient(timeout=15) as client:
+    from src.utils.http_client import create_httpx_client
+    async with create_httpx_client(15) as client:
         resp = await client.get(SEARCH_URL, params=params, headers=headers)
         data = resp.json()
     results = []
@@ -79,6 +80,7 @@ async def search(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
             "mid": item.get("mid", ""),
             "title": (item.get("text_raw", "") or item.get("text", ""))[:200],
             "author": user.get("screen_name", ""),
+            "plays": item.get("reads_count", 0) or 0,
             "created_at": item.get("created_at", ""),
             "reposts": item.get("reposts_count", 0),
             "comments": item.get("comments_count", 0),

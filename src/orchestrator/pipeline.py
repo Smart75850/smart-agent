@@ -6,7 +6,7 @@ from src.orchestrator.state import PipelineState
 from src.orchestrator.graph import compiled_graph
 from src.utils.logger import logger
 
-_DEFAULT_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou"]
+_DEFAULT_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
 
 
 def _build_initial_state(
@@ -15,13 +15,23 @@ def _build_initial_state(
     platforms: list[str] | None,
     llm_filter: bool,
     pipeline_mode: str = "simple",
+    analysis_mode: str = "keyword",
+    sort_type: int = 0,
+    publish_time: int = 0,
+    search_channel: str = "",
+    include_raw: bool = False,
 ) -> PipelineState:
     return {
         "keyword": keyword,
+        "analysis_mode": analysis_mode,
         "limit": limit,
         "platforms": platforms or _DEFAULT_PLATFORMS,
         "llm_filter": llm_filter,
         "pipeline_mode": pipeline_mode,
+        "sort_type": sort_type,
+        "publish_time": publish_time,
+        "search_channel": search_channel,
+        "include_raw": include_raw,
         "search_results": {},
         "merged_items": [],
         "filtered_items": [],
@@ -45,14 +55,25 @@ async def run_pipeline(
     platforms: list[str] | None = None,
     llm_filter: bool = False,
     pipeline_mode: str = "simple",
+    analysis_mode: str = "keyword",
+    sort_type: int = 0,
+    publish_time: int = 0,
+    search_channel: str = "",
+    include_raw: bool = False,
 ) -> dict:
     """运行 LangGraph 编排管道。
 
     pipeline_mode:
-      "simple" — 搜索→合并→格式化
-      "full"   — 搜索→合并→7 Agent 分析链→格式化
+      "simple"    — 搜索→合并→格式化
+      "full"      — 搜索→合并→7 Agent 分析链→下载→格式化
+      "download"  — 搜索→合并→下载→格式化
+      "sentiment" — 搜索→合并→舆情评论采集→格式化
+    analysis_mode:
+      "keyword" — 关键词搜索模式
+      "account" — 对标账号模式（搜索→提取user_id→拉用户主页）
     """
-    state = _build_initial_state(keyword, limit, platforms, llm_filter, pipeline_mode)
+    state = _build_initial_state(keyword, limit, platforms, llm_filter, pipeline_mode, analysis_mode,
+                                 sort_type, publish_time, search_channel, include_raw)
     result = await compiled_graph.ainvoke(
         state,
         config=_make_config(keyword, platforms or _DEFAULT_PLATFORMS),
@@ -68,9 +89,10 @@ async def run_pipeline_stream(
     platforms: list[str] | None = None,
     llm_filter: bool = False,
     pipeline_mode: str = "simple",
+    analysis_mode: str = "keyword",
 ) -> AsyncIterator[dict]:
     """运行 LangGraph 编排管道（流式模式）。"""
-    state = _build_initial_state(keyword, limit, platforms, llm_filter, pipeline_mode)
+    state = _build_initial_state(keyword, limit, platforms, llm_filter, pipeline_mode, analysis_mode)
     async for event in compiled_graph.astream_events(
         state,
         config=_make_config(keyword, platforms or _DEFAULT_PLATFORMS),

@@ -100,7 +100,9 @@ _SEARCH_JS = """\
             || el.textContent.trim().slice(0, 80);
         const author = el.querySelector('.author, .name, [class*="author"], [class*="name"]')?.textContent?.trim() || '';
         const likes = el.querySelector('.like, [class*="like"], [class*="count"], [class*="engage"]')?.textContent?.trim() || '';
-        if (title.length > 3) out.push({title: title, author: author, likes: likes, link: href});
+        const coverEl = el.querySelector('img') || el.querySelector('[class*="cover"] img') || el.querySelector('[class*="image"] img');
+        const cover = coverEl ? (coverEl.getAttribute('src') || coverEl.getAttribute('data-src') || '') : '';
+        if (title.length > 3) out.push({title: title, author: author, likes: likes, link: href, cover_url: cover});
     });
     if (out.length === 0) {
         document.querySelectorAll('a[href*="/explore/"]').forEach(a => {
@@ -314,7 +316,9 @@ class XiaohongshuAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return True
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
         data = json.loads(await xiaohongshu_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 

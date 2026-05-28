@@ -71,16 +71,16 @@ async def weibo_hot() -> str:
         await page.close()
 
 
-async def weibo_search(keyword: str) -> str:
+async def weibo_search(keyword: str, count: int = 40) -> str:
     """搜索微博。Path 1: 纯 HTTP Session → Path 2: CDP Browser"""
-    logger.info(f"微博搜索: keyword={keyword}")
+    logger.info(f"微博搜索: keyword={keyword} count={count}")
 
     # Path 1: 纯 HTTP Session（零浏览器，毫秒级）
     try:
         from src.utils.session_manager import ensure_session
         if await ensure_session("weibo"):
             from src.utils.weibo_http import search_all
-            items = await search_all(keyword, limit=20)
+            items = await search_all(keyword, limit=count)
             if items:
                 logger.info(f"[weibo-session] 纯HTTP直连成功: {len(items)} 条")
                 return json.dumps(items, ensure_ascii=False)
@@ -90,14 +90,28 @@ async def weibo_search(keyword: str) -> str:
     # Path 2: CDP Browser
     page = await browser.new_page()
     try:
-        await page.goto(
-            f"https://s.weibo.com/weibo?q={keyword}",
-            wait_until="domcontentloaded",
-        )
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate(_SEARCH_JS)
-        logger.info(f"微博搜索完成: {len(result)} 条结果")
-        return json.dumps(result, ensure_ascii=False)
+        all_items = []
+        seen = set()
+        for page_num in range(1, 15):
+            url = f"https://s.weibo.com/weibo?q={keyword}" if page_num == 1 else f"https://s.weibo.com/weibo?q={keyword}&page={page_num}"
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(4000)
+            result = await page.evaluate(_SEARCH_JS)
+            if not result:
+                break
+            new_count = 0
+            for item in result:
+                key = item.get("link", "") or item.get("title", "")
+                if key and key not in seen:
+                    seen.add(key)
+                    all_items.append(item)
+                    new_count += 1
+            if new_count == 0:
+                break
+            if len(all_items) >= count:
+                break
+        logger.info(f"微博搜索完成: {len(all_items)} 条结果")
+        return json.dumps(all_items[:count], ensure_ascii=False)
     finally:
         await page.close()
 
@@ -180,8 +194,10 @@ class WeiboAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return True
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await weibo_search(keyword))
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
+        data = json.loads(await weibo_search(keyword, count=limit or 40))
         return data[:limit] if limit else data
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:

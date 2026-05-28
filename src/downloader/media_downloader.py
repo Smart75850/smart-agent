@@ -149,49 +149,60 @@ class MediaExtractor:
     # ── bilibili ──────────────────────────────────────────
 
     async def _cover_bilibili(self, item: dict) -> str:
+        cover = item.get("cover_url", "")
+        if cover and cover.startswith("https://"):
+            return cover
+        # 兜底：浏览器提取 og:image
         link = item.get("link", "") or f"https://www.bilibili.com/video/{item.get('bvid', '')}"
         if not link:
             return ""
-        page = await self.browser.new_page()
         try:
-            await page.goto(link, wait_until="domcontentloaded", timeout=20000)
-            await page.wait_for_timeout(3000)
-            cover = await page.evaluate("""() => {
-                const meta = document.querySelector('meta[property="og:image"]');
-                return meta ? meta.getAttribute('content') : '';
-            }""")
-            return cover
-        finally:
-            await page.close()
+            page = await self.browser.new_page()
+            try:
+                await page.goto(link, wait_until="domcontentloaded", timeout=15000)
+                await page.wait_for_timeout(2000)
+                cover = await page.evaluate("""() => {
+                    const meta = document.querySelector('meta[property="og:image"]');
+                    return meta ? meta.getAttribute('content') : '';
+                }""")
+                return cover
+            finally:
+                await page.close()
+        except Exception:
+            return ""
 
     async def _video_bilibili(self, item: dict) -> str:
-        link = item.get("link", "") or f"https://www.bilibili.com/video/{item.get('bvid', '')}"
-        if not link:
+        bvid = item.get("bvid", "")
+        if not bvid:
             return ""
-        captured_url = []
-
-        async def on_response(resp):
-            if captured_url:
-                return
-            url = resp.url
-            if "mcdn.bilivideo" in url or ("api.bilibili" in url and "playurl" in url):
-                captured_url.append(url)
-
-        page = await self.browser.new_page()
+        # Path 1: 纯 HTTP API（无需浏览器）
         try:
-            page.on("response", lambda r: asyncio.ensure_future(on_response(r)))
-            await page.goto(link, wait_until="domcontentloaded", timeout=20000)
-            await page.wait_for_timeout(5000)
-            if not captured_url:
-                video_src = await page.evaluate("""() => {
-                    const v = document.querySelector('video');
-                    return v ? v.src : '';
-                }""")
-                if video_src:
-                    captured_url.append(video_src)
-        finally:
-            await page.close()
-
+            from src.utils.bilibili_http import get_video_url
+            url = await get_video_url(bvid)
+            if url:
+                return url
+        except Exception:
+            pass
+        # Path 2: CDP 浏览器兜底
+        link = item.get("link", "") or f"https://www.bilibili.com/video/{bvid}"
+        captured_url = []
+        async def on_response(resp):
+            if captured_url: return
+            if "mcdn.bilivideo" in resp.url or ("api.bilibili" in resp.url and "playurl" in resp.url):
+                captured_url.append(resp.url)
+        try:
+            page = await self.browser.new_page()
+            try:
+                page.on("response", lambda r: asyncio.ensure_future(on_response(r)))
+                await page.goto(link, wait_until="domcontentloaded", timeout=15000)
+                await page.wait_for_timeout(3000)
+                if not captured_url:
+                    src = await page.evaluate("() => {const v=document.querySelector('video');return v?v.src:'';}")
+                    if src: captured_url.append(src)
+            finally:
+                await page.close()
+        except Exception:
+            pass
         return captured_url[0] if captured_url else ""
 
     # ── xiaohongshu ───────────────────────────────────────
@@ -313,9 +324,14 @@ class MediaDownloader:
 
             if want_cover:
                 cover_url = item.get("cover_url", "")
+                if cover_url and cover_url.startswith("//"):
+                    cover_url = "https:" + cover_url
                 if not cover_url and link:
-                    cover_url = await self._extractor.extract_cover(pid, item)
-                if cover_url:
+                    try:
+                        cover_url = await self._extractor.extract_cover(pid, item)
+                    except Exception:
+                        pass
+                if cover_url and not cover_url.startswith("blob:"):
                     ext = _ext_from_url(cover_url, ".jpg")
                     filepath = base / pid / topic_safe / f"cover_{_safe_name(iid)}{ext}"
                     urls_to_fetch.append({
@@ -402,15 +418,29 @@ class MediaDownloader:
 
         fp.parent.mkdir(parents=True, exist_ok=True)
 
-        async with self._semaphore:
+        # 最多重试 3 次，指数退避 1s/2s/4s
+        for attempt in range(3):
             try:
                 await self._ensure_client()
                 tmp_path = fp.with_suffix(fp.suffix + ".tmp")
+                if tmp_path.exists():
+                    tmp_path.unlink()
 
-                async with self._client.stream("GET", url) as resp:
-                    if resp.status_code != 200:
+                download_headers = {}
+                if "hdslb.com" in url or "bilibili.com" in url:
+                    download_headers["Referer"] = "https://www.bilibili.com/"
+                elif "xhscdn.com" in url or "xiaohongshu.com" in url:
+                    download_headers["Referer"] = "https://www.xiaohongshu.com/"
+                elif "zhihu.com" in url:
+                    download_headers["Referer"] = "https://www.zhihu.com/"
+
+                async with self._client.stream("GET", url, headers=download_headers) as resp:
+                    if resp.status_code not in (200, 206):
                         result.status = "failed"
                         result.error = f"HTTP {resp.status_code}"
+                        if attempt < 2:
+                            await asyncio.sleep(2 ** attempt)
+                            continue
                         return result
 
                     content_length = int(resp.headers.get("content-length", 0))
@@ -425,15 +455,23 @@ class MediaDownloader:
                             if f.tell() > self._max_size:
                                 result.status = "failed"
                                 result.error = f"下载超过上限 {self._max_size}"
-                                try:
-                                    tmp_path.unlink()
-                                except Exception:
-                                    pass
+                                try: tmp_path.unlink()
+                                except Exception: pass
                                 return result
 
                 tmp_path.rename(fp)
                 result.size_bytes = fp.stat().st_size
                 result.status = "success"
+                logger.info(f"下载完成: {fp.name} ({result.size_bytes} bytes)")
+                return result
+
+            except Exception as e:
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                result.status = "failed"
+                result.error = str(e)[:100]
+                return result
                 logger.info(f"下载完成: {fp.name} ({result.size_bytes} bytes)")
 
             except Exception as exc:

@@ -39,16 +39,14 @@ func (s *Server) handleDataList(w http.ResponseWriter, r *http.Request) {
 		if e.IsDir() {
 			continue
 		}
-		// 简单计数，提取 platform 前缀
-		for _, p := range []string{"bilibili", "douyin", "kuaishou", "xiaohongshu", "zhihu"} {
+		for _, p := range []string{"bilibili", "douyin", "kuaishou", "xiaohongshu", "zhihu", "weibo", "tieba"} {
 			if _, ok := platforms[p]; !ok {
 				platforms[p] = 0
 			}
 		}
 	}
-	// 实际计数
 	for _, e := range entries {
-		for _, p := range []string{"bilibili", "douyin", "kuaishou", "xiaohongshu", "zhihu"} {
+		for _, p := range []string{"bilibili", "douyin", "kuaishou", "xiaohongshu", "zhihu", "weibo", "tieba"} {
 			if len(e.Name()) > len(p) && e.Name()[:len(p)] == p {
 				platforms[p]++
 			}

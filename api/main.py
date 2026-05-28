@@ -48,6 +48,61 @@ app.include_router(data_router)
 app.include_router(ws_router)
 app.include_router(pipeline_router)
 
+# ── Session 守护 ─────────────────────────────────────────────
+from src.utils.session_manager import get_health_status, start_session_guardian, harvest_all
+
+@app.get("/api/sessions/status")
+async def sessions_status():
+    return {"sessions": get_health_status()}
+
+_guardian_started = False
+
+@app.post("/api/sessions/refresh")
+async def sessions_refresh():
+    global _guardian_started
+    if not _guardian_started:
+        start_session_guardian(interval_minutes=15)
+        _guardian_started = True
+    results = await harvest_all()
+    # 收完立即更新健康状态
+    for plat, ok in results.items():
+        from src.utils.session_manager import _last_health
+        import time
+        _last_health[plat] = {"healthy": ok, "last_check": time.strftime("%H:%M:%S"), "last_ok": time.strftime("%H:%M:%S") if ok else "", "error": "" if ok else "unreachable"}
+    return {"harvested": {k: v for k, v in results.items()}}
+
+# ── Watcher API ───────────────────────────────────────────────
+_watcher_instance: "KeywordWatcher | None" = None
+
+@app.get("/api/watcher/status")
+async def watcher_status():
+    if _watcher_instance is None:
+        return {"running": False, "message": "watcher 未启动"}
+    return _watcher_instance.status()
+
+@app.post("/api/watcher/start")
+async def watcher_start(keywords: str = "", platforms: str = "bilibili", interval: int = 60):
+    global _watcher_instance
+    if _watcher_instance and _watcher_instance._running:
+        return {"message": "watcher 已在运行", "status": _watcher_instance.status()}
+    from src.utils.watcher import KeywordWatcher
+    kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
+    if not kw_list:
+        return {"error": "请提供 keywords 参数（逗号分隔）"}
+    plat_list = [p.strip() for p in platforms.split(",") if p.strip()]
+    _watcher_instance = KeywordWatcher(keywords=kw_list, platforms=plat_list, interval_minutes=interval)
+    asyncio.create_task(_watcher_instance.watch_loop())
+    return {"message": "watcher 已启动", "keywords": kw_list, "interval_min": interval}
+
+@app.post("/api/watcher/stop")
+async def watcher_stop():
+    global _watcher_instance
+    if _watcher_instance:
+        _watcher_instance.stop()
+        _watcher_instance = None
+        return {"message": "watcher 已停止"}
+    return {"message": "watcher 未在运行"}
+
 # Serve WebUI static files (after API routers to avoid route conflict)
 WEBUI_DIR = Path(__file__).parent / "webui"
 if WEBUI_DIR.exists():

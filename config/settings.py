@@ -17,6 +17,7 @@ class Settings:
     # 瀏覽器
     BROWSER_ENGINE: str = "auto"   # auto / playwright / cdp / camoufox
     CDP_PORT: int = 9222
+    MAX_CONCURRENT_SEARCHES: int = 3  # 并发搜索上限
     PAGE_TIMEOUT: int = 30000
     SLEEP_AFTER_LOAD: int = 8            # SPA 等待秒數
 

@@ -5,11 +5,15 @@ from src.utils.logger import logger
 
 
 _FIELD_MAP = {
-    "title":  ("title", "caption", "desc", "subject", "name"),
-    "author": ("author", "owner", "user", "nickname", "author_name"),
-    "plays":  ("plays", "view_count", "viewCount", "play_count", "views"),
-    "likes":  ("likes", "like_count", "likeCount", "digg_count", "votes"),
-    "link":   ("link", "url", "share_url", "short_url"),
+    "title":     ("title", "caption", "desc", "subject", "name"),
+    "author":    ("author", "owner", "user", "nickname", "author_name", "screen_name"),
+    "plays":     ("plays", "view_count", "viewCount", "play_count", "views", "reads_count"),
+    "likes":     ("likes", "like_count", "likeCount", "digg_count", "votes", "attitudes_count", "favorites"),
+    "link":      ("link", "url", "share_url", "short_url", "href"),
+    "cover_url": ("cover_url", "cover", "coverUrl", "pic_url", "pic", "image_url"),
+    "excerpt":   ("excerpt", "summary", "content", "description", "abstract"),
+    "comments":  ("comments", "comment_count", "replies", "reply_count", "reposts_count"),
+    "duration":  ("duration", "length", "video_duration"),
 }
 
 

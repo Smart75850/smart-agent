@@ -19,13 +19,19 @@ class PipelineRequest(BaseModel):
     platforms: list[str] = []
     limit: int = 30
     pipeline_mode: str = "full"  # simple / full
+    analysis_mode: str = "keyword"  # keyword / account
+    sort_type: int = 0
+    publish_time: int = 0
+    search_channel: str = ""
+    include_raw: bool = False
 
 
 @router.post("/api/pipeline")
 async def start_pipeline(req: PipelineRequest):
     task_id = str(uuid.uuid4())
     _tasks[task_id] = {"status": "running", "result": None, "error": None}
-    asyncio.create_task(_run_pipeline_task(task_id, req))
+    # 直接 await 而非 create_task，避免事件循环冲突导致 HTTP 搜索失败
+    await _run_pipeline_task(task_id, req)
     return {"task_id": task_id}
 
 
@@ -56,6 +62,11 @@ async def _run_pipeline_task(task_id: str, req: PipelineRequest):
             limit=req.limit,
             platforms=platforms,
             pipeline_mode=req.pipeline_mode,
+            analysis_mode=req.analysis_mode,
+            sort_type=req.sort_type,
+            publish_time=req.publish_time,
+            search_channel=req.search_channel,
+            include_raw=req.include_raw,
         )
 
         _tasks[task_id].update({
@@ -64,6 +75,7 @@ async def _run_pipeline_task(task_id: str, req: PipelineRequest):
                 "keyword": req.keyword,
                 "platforms": platforms,
                 "pipeline_mode": req.pipeline_mode,
+                "analysis_mode": req.analysis_mode,
                 "search_count": len(result.get("final_output", [])),
                 "trend_summary": _first_summary(result, "trend_reports"),
                 "product_summary": result.get("product_report", {}).get("summary", ""),
