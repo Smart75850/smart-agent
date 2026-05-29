@@ -17,11 +17,15 @@ from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: auto-open browser
+    # Startup: auto-open browser + start session guardian
     async def _open():
         await asyncio.sleep(1.5)
         webbrowser.open("http://localhost:8000")
     asyncio.create_task(_open())
+
+    # 启动会话守护（15分钟自动巡检+收割）
+    start_session_guardian(interval_minutes=15)
+
     yield
     # Shutdown: nothing to clean up yet
 
