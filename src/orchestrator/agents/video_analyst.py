@@ -13,8 +13,29 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
+from pydantic import BaseModel, Field
+
 from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
+
+
+# ── Pydantic 结构化输出模型 ─────────────────────────────────
+
+class VideoBreakdownOutput(BaseModel):
+    index: int = Field(description="内容在输入列表中的索引")
+    hook_type: str = Field(description="钩子类型：数字衝擊/疑問懸念/情感共鳴/反直覺/權威背書/前後對比/教程實用/故事敍事/無法判斷")
+    hook_effectiveness: int = Field(ge=0, le=100, description="钩子效果评分")
+    pacing: str = Field(min_length=15, description="节奏分析，30字以上，含节奏变化点")
+    structure_template: str = Field(description="结构模板，含阶段数命名+各阶段说明")
+    conversion_point: str = Field(description="转化点，具体位置+转化动作")
+    viral_mechanism: str = Field(min_length=20, description="爆款机制，40字以上，解释为什么这个结构能传播")
+    learnings: str = Field(min_length=15, description="可复制要点，30字以上，具体操作建议")
+    confidence: str = Field(description="分析置信度：high/medium/low")
+
+
+class VideoAnalystOutput(BaseModel):
+    summary: str = Field(min_length=20, description="整体结构规律，40字以上，含最常见钩子类型+典型结构模式")
+    breakdowns: list[VideoBreakdownOutput] = Field(description="视频结构拆解列表")
 
 
 @dataclass
@@ -27,7 +48,7 @@ class VideoBreakdown:
     structure_template: str = ""    # 結構模板
     conversion_point: str = ""      # 轉化點
     viral_mechanism: str = ""       # 爆款機制
-    learnings: str = ""             # 可複製要點
+    learnings: str = ""             # 可複製要點（50字以上，含具體操作建議+適用平台+預期效果）
 
 
 @dataclass
@@ -72,41 +93,116 @@ class VideoAnalyst(BaseAgent):
             summary=" | ".join(summaries) if summaries else "",
         ))}
 
+    # ── Few-Shot 示例庫（8 種鉤子類型各一例） ──────────────
+    _FEWSHOT_GOOD = [
+        {"hook_type": "數字衝擊", "title": "3個信號告訴你房價要跌了",
+         "analysis": "數字開場（3個信號）建立預期+負面情緒觸發（房價跌），前3秒用新聞截圖增加可信度，節奏為快剪+數據圖表穿插，轉化點在結尾引導關注",
+         "learnings": "數字+負面情緒的組合適用於財經/民生類內容"},
+        {"hook_type": "疑問懸念", "title": "為什麼你做的番茄炒蛋永遠不如餐廳好吃？",
+         "analysis": "直接提問瞄準日常痛點，前3秒展示餐廳級vs家庭版對比畫面製造認知差距，節奏為慢→快→慢（展示問題→揭示原因→總結），轉化點在中段揭示秘密食材時引導收藏",
+         "learnings": "提問式開頭適合實用技能類，需在3秒內展示「認知差距」"},
+        {"hook_type": "情感共鳴", "title": "30歲裸辭創業一年後，我終於理解了這三件事",
+         "analysis": "年齡+人生轉折點引發同齡人共鳴，開頭用emo情緒鏡頭建立真實感，節奏先抑後揚（低谷→轉折→成長），轉化點在結尾金句引導評論互動",
+         "learnings": "情感類需要真實細節支撐（具體數字/場景），避免空泛雞湯"},
+        {"hook_type": "反直覺", "title": "每天喝可樂反而瘦了10斤？醫生說出真相",
+         "analysis": "違反常識的命題製造好奇心缺口，開頭直接展示體重對比數據，節奏: 拋反直覺→科學解釋→限制條件（防誤導），轉化點用'但不是所有可樂都行'引導完播",
+         "learnings": "反直覺必須有權威背書（醫生/研究），避免淪為標題黨"},
+        {"hook_type": "權威背書", "title": "華為前HR總監：面試時這3句話打死不能說",
+         "analysis": "大廠title建立權威感，開頭直接亮身份+警告語氣製造危機感，節奏為場景還原（錯誤示範）→正確做法對比，轉化點每條規則後引導收藏'以防面試踩坑'",
+         "learnings": "權威型內容需具體身份（非模糊'專家說'），場景化更有代入感"},
+        {"hook_type": "前後對比", "title": "改造10平米出租屋，房東看到後直接免了一個月房租",
+         "analysis": "改造前後強烈視覺衝擊是核心鉤子，開頭0.5秒展示改造後驚艷效果再回溯過程，節奏為快放改造過程+關鍵步驟慢放詳解，轉化點在結尾展示總花費引導問'值不值'",
+         "learnings": "前後對比的關鍵在於反差幅度，差距越大傳播力越強"},
+        {"hook_type": "教程實用", "title": "PPT做的丑？記住這4個快捷鍵，效率提升10倍",
+         "analysis": "精準人群+具體痛點（PPT醜/慢），開頭展示用快捷鍵前後的效率對比，節奏: 每個快捷鍵一個獨立段落（5秒演示+文字標註），轉化點用'第4個最實用'引導完播",
+         "learnings": "教程類必須在開頭展示結果，讓用戶知道'學了能得到什麼'"},
+        {"hook_type": "故事敍事", "title": "我在義烏擺攤一個月，發現了一個沒人做的暴利生意",
+         "analysis": "第一人稱故事+地點標籤（義烏）+利益承諾（暴利），開頭用地攤實拍建立真實感，節奏為時間線敍事（第一週摸索→第二週發現→第三週放大），轉化點用'下期講具體怎麼做'引導關注",
+         "learnings": "故事類需要時間線+具體地點+真實細節，避免'我朋友說'式二手敘述"},
+    ]
+
+    _FEWSHOT_BAD = [
+        {"hook_type": "無法判斷", "title": "日常vlog週末在家的一天",
+         "analysis": "❌ 錯誤示範：無明確鉤子類型、開頭平淡無衝突、節奏拖沓無起伏、無轉化點設計，分析應坦承'此內容無明顯爆款結構'而非牽強附會",
+         "learnings": "平庸內容應誠實標註 confidence=low，不應強行解讀"},
+        {"hook_type": "數字衝擊", "title": "10個小技巧",
+         "analysis": "❌ 錯誤示範：雖有數字但無具體價值承諾（什麼小技巧？對誰有用？），鉤子效果極弱，分析過度誇大為'數字衝擊型鉤子'是錯誤的——真正的數字衝擊需要數字+具體結果",
+         "learnings": "不是有數字就是數字衝擊型，必須數字+價值承諾同時成立"},
+    ]
+
     async def _llm_generate(self, items: list, platform: str) -> VideoReport:
+        """DeepSeek LLM 拆解爆款視頻結構（v2 增強 prompt）。"""
         items_text = "\n".join(
             f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')}"
             for i, it in enumerate(items[:10])
         )
 
-        prompt = (
-            f"分析以下{platform}爆款內容的視頻結構，從創作者角度拆解成功要素：\n\n"
-            f"{items_text}\n\n"
-            f"請返回 JSON（不要 markdown 代碼塊）：\n"
-            f'{{"summary": "整體結構規律一句話", '
-            f'"breakdowns": [{{"index": 數字, "hook_type": "開頭鉤子類型", '
-            f'"hook_effectiveness": 0-100, "pacing": "節奏分析", '
-            f'"structure_template": "結構模板", "conversion_point": "轉化點", '
-            f'"viral_mechanism": "爆款機制", "learnings": "可複製要點"}}]}}'
+        good_examples_text = "\n".join(
+            f"  ✅ 鉤子類型: {ex['hook_type']}\n     標題: {ex['title']}\n     分析: {ex['analysis']}\n     可複製: {ex['learnings']}"
+            for ex in self._FEWSHOT_GOOD
+        )
+        bad_examples_text = "\n".join(
+            f"  ❌ 鉤子類型: {ex['hook_type']}\n     標題: {ex['title']}\n     分析: {ex['analysis']}\n     教訓: {ex['learnings']}"
+            for ex in self._FEWSHOT_BAD
         )
 
+        prompt = f"""你是頂級短視頻結構分析師（Video Analyst），專門從創作者角度拆解爆款視頻的成功要素。
+
+## 任務
+分析以下 {platform} 的爆款內容，拆解每個視頻的開頭鉤子、節奏設計、結構模板、轉化點和爆款機制。
+
+## 品質標準
+- 好的分析：精確指出鉤子類型+推斷具體秒數（如「前3秒」不是「開頭」）+為什麼這個鉤子在該平台有效、結構模板直接可用於創作（如「3段式：痛點→解決方案→結果展示」不是「先介紹再展示」）、可複製要點含具體操作步驟（如「開頭用數字+反直覺組合，數字不超過3個」不是「用好的標題」）
+- 差的分析：鉤子類型選「無法判斷」、結構描述空泛如「先介紹再展示」、可複製要點無操作價值
+
+## ⚠️ 重要限制
+- 僅基於標題和數據分析，如無視頻時長/分段信息，明確標註「基於標題推斷」
+- 每個分析必須標註 **confidence: high/medium/low**
+  - high：標題+數據充足，能清晰推斷結構
+  - medium：有足夠信息但部分細節需推測
+  - low：數據稀疏，分析可靠性低
+
+## 鉤子類型枚舉（必須從以下選一）
+數字衝擊、疑問懸念、情感共鳴、反直覺、權威背書、前後對比、教程實用、故事敍事、無法判斷
+⚠️ 「無法判斷」僅限數據極度缺失或內容完全無結構時使用
+
+## 結構模板命名規範
+使用「[模式名] + 階段數」格式，如：
+- 「問題-解決 3段式」（提出痛點→展示方案→驗證結果）
+- 「對比衝擊 2段式」（改造前→改造後）
+- 「知識拆解 4段式」（結論先行→原理解釋→案例佐證→行動指引）
+
+## Few-Shot 正例（8 種鉤子類型各一例）
+{good_examples_text}
+
+## Few-Shot 負例（避免以下錯誤分析）
+{bad_examples_text}
+
+## 邊界情況處理
+- 僅有標題無其他數據：confidence=low，hook_type 可推斷但 hook_effectiveness 不超 40
+- 多條內容標題相似（同質化）：在 viral_mechanism 標註「同質化競爭」，hook_effectiveness 扣 15 分
+- 純文字內容（無視頻）：pacing 標註「文字內容，節奏為閱讀節奏」
+
+## 待分析內容
+{items_text}"""
+
         try:
-            content = await self._call_llm(prompt, temperature=0.3, json_mode=True)
-            parsed = self._parse_json(content)
+            output = await self._call_llm_with_critic(prompt, VideoAnalystOutput, "video_analyst", temperature=0.3)
 
             breakdowns = []
-            for b in parsed.get("breakdowns", []):
-                idx = b.get("index", 0)
+            for b in output.breakdowns:
+                idx = b.index
                 src = items[idx] if 0 <= idx < len(items) else {}
                 breakdowns.append(VideoBreakdown(
                     title=src.get("title", ""),
                     platform=platform,
-                    hook_type=b.get("hook_type", ""),
-                    hook_effectiveness=int(b.get("hook_effectiveness", 50)),
-                    pacing=b.get("pacing", ""),
-                    structure_template=b.get("structure_template", ""),
-                    conversion_point=b.get("conversion_point", ""),
-                    viral_mechanism=b.get("viral_mechanism", ""),
-                    learnings=b.get("learnings", ""),
+                    hook_type=b.hook_type,
+                    hook_effectiveness=b.hook_effectiveness,
+                    pacing=b.pacing,
+                    structure_template=b.structure_template,
+                    conversion_point=b.conversion_point,
+                    viral_mechanism=b.viral_mechanism,
+                    learnings=b.learnings,
                 ))
 
             breakdowns.sort(key=lambda x: x.hook_effectiveness, reverse=True)
@@ -114,7 +210,7 @@ class VideoAnalyst(BaseAgent):
                 platform=platform,
                 total_analyzed=len(breakdowns),
                 items=breakdowns,
-                summary=parsed.get("summary", ""),
+                summary=output.summary,
             )
         except Exception as exc:
             logger.warning(f"VideoAnalyst LLM 失敗: {exc}")

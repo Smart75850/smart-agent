@@ -16,8 +16,24 @@ import asyncio
 import json
 from dataclasses import dataclass, field, asdict
 
+from pydantic import BaseModel, Field
+
 from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
+
+
+# ── Pydantic 结构化输出模型 ─────────────────────────────────
+
+class TrendScoutItemOutput(BaseModel):
+    index: int = Field(description="内容在输入列表中的索引")
+    viral_score: int = Field(ge=0, le=100, description="爆款潜力分：90+蓝海/70-89有需求/50-69红海/<50小众")
+    trend_reason: str = Field(min_length=20, description="爆款原因分析，40字以上，引用具体数据+爆款机制")
+    category: str = Field(description="分类枚举：科技/AI、美妝、美食、穿搭、家居、健身、教育、財經、遊戲、娛樂、旅遊、母嬰、寵物、健康/醫療、其他")
+
+
+class TrendScoutOutput(BaseModel):
+    summary: str = Field(min_length=15, description="整体趋势一句话，30字以上，含赛道判断+机会信号")
+    items: list[TrendScoutItemOutput] = Field(description="爆款候选列表")
 
 
 @dataclass
@@ -106,10 +122,38 @@ class TrendScout(BaseAgent):
         from src.aggregator import _normalize
         return [_normalize(item, platform) for item in (raw if isinstance(raw, list) else [])]
 
+    # ── Few-Shot 示例庫 ──────────────────────────────────────
+    _FEWSHOT_GOOD = [
+        {"title": "我用AI做了一個能自動回覆客服的機器人，成本只花了50塊", "plays": "85万", "likes": "4.2万",
+         "viral_score": 92, "category": "科技/AI",
+         "trend_reason": "AI工具實操+極低成本+個人即商用，三層鉤子疊加；互動比4.9%遠超均值，藍海信號明確"},
+        {"title": "小個子女生這樣穿顯高10cm！5套通勤穿搭公式", "plays": "120万", "likes": "6.8万",
+         "viral_score": 85, "category": "穿搭",
+         "trend_reason": "精準人群（小個子）+ 數字衝擊（10cm）+ 公式化教程（可收藏），互動比5.7%"},
+        {"title": "小學五年級數學這樣教，孩子終於聽懂了｜分數加減法", "plays": "45万", "likes": "2.1万",
+         "viral_score": 78, "category": "教育",
+         "trend_reason": "垂直剛需（家長痛點）+ 教學實用性強 + 標題含關鍵詞利於搜索，教育賽道持續有需求"},
+        {"title": "黑神話悟空隱藏BOSS位置全攻略，第7個99%人不知道", "plays": "320万", "likes": "15万",
+         "viral_score": 88, "category": "遊戲",
+         "trend_reason": "蹭熱門遊戲IP+數字列舉+稀缺性（99%人不知道），攻略類內容天然有收藏價值"},
+        {"title": "3種食材5分鐘搞定週末早餐，比外面賣的好吃10倍", "plays": "68万", "likes": "3.5万",
+         "viral_score": 76, "category": "美食",
+         "trend_reason": "數字簡化（3食材5分鐘）+ 對比錨定（比外面好吃）+ 場景精準（週末），實用型爆款"},
+    ]
+
+    _FEWSHOT_BAD = [
+        {"title": "今天的天氣真好呀陽光明媚", "plays": "1.2万", "likes": "200",
+         "viral_score": 8, "category": "其他",
+         "trend_reason": "❌ 錯誤示範：純個人生活記錄、無任何爆款元素、互動比僅1.7%，不應高估此類內容"},
+        {"title": "推薦一個很好用的東西給大家", "plays": "5000", "likes": "150",
+         "viral_score": 12, "category": "其他",
+         "trend_reason": "❌ 錯誤示範：標題模糊無具體信息、無品類關鍵詞、無數字無情緒、無搜索價值"},
+    ]
+
     async def _llm_generate(
         self, platform: str, keyword: str, items: list[dict]
     ) -> TrendReport:
-        """DeepSeek LLM 分析爆款趨勢。"""
+        """DeepSeek LLM 分析爆款趨勢（v2 增強 prompt）。"""
         if not self._api_key:
             logger.info("DeepSeek API key 未設定，使用純熱度排序")
             return self._fallback(platform, keyword, items)
@@ -119,30 +163,69 @@ class TrendScout(BaseAgent):
             for i, it in enumerate(items[:15])
         )
 
-        context = f"平台: {platform}" + (f", 關鍵詞: {keyword}" if keyword else " (熱榜)")
-        prompt = (
-            f"分析以下{context}的內容列表，找出爆款趨勢：\n\n"
-            f"{items_text}\n\n"
-            f"請返回 JSON，格式如下（不要 markdown 代碼塊）：\n"
-            f'{{"summary": "一句話總結整體趨勢", '
-            f'"items": [{{"index": 數字, "viral_score": 0-100, '
-            f'"trend_reason": "一句話爆款原因", "category": "品類"}}]}}'
+        good_examples_text = "\n".join(
+            f"  ✅ [{ex['category']}] score={ex['viral_score']} | {ex['title'][:50]}\n     → {ex['trend_reason']}"
+            for ex in self._FEWSHOT_GOOD
+        )
+        bad_examples_text = "\n".join(
+            f"  ❌ [{ex['category']}] score={ex['viral_score']} | {ex['title'][:50]}\n     → {ex['trend_reason']}"
+            for ex in self._FEWSHOT_BAD
         )
 
+        context = f"平台: {platform}" + (f", 關鍵詞: {keyword}" if keyword else " (熱榜)")
+        prompt = f"""你是頂級內容趨勢分析師（Trend Scout），專門從社交媒體數據中識別具有爆款潛力的內容。
+
+## 任務
+分析以下 {context} 的內容列表，為每條內容評分並解釋爆款潛力。
+
+## 品質標準
+- 好的分析：有具體數據支撐、引用互動指標、指出可複製的爆款機制、分類精確
+- 差的分析：空泛描述如「內容不錯」「有潛力」、分類選「其他」偷懶、無視數據只憑標題猜
+
+## 爆款判定規則
+一條內容被視為有爆款潛力，必須滿足以下 4 項中至少 2 項：
+1. **互動比異常** — 讚/播 > 3% 或 評論/播 > 0.5%（高於平台均值）
+2. **熱門賽道** — 屬於當前增長中的內容賽道
+3. **情緒觸發** — 標題含強烈情緒信號（好奇/共鳴/焦慮/憤怒/驚喜）
+4. **形式創新** — 內容形式有別於同賽道常規做法
+
+## 分類枚舉（必須從以下選一，不得自創）
+科技/AI、美妝、美食、穿搭、家居、健身、教育、財經、遊戲、娛樂、旅遊、母嬰、寵物、健康/醫療、其他
+⚠️ 「其他」僅限以下情況才能用：內容無主題（如日常隨拍、純閒聊）。如果內容涉及任何產品/話題/領域，必須選擇最接近的分類。嚴禁因懶得判斷而選「其他」。每批最多 1 個「其他」，超過則按錯誤處理。如果不確定選哪個分類，選最接近的兩個分類中更具體的那個。
+
+## viral_score 評分錨點
+- 90-100：藍海信號 — 互動比 >5% + 新賽道/新形式 + 可大量複製
+- 70-89：有明確需求 — 互動比 >3% + 熱門賽道 + 有可複製元素
+- 50-69：紅海競爭 — 互動正常但賽道擁擠，需差異化才能突圍
+- <50：小眾或低互動 — 互動比低或受眾太窄
+
+## Few-Shot 正例（學習這些分析的深度和具體度）
+{good_examples_text}
+
+## Few-Shot 負例（避免以下空洞/錯誤的分析）
+{bad_examples_text}
+
+## 邊界情況處理
+- 數據缺失（播放/讚為 0）：標註 confidence=low，viral_score 不超過 50
+- 標題含明顯廣告/營銷話術：標註為商業內容，viral_score 扣 20 分
+- 跨類別內容（如科技+教育）：選主類別，trend_reason 提及次要類別
+
+## 待分析內容
+{items_text}"""
+
         try:
-            content = await self._call_llm(prompt, temperature=0.3, json_mode=True)
-            parsed = self._parse_json(content)
+            output = await self._call_llm_with_critic(prompt, TrendScoutOutput, "trend_scout", temperature=0.3)
 
             trend_items = []
-            for ti in parsed.get("items", []):
-                idx = ti.get("index", 0)
+            for ti in output.items:
+                idx = ti.index
                 src = items[idx] if 0 <= idx < len(items) else {}
                 trend_items.append(TrendItem(
                     title=src.get("title", ""),
                     platform=platform,
-                    viral_score=int(ti.get("viral_score", 50)),
-                    trend_reason=ti.get("trend_reason", ""),
-                    category=ti.get("category", ""),
+                    viral_score=ti.viral_score,
+                    trend_reason=ti.trend_reason,
+                    category=ti.category,
                     engagement={"plays": src.get("plays", "0"), "likes": src.get("likes", "0")},
                     raw=src,
                 ))
@@ -153,7 +236,7 @@ class TrendScout(BaseAgent):
                 keyword=keyword or "hot",
                 total_candidates=len(trend_items),
                 items=trend_items,
-                summary=parsed.get("summary", ""),
+                summary=output.summary,
             )
 
         except Exception as exc:
