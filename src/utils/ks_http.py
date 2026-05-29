@@ -110,16 +110,17 @@ async def search(keyword: str, count: int = 20, pcursor: str = "") -> tuple[list
     results = []
     for f in feeds:
         photo = f.get("photo", {}) or {}
-        author = f.get("user", {}) or {}
+        author = f.get("author", {}) or f.get("user", {}) or {}
         pid = photo.get("id", "")
+        cover = photo.get("coverUrl", "") or photo.get("cover_url", "")
         results.append({
             "title": photo.get("caption", ""),
-            "author": author.get("name", ""),
+            "author": author.get("name", "") or author.get("nickname", "") or author.get("userName", ""),
             "likes": photo.get("likeCount", 0) or 0,
             "plays": photo.get("viewCount", 0) or 0,
             "photo_id": pid,
             "duration": photo.get("duration", 0),
-            "cover_url": (photo.get("coverUrls", []) or [{}])[0].get("url", ""),
+            "cover_url": cover,
             "link": f"https://www.kuaishou.com/short-video/{pid}" if pid else "",
         })
 
