@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  smart-agent-trial:
+    build:
+      context: .
+      dockerfile: Dockerfile.trial
+    container_name: smart-agent-trial
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./output:/app/output
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BROWSER_ENGINE=playwright
+      - USAGE_FILE=/app/config/usage.json
+    restart: unless-stopped

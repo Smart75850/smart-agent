@@ -40,17 +40,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 使用额度中间件（试用版限 50 次）
+app.add_middleware(UsageMiddleware)
+
 from api.routers.platforms import router as platforms_router
 from api.routers.crawl import router as crawl_router
 from api.routers.data import router as data_router
 from api.routers.ws import router as ws_router
 from api.routers.pipeline import router as pipeline_router
+from api.routers.usage import router as usage_router
+from api.middleware import UsageMiddleware
 
 app.include_router(platforms_router)
 app.include_router(crawl_router)
 app.include_router(data_router)
 app.include_router(ws_router)
 app.include_router(pipeline_router)
+app.include_router(usage_router)
 
 # ── Session 守护 ─────────────────────────────────────────────
 from src.utils.session_manager import get_health_status, start_session_guardian, harvest_all
