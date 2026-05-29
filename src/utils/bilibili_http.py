@@ -364,7 +364,7 @@ async def fetch_user_profile(mid: str) -> dict:
 
     profile = {"nickname": "", "avatar": "", "follower_count": 0, "video_count": 0, "mid": mid}
 
-    # 1. 用户基本信息（非 Wbi 端点）
+    # 1. 用户基本信息（card API，无需 Wbi）
     try:
         resp = _get_http_session().get(
             "https://api.bilibili.com/x/web-interface/card",
@@ -373,22 +373,12 @@ async def fetch_user_profile(mid: str) -> dict:
         )
         data = resp.json()
         if data.get("code") == 0:
-            card = data.get("data", {}).get("card", {})
+            d = data.get("data", {})
+            card = d.get("card", {})
             profile["nickname"] = card.get("name", "")
             profile["avatar"] = card.get("face", "")
-            profile["follower_count"] = data.get("data", {}).get("follower", 0)
-    except Exception:
-        pass
-
-    # 2. 作品数
-    try:
-        data = await _wbi_get(
-            "https://api.bilibili.com/x/space/upstat",
-            {"mid": mid},
-            referer=f"https://space.bilibili.com/{mid}",
-        )
-        if data and isinstance(data.get("archive"), dict):
-            profile["video_count"] = data["archive"].get("view", 0)
+            profile["follower_count"] = d.get("follower", 0)
+            profile["video_count"] = d.get("archive_count", 0)
     except Exception:
         pass
 
