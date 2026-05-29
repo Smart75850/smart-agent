@@ -293,6 +293,13 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
     <div class="progress-bar" id="pl-progress"><span class="progress-dot"></span><span id="pl-progress-text"></span></div>
   </div>
 
+  <!-- Dashboard — 数据仪表盘 -->
+  <div id="dashboard-card" class="card" style="display:none">
+    <h2>分析仪表盘</h2>
+    <div id="dashboard-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+    </div>
+  </div>
+
   <!-- Agent Reports — 放在最上面，最先睇到 -->
   <div id="agent-reports" class="card">
     <h2>AI 分析报告</h2>
@@ -663,6 +670,9 @@ function handlePipelineResult(result) {
   $('stats-bar').innerHTML=statsHTML;
   $('stats-card').style.display='block';
 
+  // Dashboard
+  renderDashboard(full, items);
+
   // Results table
   if(items.length) renderResults(items,'results-area-pl','results-note-pl');
 
@@ -736,6 +746,50 @@ function handlePipelineResult(result) {
   addLog('log-container-pl','分析完成: '+items.length+' 条结果, '+$('agent-cards').children.length+' 份报告','ok');
   finishPipeline();
 }
+function renderDashboard(full, items) {
+  const agents = [
+    {k:'trend',n:'爆款识别',c:'#e0437c'},
+    {k:'product',n:'选品分析',c:'#e07a1a'},
+    {k:'video',n:'视频拆解',c:'#4f6ef6'},
+    {k:'sentiment',n:'评论情绪',c:'#10b981'},
+    {k:'copy',n:'营销文案',c:'#8b5cf6'},
+    {k:'remix',n:'内容改写',c:'#f59e0b'},
+    {k:'visual',n:'配图策略',c:'#06b6d4'},
+  ];
+  // 平台分布统计
+  const platCounts = {};
+  let totalPlays = 0, totalLikes = 0;
+  items.forEach(it => {
+    const p = it.platform || '?';
+    platCounts[p] = (platCounts[p]||0) + 1;
+    totalPlays += parseInt(String(it.plays||0).replace(/[,，万]/g,'')) || 0;
+    totalLikes += parseInt(String(it.likes||0).replace(/[,，万]/g,'')) || 0;
+  });
+
+  const names = {bilibili:'B站',xiaohongshu:'小红书',douyin:'抖音',zhihu:'知乎',kuaishou:'快手',weibo:'微博',tieba:'贴吧'};
+  let platHTML = Object.entries(platCounts).map(([p,c]) => {
+    const pct = Math.round(c/items.length*100);
+    return '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px"><div style="font-size:11px;color:var(--text-dim)">'+(names[p]||p)+'</div><div style="font-size:20px;font-weight:700;color:var(--accent)">'+c+'<span style="font-size:11px;font-weight:400;color:var(--text-dim)"> 条 ('+pct+'%)</span></div></div>';
+  }).join('');
+  if(!platHTML) platHTML = '<div style="color:var(--text-dim);font-size:13px">暂无数据</div>';
+
+  // Agent 状态
+  const agentOK = agents.filter(a => full[a.k+'_summary'] || (full.full_result||{})[a.k+'_reports'] || (full.full_result||{})[a.k+'_report']).length;
+  let agentHTML = '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;grid-column:span 2"><div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">Agent 分析状态</div>'+agents.map(a => {
+    const has = full[a.k+'_summary'] || (full.full_result||{})[a.k+'_reports'] || (full.full_result||{})[a.k+'_report'];
+    return '<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:4px;font-size:11px;background:'+(has?a.c:'var(--surface2)')+';color:'+(has?'#fff':'var(--text-dim)')+'">'+(has?'✅':'⬜')+' '+a.n+'</span>';
+  }).join('<br>')+'</div>';
+
+  // 总览指标
+  const metricsHTML = '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">总结果</div><div style="font-size:24px;font-weight:700;color:var(--accent)">'+items.length+'</div></div>'+
+    '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">总播放量</div><div style="font-size:20px;font-weight:700">'+fmtCount(totalPlays)+'</div></div>'+
+    '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">总点赞</div><div style="font-size:20px;font-weight:700">'+fmtCount(totalLikes)+'</div></div>'+
+    '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:11px;color:var(--text-dim)">Agent 完成</div><div style="font-size:20px;font-weight:700;color:#10b981">'+agentOK+'/7</div></div>';
+
+  $('dashboard-grid').innerHTML = metricsHTML + platHTML + agentHTML;
+  $('dashboard-card').style.display = 'block';
+}
+
 function finishPipeline() {
   const btn=$('pl-btn'); btn.classList.remove('loading'); btn.disabled=false;
   $('pl-progress').classList.remove('visible');

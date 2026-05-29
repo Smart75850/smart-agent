@@ -1,56 +1,18 @@
+version: "3.9"
+
 services:
-  app:
+  smart-agent:
     build: .
     container_name: smart-agent
-    restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - DEEPSEEK_API_URL=${DEEPSEEK_API_URL:-https://api.deepseek.com/v1}
-      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
-      - BROWSER_ENGINE=${BROWSER_ENGINE:-playwright}
-      - STORE_BACKEND=${STORE_BACKEND:-json}
-      - OUTPUT_DIR=/app/output
-      - DOWNLOAD_DIR=/app/downloads
-      - COOKIE_DIR=/app/browser_data
-      - MYSQL_HOST=mysql
-      - MYSQL_PORT=3306
-      - MYSQL_USER=${MYSQL_USER:-root}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-smart_agent}
     volumes:
       - ./output:/app/output
       - ./downloads:/app/downloads
+      - ./logs:/app/logs
       - ./browser_data:/app/browser_data
-      - ./.env:/app/.env:ro
-    depends_on:
-      mysql:
-        condition: service_healthy
-        required: false
-    # 浏览器需要 IPC host 模式 (Chrome sandbox)
-    ipc: host
-    # Chrome 在 Docker 中需要 --no-sandbox（已由 browser_service 处理）
-
-  mysql:
-    image: mysql:8.4
-    container_name: smart-agent-mysql
-    restart: unless-stopped
-    ports:
-      - "3307:3306"
+      - ./config:/app/config
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-smartagent}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-smart_agent}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    profiles:
-      - mysql
-
-volumes:
-  mysql_data:
+      - PYTHONUNBUFFERED=1
+      - BROWSER_ENGINE=playwright
+    restart: unless-stopped
