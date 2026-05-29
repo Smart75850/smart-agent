@@ -10,7 +10,18 @@
   --bg: #f5f6f8; --surface: #fff; --surface2: #f8f9fb; --border: #e5e7eb;
   --text: #1a1b23; --text-dim: #6b7280; --accent: #4f6ef6; --accent-hover: #3b5de7;
   --green: #10b981; --red: #ef4444; --yellow: #f59e0b; --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06);
 }
+[data-theme="dark"] {
+  --bg: #111318; --surface: #1a1d24; --surface2: #22252d; --border: #2d3039;
+  --text: #e5e7eb; --text-dim: #9ca3af; --accent: #6d8af6; --accent-hover: #8da3f8;
+  --shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+[data-theme="dark"] .history-item:hover { background: #1e2230; }
+[data-theme="dark"] .history-item .hi-delete:hover { background: #3d1a1a; }
+[data-theme="dark"] .result-table th { background: var(--surface2); }
+[data-theme="dark"] .btn-sm { background: var(--surface2); border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .btn-sm:hover { border-color: var(--accent); }
 html, body { height: 100%; }
 body {
   background: var(--bg); color: var(--text);
@@ -191,6 +202,7 @@ main { flex: 1; display: flex; flex-direction: column; padding: 20px 28px; gap: 
 <header>
   <h1>Smart Agent</h1>
   <span class="badge">内容分析</span>
+  <button id="theme-toggle" title="切换深色/浅色模式" style="background:none;border:none;font-size:20px;cursor:pointer;padding:2px 6px;border-radius:6px;margin-left:auto;margin-right:8px">🌙</button>
   <span class="conn-dot off" id="conn-dot" title="连接状态"></span>
 </header>
 
@@ -343,6 +355,20 @@ let _currentKeyword = '', _currentPlatforms = [];
 const typeLabels = { search:'搜索', hot:'热榜', rank:'排行榜', detail:'详情', user:'用户' };
 const platformHotLabels = { bilibili:'排行榜', douyin:'热搜关键词', xiaohongshu:'推荐热门', zhihu:'热榜问题', kuaishou:'热播视频', weibo:'热搜话题', tieba:'热门帖子' };
 function getHotLabel(platformId) { return platformHotLabels[platformId] || '热榜'; }
+
+// ─── Theme ────────────────────────────────────────
+(function(){
+  const saved=localStorage.getItem('theme')||'light';
+  document.documentElement.setAttribute('data-theme',saved);
+  const btn=$('theme-toggle'); if(btn)btn.textContent=saved==='dark'?'☀️':'🌙';
+  $('theme-toggle').addEventListener('click',()=>{
+    const cur=document.documentElement.getAttribute('data-theme');
+    const next=cur==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    localStorage.setItem('theme',next);
+    $('theme-toggle').textContent=next==='dark'?'☀️':'🌙';
+  });
+})();
 
 // ─── Helpers ──────────────────────────────────────
 function fmtCount(v) {

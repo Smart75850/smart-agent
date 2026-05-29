@@ -283,23 +283,28 @@ _USER_JS = """() => {
 
 
 async def bilibili_user(uid: str) -> str:
-    """爬取 B站 用戶主頁視頻列表 — HTTP API 优先，CDP 兜底。"""
+    """爬取 B站 用戶資料 + 主頁視頻列表。"""
     logger.info(f"B站用戶: uid={uid}")
+
+    profile = {"nickname": "", "avatar": "", "follower_count": 0, "video_count": 0, "mid": uid}
+    works = []
 
     # Path 1: 纯 HTTP API（零浏览器）
     try:
-        from src.utils.bilibili_http import fetch_user_videos
-        items = await fetch_user_videos(uid, limit=40)
-        if items:
-            logger.info(f"B站用戶 HTTP: {len(items)} 條")
-            return json.dumps(_normalize_links(items), ensure_ascii=False)
+        from src.utils.bilibili_http import fetch_user_videos, fetch_user_profile
+        profile = await fetch_user_profile(uid)
+        works = await fetch_user_videos(uid, limit=40)
+        if works:
+            works = _normalize_links(works)
+        logger.info(f"B站用戶 HTTP: profile={profile.get('nickname','')}, {len(works)} 作品")
+        return json.dumps({"profile": profile, "works": works}, ensure_ascii=False)
     except Exception as exc:
         logger.warning(f"B站用戶 HTTP 失败: {exc}，回退 CDP")
 
-    # Path 2: CDP 浏览器兜底
-    result = await _bilibili_user_cdp(uid)
-    logger.info(f"B站用戶 CDP: {len(result)} 條")
-    return json.dumps(result, ensure_ascii=False)
+    # Path 2: CDP 浏览器兜底（仅作品列表）
+    works = await _bilibili_user_cdp(uid)
+    logger.info(f"B站用戶 CDP: {len(works)} 條")
+    return json.dumps({"profile": profile, "works": works}, ensure_ascii=False)
 
 
 class BilibiliAdapter(PlatformAdapter):

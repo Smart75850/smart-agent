@@ -349,3 +349,47 @@ async def download_media(url: str, filepath: str) -> bool:
         return True
     except Exception:
         return False
+
+
+async def fetch_user_profile(mid: str) -> dict:
+    """B站纯 HTTP 获取用户资料：昵称/头像/粉丝数/作品数。"""
+    sess = _load_session()
+    headers = {
+        "accept": "application/json",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "referer": f"https://space.bilibili.com/{mid}",
+    }
+    if sess.cookies_str:
+        headers["cookie"] = sess.cookies_str
+
+    profile = {"nickname": "", "avatar": "", "follower_count": 0, "video_count": 0, "mid": mid}
+
+    # 1. 用户基本信息（非 Wbi 端点）
+    try:
+        resp = _get_http_session().get(
+            "https://api.bilibili.com/x/web-interface/card",
+            params={"mid": mid, "platform": "web"},
+            headers=headers, impersonate=_IMPERSONATE,
+        )
+        data = resp.json()
+        if data.get("code") == 0:
+            card = data.get("data", {}).get("card", {})
+            profile["nickname"] = card.get("name", "")
+            profile["avatar"] = card.get("face", "")
+            profile["follower_count"] = data.get("data", {}).get("follower", 0)
+    except Exception:
+        pass
+
+    # 2. 作品数
+    try:
+        data = await _wbi_get(
+            "https://api.bilibili.com/x/space/upstat",
+            {"mid": mid},
+            referer=f"https://space.bilibili.com/{mid}",
+        )
+        if data and isinstance(data.get("archive"), dict):
+            profile["video_count"] = data["archive"].get("view", 0)
+    except Exception:
+        pass
+
+    return profile
