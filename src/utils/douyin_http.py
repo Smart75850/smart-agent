@@ -94,6 +94,14 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
     params["uifid"] = session.uifid
     params["search_id"] = search_id
 
+    # 本地生成 a_bogus 签名
+    try:
+        from src.utils.abogus import ABogus, DEFAULT_UA
+        ab = ABogus(user_agent=DEFAULT_UA)
+        params["a_bogus"] = ab.get_value(params, method="GET")
+    except Exception as e:
+        logger.debug(f"a_bogus 生成失败: {e}")
+
     headers = _build_headers(session, keyword, search_id)
 
     from src.utils.http_client import create_httpx_client
