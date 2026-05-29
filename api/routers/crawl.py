@@ -203,6 +203,12 @@ async def _run_crawl(task_id: str, req: CrawlRequest):
                 filepath = store.save(new_data, settings.OUTPUT_DIR, key) if new_data else ""
                 count = len(new_data)
                 data = new_data
+                # 用户类型: 包装为 {profile, works} 格式
+                if action == "user":
+                    data = await _wrap_user_profile(data, platform, keyword)
+            elif isinstance(data, dict) and action == "user":
+                # adapter 已返回 profile+works 格式（如B站）
+                count = len(data.get("works", []))
             else:
                 filepath = store.save(data, settings.OUTPUT_DIR, key)
                 count = 1
@@ -220,6 +226,30 @@ async def _run_crawl(task_id: str, req: CrawlRequest):
         _tasks[task_id].update({"status": "error", "error": err_msg})
         if req.platform:
             get_checkpoint().mark_failed(req.platform, req.type, req.keyword or "", error_msg=err_msg)
+
+
+async def _wrap_user_profile(works: list, platform: str, user_id: str) -> dict:
+    """将作品列表包装为 {profile, works} 格式。"""
+    profile = {"nickname": "", "avatar": "", "follower_count": 0, "video_count": len(works), "user_id": user_id}
+
+    # 尝试从 HTTP API 获取更完整的 profile
+    try:
+        if platform == "kuaishou":
+            from src.utils.ks_http import fetch_user_profile as _ks_profile
+            p = await _ks_profile(user_id)
+            if p and p.get("nickname"):
+                profile.update(p)
+    except Exception:
+        pass
+
+    # 从作品列表中提取作者名作为昵称 fallback
+    if not profile.get("nickname") and works:
+        for w in works:
+            if w.get("author"):
+                profile["nickname"] = str(w["author"])
+                break
+
+    return {"profile": profile, "works": works}
 
 
 def _get_method_kwargs(method_name, keyword, limit=20):

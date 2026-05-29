@@ -277,8 +277,48 @@ async def kuaishou_comment(photo_id: str) -> str:
 
 
 async def kuaishou_user(user_id: str) -> str:
-    """爬取快手用户主页视频列表，需登入先有完整内容。回传 JSON 字串。"""
+    """爬取快手用户主页视频列表 — HTTP API 优先，CDP 兜底。"""
     logger.info(f"快手用户: user_id={user_id}")
+
+    # Path 1: HTTP API
+    try:
+        from src.utils.session_manager import ensure_session
+        if await ensure_session("kuaishou"):
+            from src.utils.ks_http import _load_session
+            import httpx
+            sess = _load_session()
+            headers = {"cookie": sess.cookies_str, "user-agent": "Mozilla/5.0", "referer": f"https://www.kuaishou.com/profile/{user_id}"}
+            async with httpx.AsyncClient(timeout=15) as c:
+                r = await c.post(
+                    "https://www.kuaishou.com/rest/v/profile/feed",
+                    json={"userId": user_id, "pcursor": "", "count": 30},
+                    headers=headers,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    feeds = data.get("feeds", []) or data.get("data", {}).get("feeds", [])
+                    items = []
+                    for f in feeds:
+                        photo = f.get("photo", {}) or {}
+                        author = f.get("author", {}) or f.get("user", {}) or {}
+                        pid = photo.get("id", "")
+                        if pid:
+                            items.append({
+                                "title": photo.get("caption", ""),
+                                "author": author.get("name", "") or author.get("nickname", ""),
+                                "plays": photo.get("viewCount", 0) or 0,
+                                "likes": photo.get("likeCount", 0) or 0,
+                                "photo_id": pid,
+                                "cover_url": photo.get("coverUrl", ""),
+                                "link": f"https://www.kuaishou.com/short-video/{pid}",
+                            })
+                    if items:
+                        logger.info(f"快手用户 HTTP: {len(items)} 条")
+                        return json.dumps(items, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"快手用户 HTTP 失败: {e}")
+
+    # Path 2: CDP 浏览器兜底
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.kuaishou.com/profile/{user_id}", wait_until="domcontentloaded")

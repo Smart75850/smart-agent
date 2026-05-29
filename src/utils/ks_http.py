@@ -127,6 +127,39 @@ async def search(keyword: str, count: int = 20, pcursor: str = "") -> tuple[list
     return results, str(next_pcursor) if next_pcursor else ""
 
 
+async def fetch_user_profile(user_id: str) -> dict:
+    """快手用户资料：昵称/头像/粉丝/作品数。"""
+    sess = _load_session()
+    headers = {
+        "cookie": sess.cookies_str,
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "referer": f"https://www.kuaishou.com/profile/{user_id}",
+    }
+    profile = {"nickname": "", "avatar": "", "follower_count": 0, "video_count": 0, "user_id": user_id}
+
+    try:
+        from src.utils.http_client import create_httpx_client
+        async with create_httpx_client(10) as client:
+            resp = await client.get(
+                f"https://www.kuaishou.com/rest/v/profile/basic",
+                params={"userId": user_id},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("result") == 1:
+                    info = data.get("data", {}) or {}
+                    profile["nickname"] = info.get("name", "") or info.get("userName", "") or info.get("nickname", "")
+                    profile["avatar"] = info.get("avatar", "") or info.get("headUrl", "") or info.get("headerUrl", "")
+                    stats = data.get("countInfo", {}) or {}
+                    profile["follower_count"] = stats.get("fan", 0) or info.get("fan", 0) or 0
+                    profile["video_count"] = stats.get("photo", 0) or info.get("photo", 0) or 0
+    except Exception:
+        pass
+
+    return profile
+
+
 async def search_all(keyword: str, limit: int = 40) -> list[dict]:
     all_results = []
     seen_ids = set()
