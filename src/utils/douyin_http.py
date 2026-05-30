@@ -3,7 +3,7 @@
 基于收割的会话上下文（sessionid + ttwid + uifid），
 直接发 HTTP 请求到抖音搜索 API，唔需要浏览器。
 """
-import json, random, string, logging
+import asyncio, json, random, string, logging, time
 from datetime import datetime
 from urllib.parse import quote
 import httpx
@@ -165,3 +165,100 @@ async def search_all(keyword: str, limit: int = 40) -> list[dict]:
         all_results.extend(new_items)
         offset += len(batch)
     return all_results[:limit]
+
+
+# ── 会话收割（session_manager 需要）──────────────────────────
+
+async def harvest_from_cdp(port: int = 9222):
+    """从 CDP Chrome 收割抖音会话。"""
+    return await session_store.harvest_from_cdp(port)
+
+
+async def harvest_persistent():
+    """使用持久化 Playwright Profile 收割抖音会话。"""
+    import asyncio, os
+    os.environ["no_proxy"] = "127.0.0.1,localhost"
+    os.environ["NO_PROXY"] = "127.0.0.1,localhost"
+    from playwright.async_api import async_playwright
+    from pathlib import Path
+
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    profile_dir = str(_PROJECT_ROOT / "browser_data" / "douyin_profile")
+    Path(profile_dir).mkdir(parents=True, exist_ok=True)
+
+    async with async_playwright() as p:
+        context = await p.chromium.launch_persistent_context(
+            profile_dir, headless=False,
+            viewport={"width": 1280, "height": 800}, locale="zh-CN",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
+        await page.goto("https://www.douyin.com", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(3000)
+
+        cookies = await context.cookies()
+        has_sessionid = any(c['name'] == 'sessionid' for c in cookies)
+        if not has_sessionid:
+            logger.warning("抖音未登录（缺少 sessionid），请在弹出窗口中扫码登录...")
+            for i in range(90):
+                await asyncio.sleep(2)
+                cookies = await context.cookies()
+                if any(c['name'] == 'sessionid' for c in cookies):
+                    logger.info("抖音登录成功")
+                    break
+                if i % 15 == 0:
+                    logger.info(f"  等待登录... ({i*2}s)")
+
+        cookies = await context.cookies()
+        cookies_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+        cookie_map = {c['name']: c['value'] for c in cookies}
+
+        from datetime import datetime
+        sess = DouyinSession(
+            ttwid=cookie_map.get("ttwid", ""),
+            sessionid=cookie_map.get("sessionid", ""),
+            uifid=cookie_map.get("UIFID", ""),
+            odin_tt=cookie_map.get("odin_tt", ""),
+            passport_csrf_token=cookie_map.get("passport_csrf_token", ""),
+            cookies_str=cookies_str,
+            harvested_at=datetime.now().isoformat(),
+        )
+        if sess.is_valid():
+            session_store._session = sess
+        await context.close()
+        return sess
+
+
+# ── 反反爬：请求速率控制 ─────────────────────────────────────
+
+class _RateLimiter:
+    def __init__(self):
+        self._last_call = 0.0
+        self._consecutive_failures = 0
+        self._cooldown_until = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self._lock:
+            now = time.time()
+            if now < self._cooldown_until:
+                return False
+            min_gap = random.uniform(2.0, 5.0)
+            since_last = now - self._last_call
+            if since_last < min_gap:
+                await asyncio.sleep(min_gap - since_last)
+            self._last_call = time.time()
+            return True
+
+    def report_failure(self, is_blocked=False):
+        self._consecutive_failures += 1
+        if is_blocked:
+            backoff = min(30 * (2 ** min(self._consecutive_failures, 4)), 480)
+            self._cooldown_until = time.time() + backoff + random.uniform(0, backoff * 0.3)
+
+    @property
+    def in_cooldown(self):
+        return time.time() < self._cooldown_until
+
+
+_rate_limiter = _RateLimiter()

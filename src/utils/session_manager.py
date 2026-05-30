@@ -127,26 +127,40 @@ def _check_cdp_available(port: int = 9222) -> bool:
         return False
 
 
+_health_cache: dict[str, tuple[float, bool]] = {}
+_HEALTH_CACHE_TTL = 60
+
 async def check_health(platform: str) -> bool:
-    """快速健康检测 — 用平台自己的 search 做个最小调用。"""
+    """快速健康检测。结果缓存 60 秒防反爬。"""
     cfg = _PLATFORMS.get(platform)
     if not cfg:
         return False
 
+    import time
+    now = time.time()
+    cached = _health_cache.get(platform)
+    if cached and (now - cached[0]) < _HEALTH_CACHE_TTL:
+        return cached[1]
+
     session_path = Path(cfg["session_file"])
     if not session_path.exists():
+        _health_cache[platform] = (now, False)
         return False
 
-    # 用对应模块的 search 函数做轻量调用（用常见词确保有结果）
+    result = False
     try:
         if platform == "douyin":
-            from src.utils.douyin_http import search
-            items = await search("美食", count=1)
-            return len(items) > 0
+            # 轻量检查：验证 session 文件有效性，不触发搜索 API
+            from src.utils.session_context import session_store
+            sess = session_store.session
+            if sess.is_valid() and sess.sessionid and sess.ttwid:
+                result = True
+            else:
+                result = False
         elif platform == "xiaohongshu":
             from src.utils.xhs_http import search
             items = await search("美食", count=1)
-            return len(items) >= 0  # XHS 返回空列表都算会话有效
+            result = len(items) >= 0
         elif platform == "kuaishou":
             from src.utils.ks_http import search
             items = await search("美女", count=1)
@@ -167,9 +181,11 @@ async def check_health(platform: str) -> bool:
             from src.utils.tieba_http import search
             items = await search("美食", count=1)
             return len(items) > 0
-    except:
+    except Exception:
         pass
-    return False
+
+    _health_cache[platform] = (time.time(), result)
+    return result
 
 
 def _build_headers(platform: str, cookies_str: str, session: dict) -> dict:

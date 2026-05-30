@@ -13,6 +13,7 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
+from typing import Literal
 from pydantic import BaseModel, Field
 
 from src.orchestrator.agents.base import BaseAgent
@@ -23,18 +24,18 @@ from src.utils.logger import logger
 
 class VideoBreakdownOutput(BaseModel):
     index: int = Field(description="内容在输入列表中的索引")
-    hook_type: str = Field(description="钩子类型：数字衝擊/疑問懸念/情感共鳴/反直覺/權威背書/前後對比/教程實用/故事敍事/無法判斷")
+    hook_type: Literal["數字衝擊", "疑問懸念", "情感共鳴", "反直覺", "權威背書", "前後對比", "教程實用", "故事敍事", "無法判斷"] = Field(description="钩子类型")
     hook_effectiveness: int = Field(ge=0, le=100, description="钩子效果评分")
-    pacing: str = Field(min_length=15, description="节奏分析，30字以上，含节奏变化点")
+    pacing: str = Field(min_length=20, description="节奏分析，含节奏变化点")
     structure_template: str = Field(description="结构模板，含阶段数命名+各阶段说明")
     conversion_point: str = Field(description="转化点，具体位置+转化动作")
-    viral_mechanism: str = Field(min_length=20, description="爆款机制，40字以上，解释为什么这个结构能传播")
-    learnings: str = Field(min_length=15, description="可复制要点，30字以上，具体操作建议")
-    confidence: str = Field(description="分析置信度：high/medium/low")
+    viral_mechanism: str = Field(default="", description="爆款机制，40字以上，解释为什么这个结构能传播")
+    learnings: str = Field(default="", description="可复制要点，30字以上，具体操作建议")
+    confidence: Literal["high", "medium", "low"] = Field(description="分析置信度")
 
 
 class VideoAnalystOutput(BaseModel):
-    summary: str = Field(min_length=20, description="整体结构规律，40字以上，含最常见钩子类型+典型结构模式")
+    summary: str = Field(min_length=40, description="整体结构规律，含最常见钩子类型+典型结构模式")
     breakdowns: list[VideoBreakdownOutput] = Field(description="视频结构拆解列表")
 
 
@@ -146,45 +147,48 @@ class VideoAnalyst(BaseAgent):
             for ex in self._FEWSHOT_BAD
         )
 
-        prompt = f"""你是頂級短視頻結構分析師（Video Analyst），專門從創作者角度拆解爆款視頻的成功要素。
+        prompt = f"""<instructions>
+你是短視頻結構分析師。基於標題和互動數據，拆解每個視頻的爆款結構。
 
-## 任務
-分析以下 {platform} 的爆款內容，拆解每個視頻的開頭鉤子、節奏設計、結構模板、轉化點和爆款機制。
+強制規則：
+1. hook_type 必須從以下9個枚舉值中精確選擇（不可自創、不可同義詞替換）：
+   數字衝擊 | 疑問懸念 | 情感共鳴 | 反直覺 | 權威背書 | 前後對比 | 教程實用 | 故事敍事 | 無法判斷
+2. 先判斷hook_type，再分析節奏和結構（Chain-of-Thought）
+3. structure_template 用「模式名 + N段式」格式，如「問題-解決 3段式（痛點→方案→驗證）」
+4. confidence 標註：有播放/點讚數據→medium；僅標題→low
+5. learnings 必須具體可操作（如「開頭用數字+反直覺組合」而非「用好的標題」）
+</instructions>
 
-## 品質標準
-- 好的分析：精確指出鉤子類型+推斷具體秒數（如「前3秒」不是「開頭」）+為什麼這個鉤子在該平台有效、結構模板直接可用於創作（如「3段式：痛點→解決方案→結果展示」不是「先介紹再展示」）、可複製要點含具體操作步驟（如「開頭用數字+反直覺組合，數字不超過3個」不是「用好的標題」）
-- 差的分析：鉤子類型選「無法判斷」、結構描述空泛如「先介紹再展示」、可複製要點無操作價值
+<context>
+平台：{platform}
+</context>
 
-## ⚠️ 重要限制
-- 僅基於標題和數據分析，如無視頻時長/分段信息，明確標註「基於標題推斷」
-- 每個分析必須標註 **confidence: high/medium/low**
-  - high：標題+數據充足，能清晰推斷結構
-  - medium：有足夠信息但部分細節需推測
-  - low：數據稀疏，分析可靠性低
-
-## 鉤子類型枚舉（必須從以下選一）
-數字衝擊、疑問懸念、情感共鳴、反直覺、權威背書、前後對比、教程實用、故事敍事、無法判斷
-⚠️ 「無法判斷」僅限數據極度缺失或內容完全無結構時使用
-
-## 結構模板命名規範
-使用「[模式名] + 階段數」格式，如：
-- 「問題-解決 3段式」（提出痛點→展示方案→驗證結果）
-- 「對比衝擊 2段式」（改造前→改造後）
-- 「知識拆解 4段式」（結論先行→原理解釋→案例佐證→行動指引）
-
-## Few-Shot 正例（8 種鉤子類型各一例）
+<examples>
+## 正例（8種鉤子各一）
 {good_examples_text}
 
-## Few-Shot 負例（避免以下錯誤分析）
+## 負例
 {bad_examples_text}
+</examples>
 
-## 邊界情況處理
-- 僅有標題無其他數據：confidence=low，hook_type 可推斷但 hook_effectiveness 不超 40
-- 多條內容標題相似（同質化）：在 viral_mechanism 標註「同質化競爭」，hook_effectiveness 扣 15 分
-- 純文字內容（無視頻）：pacing 標註「文字內容，節奏為閱讀節奏」
+<task>
+分析以下內容的視頻結構：
+{items_text}
+</task>
 
-## 待分析內容
-{items_text}"""
+<output_format>
+返回純JSON：
+{{"summary": "整體結構規律（40字以上）",
+ "breakdowns": [{{"index": 數字,
+   "hook_type": "枚舉值之一",
+   "hook_effectiveness": 0-100,
+   "pacing": "節奏分析（20字以上）",
+   "structure_template": "結構模板（含階段數+各階段說明）",
+   "conversion_point": "轉化點",
+   "viral_mechanism": "爆款機制（20字以上）",
+   "learnings": "可複製要點（20字以上）",
+   "confidence": "medium/low"}}]}}
+</output_format>"""
 
         try:
             output = await self._call_llm_with_critic(prompt, VideoAnalystOutput, "video_analyst", temperature=0.3)

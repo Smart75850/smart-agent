@@ -13,8 +13,31 @@ Flow:
 import json
 from dataclasses import dataclass, field, asdict
 
+from typing import Literal
+from pydantic import BaseModel, Field
+
 from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
+
+
+# ── Pydantic 结构化输出模型 ─────────────────────────────────
+
+class SentimentItemOutput(BaseModel):
+    index: int = Field(description="内容在输入列表中的索引")
+    sentiment: Literal["positive", "neutral", "negative", "mixed", "unknown"] = Field(description="情绪标签")
+    positive_pct: float = Field(ge=0, le=100, description="正面评论百分比")
+    neutral_pct: float = Field(ge=0, le=100, description="中性评论百分比")
+    negative_pct: float = Field(ge=0, le=100, description="负面评论百分比")
+    key_insights: str = Field(default="", description="关键洞察，30字以上，引用具体评论佐证。无评论数据时可为空")
+    audience_reaction: str = Field(default="", description="受众反应一句话，20字以上")
+    confidence: Literal["high", "medium", "low"] = Field(description="置信度：high(>=30条)/medium(10-29条)/low(<10条)")
+    monetization_signals: str = Field(default="", description="购买意愿信号描述，30字以上，含具体信号类型+数量。无评论数据时可为空")
+
+
+class SentimentReaderOutput(BaseModel):
+    overall_sentiment: Literal["positive", "neutral", "negative", "mixed", "unknown"] = Field(description="整体情绪倾向（零评论时为unknown）")
+    summary: str = Field(min_length=30, description="一句话总结，含情绪主导方向+关键发现")
+    items: list[SentimentItemOutput] = Field(description="情绪分析列表")
 
 
 @dataclass
@@ -22,11 +45,13 @@ class SentimentItem:
     title: str
     platform: str
     sentiment: str = ""           # positive / neutral / negative / mixed
-    positive_pct: int = 0
-    neutral_pct: int = 0
-    negative_pct: int = 0
+    positive_pct: float = 0.0
+    neutral_pct: float = 0.0
+    negative_pct: float = 0.0
     key_insights: str = ""        # 關鍵洞察
     audience_reaction: str = ""   # 受眾反應摘要
+    confidence: str = "medium"    # high/medium/low — 基於評論樣本量
+    monetization_signals: str = ""  # 購買意願信號
 
 
 @dataclass
@@ -71,7 +96,7 @@ class SentimentReader(BaseAgent):
             items = report_dict.get("items", [])
             if items:
                 raw_items = [it.get("raw", {}) for it in items if isinstance(it, dict)]
-                report = await self.run(items=raw_items[:3], platform=p, fetch_comments=True)
+                report = await self.run(items=raw_items[:5], platform=p, fetch_comments=True)
                 all_sentiments.extend(report.items)
                 if report.summary:
                     summaries.append(report.summary)
@@ -91,7 +116,7 @@ class SentimentReader(BaseAgent):
             from src.orchestrator.nodes import _get_adapter
             adapter = _get_adapter(platform)
             result = {}
-            for item in items[:3]:
+            for item in items[:5]:
                 item_id = (
                     item.get("platform_id") or item.get("bvid")
                     or item.get("aweme_id") or item.get("note_id") or ""
@@ -111,9 +136,57 @@ class SentimentReader(BaseAgent):
             logger.debug(f"SentimentReader 評論拉取跳過: {exc}")
             return {}
 
+    # ── Few-Shot 示例庫（6 好 + 2 壞）──────────────────────
+    _FEWSHOT_GOOD = [
+        {"comment_count": "多（>50條）", "sentiment": "mixed",
+         "positive_pct": 45, "neutral_pct": 25, "negative_pct": 30,
+         "confidence": "high", "monetization_signals": "評論區8人問購買渠道，3人已下單並曬單，2人抱怨發貨慢",
+         "insights": "正面集中於產品性價比（'這個價位很值''比XX品牌便宜一半'），負面集中於發貨速度（'等了10天'），核心矛盾在供應鏈而非產品力",
+         "reaction": "購買意願強烈但物流體驗影響復購口碑"},
+        {"comment_count": "多（>50條）", "sentiment": "positive",
+         "positive_pct": 78, "neutral_pct": 15, "negative_pct": 7,
+         "confidence": "high", "monetization_signals": "評論區5人表示'已買''好用'，多人@朋友來看，2人問鏈接",
+         "insights": "壓倒性好評集中在'效果明顯''性價比高'，tag朋友行為說明社交傳播力強；7%負評為個別品控問題",
+         "reaction": "壓倒性好評+自發社交傳播，適合加大投放"},
+        {"comment_count": "少（<10條）", "sentiment": "positive",
+         "positive_pct": 80, "neutral_pct": 20, "negative_pct": 0,
+         "confidence": "low", "monetization_signals": "評論量太少（僅5條），無法判斷真實購買意願",
+         "insights": "雖正面比例高但樣本極少（僅5條評論），統計無意義；播放高但評論低說明內容可能缺乏討論點或互動引導不足",
+         "reaction": "受眾被動消費無參與感，需在內容中加入討論引導"},
+        {"comment_count": "多（>50條）", "sentiment": "negative",
+         "positive_pct": 12, "neutral_pct": 18, "negative_pct": 70,
+         "confidence": "high", "monetization_signals": "無人表達購買意願，多人勸退，5人表示'後悔買了'",
+         "insights": "負評集中在產品質量差+售後無回應，內容引發負面口碑傳播；對品牌方是危機信號，對競品是切入機會",
+         "reaction": "負評風暴，品牌需危機公關；競品可藉機推出對比內容"},
+        {"comment_count": "零評論", "sentiment": "unknown",
+         "positive_pct": 0, "neutral_pct": 0, "negative_pct": 0,
+         "confidence": "low", "monetization_signals": "無評論數據",
+         "insights": "無任何評論，無法進行情緒分析。可能原因：內容新發佈、評論區關閉、或內容缺乏互動性",
+         "reaction": "無受眾反應數據，無法判斷"},
+        {"comment_count": "中（10-50條）", "sentiment": "mixed",
+         "positive_pct": 55, "neutral_pct": 20, "negative_pct": 25,
+         "confidence": "medium", "monetization_signals": "評論區3人問'多少錢''在哪買'，1人表示價格超出預算",
+         "insights": "正面多為認可內容質量（'講得好詳細'），負面集中於價格敏感性；購買意願存在但價格是主要障礙",
+         "reaction": "內容質量獲認可，價格定位需優化以轉化潛在買家"},
+    ]
+
+    _FEWSHOT_BAD = [
+        {"comment_count": "少（<10條）", "sentiment": "positive",
+         "positive_pct": 80, "neutral_pct": 20, "negative_pct": 0,
+         "confidence": "high", "monetization_signals": "正面情緒高，適合帶貨",
+         "insights": "❌ 錯誤1：5條評論就給high confidence——評論<10時必須low",
+         "reaction": "教訓：樣本量決定置信度，不能為了好看而虛標high"},
+        {"comment_count": "中（10-50條）", "sentiment": "positive",
+         "positive_pct": 60, "neutral_pct": 30, "negative_pct": 10,
+         "confidence": "medium", "monetization_signals": "未提及",
+         "insights": "❌ 錯誤2：分析完全忽略評論區的購買意願信號（'在哪買''多少錢'），只看了情緒沒看消費意圖",
+         "reaction": "教訓：monetization_signals 欄位必須掃描購買關鍵詞，無信號也要明確標註「無明顯購買信號」"},
+    ]
+
     async def _llm_generate(
         self, items: list, platform: str, comments_data: dict
     ) -> SentimentReport:
+        """DeepSeek LLM 分析評論情緒（v2 增強 prompt）。"""
         items_text = "\n".join(
             f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')}"
             + (f" | 評論:{comments_data.get(it.get('platform_id','') or it.get('bvid',''), [])[:5]}"
@@ -121,41 +194,83 @@ class SentimentReader(BaseAgent):
             for i, it in enumerate(items[:10])
         )
 
-        prompt = (
-            f"分析以下{platform}內容的受眾情緒反應：\n\n"
-            f"{items_text}\n\n"
-            f"請返回 JSON（不要 markdown 代碼塊）：\n"
-            f'{{"overall_sentiment": "整體情緒傾向", "summary": "一句話總結", '
-            f'"items": [{{"index": 數字, "sentiment": "positive/neutral/negative/mixed", '
-            f'"positive_pct": 0-100, "neutral_pct": 0-100, "negative_pct": 0-100, '
-            f'"key_insights": "關鍵洞察", "audience_reaction": "受眾反應一句話"}}]}}'
+        good_examples_text = "\n".join(
+            f"  ✅ 評論量: {ex['comment_count']} | 情緒: {ex['sentiment']} | 置信度: {ex['confidence']}\n     P:{ex['positive_pct']}% N:{ex['neutral_pct']}% Neg:{ex['negative_pct']}%\n     購買信號: {ex['monetization_signals']}\n     洞察: {ex['insights']}\n     受眾反應: {ex['reaction']}"
+            for ex in self._FEWSHOT_GOOD
+        )
+        bad_examples_text = "\n".join(
+            f"  ❌ 評論量: {ex['comment_count']} | 情緒: {ex['sentiment']} | 置信度: {ex['confidence']}\n     洞察: {ex['insights']}\n     受眾反應: {ex['reaction']}"
+            for ex in self._FEWSHOT_BAD
         )
 
+        total_comments = sum(len(v) for v in comments_data.values())
+        prompt = f"""<instructions>
+你是專業受眾情緒分析師。先逐一分析每條評論的情緒方向，再綜合統計百分比（Chain-of-Thought）。
+
+核心規則（必須嚴格遵守）：
+1. confidence 按評論數量決定：≥30→high，10-29→medium，<10→low（含0評論）
+2. 必須掃描購買信號（問價格/問渠道/已下單/已買/勸退），即使沒有也要明確標註「無明顯購買信號」
+3. 零評論時：所有百分比=0，sentiment="unknown"，insights="無評論數據，無法分析情緒"
+4. positive+neutral+negative 三者必須等於100%（零評論除外）
+5. 引用至少1條具體評論佐證你的判斷（零評論除外）
+</instructions>
+
+<context>
+平台：{platform} | 共 {total_comments} 條評論
+</context>
+
+<examples>
+## 正例
+{good_examples_text}
+
+## 負例
+{bad_examples_text}
+</examples>
+
+<task>
+分析以下內容的受眾情緒反應：
+{items_text}
+</task>
+
+<output_format>
+返回純 JSON：
+{{"overall_sentiment": "positive/neutral/negative/mixed",
+ "summary": "整體結論（30字以上）",
+ "items": [{{"index": 數字,
+   "sentiment": "positive/neutral/negative/mixed",
+   "positive_pct": 0-100, "neutral_pct": 0-100, "negative_pct": 0-100,
+   "key_insights": "引用具體評論的洞察（30字以上，零評論時說明原因）",
+   "audience_reaction": "受眾反應摘要（20字以上）",
+   "confidence": "high/medium/low",
+   "monetization_signals": "購買信號描述（30字以上，含信號類型+數量，無則標註原因）"}}]}}
+</output_format>"""
+
         try:
-            content = await self._call_llm(prompt, temperature=0.3, json_mode=True)
-            parsed = self._parse_json(content)
+            output = await self._call_llm_with_critic(prompt, SentimentReaderOutput, "sentiment_reader", temperature=0.3)
 
             sentiment_items = []
-            for s in parsed.get("items", []):
-                idx = s.get("index", 0)
+            for s in output.items:
+                idx = s.index
                 src = items[idx] if 0 <= idx < len(items) else {}
                 sentiment_items.append(SentimentItem(
                     title=src.get("title", ""),
                     platform=platform,
-                    sentiment=s.get("sentiment", "neutral"),
-                    positive_pct=int(s.get("positive_pct", 0)),
-                    neutral_pct=int(s.get("neutral_pct", 0)),
-                    negative_pct=int(s.get("negative_pct", 0)),
-                    key_insights=s.get("key_insights", ""),
-                    audience_reaction=s.get("audience_reaction", ""),
+                    sentiment=s.sentiment,
+                    positive_pct=s.positive_pct,
+                    neutral_pct=s.neutral_pct,
+                    negative_pct=s.negative_pct,
+                    key_insights=s.key_insights,
+                    audience_reaction=s.audience_reaction,
+                    confidence=s.confidence,
+                    monetization_signals=s.monetization_signals,
                 ))
 
             return SentimentReport(
                 platform=platform,
                 total_analyzed=len(sentiment_items),
                 items=sentiment_items,
-                overall_sentiment=parsed.get("overall_sentiment", ""),
-                summary=parsed.get("summary", ""),
+                overall_sentiment=output.overall_sentiment,
+                summary=output.summary,
             )
         except Exception as exc:
             logger.warning(f"SentimentReader LLM 失敗: {exc}")

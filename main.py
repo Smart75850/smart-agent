@@ -9,6 +9,10 @@ import sys
 import time
 from pathlib import Path
 
+# Windows 控制台 UTF-8 编码修复
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 from src.utils.checkpoint import get_checkpoint

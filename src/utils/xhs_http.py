@@ -258,8 +258,9 @@ async def search(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
 
     code = data.get("code", -1)
     if code != 0:
-        logger.warning(f"XHS 搜索失败: code={code}, msg={data.get('msg', '')}")
-        return []
+        msg = data.get("msg", "")
+        logger.warning(f"XHS 搜索失败: code={code}, msg={msg}")
+        raise RuntimeError(f"XHS API code={code}: {msg}")
 
     return _parse_items(data)
 

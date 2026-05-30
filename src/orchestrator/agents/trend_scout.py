@@ -16,10 +16,38 @@ import asyncio
 import json
 from dataclasses import dataclass, field, asdict
 
-from pydantic import BaseModel, Field
+from typing import Literal
+from pydantic import BaseModel, Field, field_validator
 
 from src.orchestrator.agents.base import BaseAgent
 from src.utils.logger import logger
+
+
+# ── 分类别名映射（LLM 常见变体 → 标准枚举值）─────────────
+
+_CATEGORY_ALIASES: dict[str, str] = {
+    # 简体/异体 → 标准繁体
+    "美妆": "美妝", "财经": "財經", "游戏": "遊戲", "娱乐": "娛樂",
+    "旅游": "旅遊", "母婴": "母嬰", "宠物": "寵物", "健康": "健康/醫療",
+    "医疗": "健康/醫療", "健身运动": "健身",
+    # 科技/数码相关
+    "數碼": "科技/AI", "数码": "科技/AI", "科技": "科技/AI",
+    "AI": "科技/AI", "人工智能": "科技/AI", "AI工具": "科技/AI",
+    # 教育相关
+    "学习": "教育", "考试": "教育",
+    # 家居相关
+    "房产": "家居", "装修": "家居", "房地产": "家居",
+    # 财经相关
+    "金融": "財經", "投资": "財經", "理财": "財經",
+    # 其他常见输出
+    "搞笑": "娛樂", "综艺": "娛樂", "明星": "娛樂",
+    "汽车": "其他", "职场": "其他",
+}
+
+_CATEGORY_VALUES = frozenset([
+    "科技/AI", "美妝", "美食", "穿搭", "家居", "健身", "教育",
+    "財經", "遊戲", "娛樂", "旅遊", "母嬰", "寵物", "健康/醫療", "其他",
+])
 
 
 # ── Pydantic 结构化输出模型 ─────────────────────────────────
@@ -27,12 +55,34 @@ from src.utils.logger import logger
 class TrendScoutItemOutput(BaseModel):
     index: int = Field(description="内容在输入列表中的索引")
     viral_score: int = Field(ge=0, le=100, description="爆款潜力分：90+蓝海/70-89有需求/50-69红海/<50小众")
-    trend_reason: str = Field(min_length=20, description="爆款原因分析，40字以上，引用具体数据+爆款机制")
-    category: str = Field(description="分类枚举：科技/AI、美妝、美食、穿搭、家居、健身、教育、財經、遊戲、娛樂、旅遊、母嬰、寵物、健康/醫療、其他")
+    trend_reason: str = Field(min_length=40, description="爆款原因分析，引用具体数据+爆款机制")
+    category: Literal["科技/AI", "美妝", "美食", "穿搭", "家居", "健身", "教育", "財經", "遊戲", "娛樂", "旅遊", "母嬰", "寵物", "健康/醫療", "其他"] = Field(description="分类枚举")
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: str) -> str:
+        """将 LLM 常见变体映射到标准枚举值，做繁简兼容。"""
+        if v in _CATEGORY_VALUES:
+            return v
+        mapped = _CATEGORY_ALIASES.get(v)
+        if mapped:
+            return mapped
+        # 模糊匹配：去掉空格后重试
+        stripped = v.replace(" ", "")
+        if stripped in _CATEGORY_VALUES:
+            return stripped
+        mapped2 = _CATEGORY_ALIASES.get(stripped)
+        if mapped2:
+            return mapped2
+        # 最后兜底：包含关键词的映射
+        for alias, target in _CATEGORY_ALIASES.items():
+            if alias in v or v in alias:
+                return target
+        return v
 
 
 class TrendScoutOutput(BaseModel):
-    summary: str = Field(min_length=15, description="整体趋势一句话，30字以上，含赛道判断+机会信号")
+    summary: str = Field(min_length=30, description="整体趋势一句话，含赛道判断+机会信号")
     items: list[TrendScoutItemOutput] = Field(description="爆款候选列表")
 
 

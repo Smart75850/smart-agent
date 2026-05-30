@@ -11,7 +11,7 @@ class TestImports(unittest.TestCase):
 
     def test_constants(self):
         from constant.platform import PlatformType, CrawlType, ErrorCode
-        self.assertEqual(len(list(PlatformType)), 5)
+        self.assertEqual(len(list(PlatformType)), 7)
         self.assertEqual(len(list(CrawlType)), 6)
 
     def test_store_backends(self):
