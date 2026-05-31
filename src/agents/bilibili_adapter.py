@@ -121,8 +121,19 @@ def _normalize_links(data: list[dict]) -> list[dict]:
 
 
 async def bilibili_comment(bvid: str) -> str:
-    """爬取 B站 評論，DOM 滚动提取。"""
+    """B站评论获取 — 优先纯 HTTP（Wbi 签名），失败回退浏览器。"""
     logger.info(f"B站評論: bvid={bvid}")
+    # 优先纯 HTTP
+    try:
+        from src.utils.bilibili_http import fetch_comments
+        items = await fetch_comments(bvid=bvid, count=20)
+        if items:
+            logger.info(f"B站評論 HTTP 完成: {len(items)} 條")
+            return json.dumps(items)
+    except Exception as e:
+        logger.debug(f"B站評論 HTTP 失败，回退浏览器: {e}")
+
+    # 回退浏览器模式
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.bilibili.com/video/{bvid}", wait_until="domcontentloaded")

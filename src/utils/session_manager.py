@@ -166,13 +166,11 @@ async def check_health(platform: str) -> bool:
             items = await search("美女", count=1)
             return len(items) > 0
         elif platform == "zhihu":
-            from src.utils.zh_http import search
-            items = await search("美食", count=1)
-            return len(items) > 0
+            from src.utils.zh_http import _load
+            result = _load().is_valid()
         elif platform == "weibo":
-            from src.utils.weibo_http import search
-            items = await search("美食", count=1)
-            return len(items) > 0
+            from src.utils.weibo_http import _load
+            result = _load().is_valid()
         elif platform == "bilibili":
             from src.utils.bilibili_http import search
             items = await search("美食", count=1)

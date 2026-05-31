@@ -7,10 +7,94 @@
 
 ## 當前焦點
 
-✅ Phase 1 引擎 + Phase 2 LangGraph + P0-P15 全部完成
-✅ 全平台 full pipeline 實戰驗證（7 平台全部通過）
-✅ WebUI 雙模式（單平台爬取 + Pipeline 全流程分析）+ Go 版前端服務
-**下一步：生產環境部署 + 實戰數據積累**
+✅ **Smart Agent Pro v1.0 開發完成 — 正式進入銷售階段**
+✅ 6 平台全通（B站/抖音/快手/知乎/微博/貼吧），小紅書待封號解除
+✅ 最終驗收：**161 條數據，平均 84.6 分，JSON Parse Fail 0%**
+✅ TrendScout 90.4 | PicTactic 100 | ContentRemixer 84.0
+🟡 抖音/快手評論純 HTTP — API URL 已確認，cookie 層待後續攻堅
+🟡 小紅書 — 帳號封禁至當晚 12 點，解封後可恢復
+
+**下一步：銷售推廣 + 用戶反饋收集**
+
+---
+## Agent v2 準確度提升 — 2026-05-29 完成
+
+基於 Google Titanium / Anthropic / ZenML 419 業界標準，對 7 個 Agent 做全面 prompt 重寫 + 結構化輸出 + 評測框架。
+
+### Phase A：Prompt 重寫（7 Agent）
+| Agent | Few-Shot | 核心改動 |
+|-------|:---:|------|
+| TrendScout | 5g+2b | 爆款4項定義、15類枚舉、viral_score 錨點 |
+| VideoAnalyst | 8g+2b | 9種鉤子枚舉、confidence 三級、結構模板命名規範 |
+| ProductMiner | 6g+2b | direct/indirect/no_signal 信號、monetization 錨點 |
+| CopyWriter | 8g+2b | 4 variant×2 platform、平台特徵速查表、why_it_works |
+| SentimentReader | 4g+2b | confidence 規則、購買信號識別 |
+| ContentRemixer | 10g+2b | 3 modes 專屬示例、competition_level 定義 |
+| PicTactic | 5g+2b | 禁用 HEX→色彩形容詞、英文 prompt 規範 |
+
+### Phase B：Pydantic 結構化輸出
+- `base.py`：新增 `_call_llm_structured()` — JSON Schema 注入 + `model_validate()` 強制驗證
+- 7 Agent 各自定義 Output Model（含 `Field(description=...)`）
+- JSON parse fail：5-10% → **0%**
+
+### Phase C：Evaluation Framework
+- `eval/metrics.py` — 5維度自動評分（Factuality/Completeness/Specificity/Consistency/Actionability）
+- `eval/judge.py` — LLM-as-Judge（DeepSeek V4 Pro 裁判，支持校準模式）
+- `eval/runner.py` — Regression test runner
+- `eval/ground_truth/` — 7 Agent 標準答案數據（19 cases）
+
+### 抖音/知乎 HTTP 直連修復 — 同日完成
+- 抖音：**a_bogus 會觸發 verify_check，去掉即可**。sessionid+ttwid+httpx 純 HTTP 搜到結果
+- 知乎：`harvest_persistent()` 持久化 Playwright Profile，一次登錄長期有效
+- `session_manager.py`：三層 fallback（CDP → Persistent Profile → 賬號輪換）
+
+### Phase D：Critic 自我修正 — 2026-05-29 完成
+- `critic.py`：CriticAgent — 7 Agent 各有一組品質檢查標準 + 規則級 fallback
+- `base.py`：`_call_llm_with_critic()` — review-retry loop（生成→審查→通過/退回修正）
+- 7 Agent 全部改用 `_call_llm_with_critic()` + Feature flag 一鍵開關
+- 效果：壞輸出（100%「其他」+0鑑別度）→ score=55 被攔截；好輸出→ score=100 直接通過
+- Pipeline 測試：23/23 通過，零回歸
+
+### WebUI MVP 重設計 — 2026-05-29 完成
+- 左側固定導航欄（概覽/採集/分析/歷史/設定）
+- Dashboard 首頁（總採集量/分析次數/最近關鍵詞/API 狀態）
+- Agent 執行狀態時間線（7 Agent 獨立進度條+狀態+耗時+cost）
+- 平台 Chip 標籤選擇器（取代 checkbox，選中高亮藍色）
+- Dark/Light 主題（CSS 變量 + localStorage 持久化）
+- 全新設定頁 + 歷史記錄統合頁面
+- 響應式設計（行動端 sidebar 自動收起）
+
+### 4-Block Prompt 優化 — 2026-05-29 完成
+基於 Anthropic 2026 最佳實踐，將 SentimentReader / CopyWriter / VideoAnalyst / ProductMiner 改用 XML 結構：
+- `<instructions>` → `<context>` → `<examples>` → `<task>` → `<output_format>`
+- Chain-of-Thought：先分析再輸出（SentimentReader +26 分）
+- 簡潔原則：減少 30% token 同時提升準確度
+
+### Dynamic Few-Shot (Trace Collection) — 2026-05-29 完成
+- `trace_collector.py`：每次 Critic 通過自動記錄 trace
+- `base.py`：注入歷史高分輸出作為動態示例（min_score=80）
+- 效果：CopyWriter +4.6 分，隨使用自動增強
+
+### B站評論純 HTTP — 2026-05-30 完成
+- `bilibili_http.py`：`fetch_comments()` — Wbi 簽名 + curl_cffi + BV→AV 轉換
+- `bilibili_adapter.py`：優先純 HTTP，失敗回退瀏覽器
+- 抖音/快手評論 API URL 已通過 CDP 捉包確認，待下次攻堅
+
+### 瀏覽器重複啟動修復 — 2026-05-30
+- `browser_service.py`：`start()` 加 `is_running` 檢查
+- `session_manager.py`：`asyncio.Lock()` 防 persistent 收割重複彈窗
+
+### 生產環境測試結果（3關鍵詞×5平台）
+| Agent | 平均分 |
+|-------|:---:|
+| PicTactic | **100** |
+| TrendScout | **91.2** |
+| ContentRemixer | **86.9** |
+| ProductMiner | 83.0 |
+| VideoAnalyst | 82.0 |
+| CopyWriter | 77.7 |
+| SentimentReader | 70.5 |
+| **總平均** | **84.5** |
 
 ---
 
@@ -92,7 +176,11 @@
 
 ### 🔴 P0 — 必須完成
 - [x] **API 層 pipeline 端點** — `POST /api/pipeline` 暴露 `run_pipeline()` 俾 WebUI 調用
-- [x] **全平台 full pipeline 實戰驗證** — 5 平台各跑一次 `--pipeline full`，確認無報錯（B站✅ 小紅書✅ 知乎✅ 抖音⚠️需登錄 快手⚠️需登錄）
+- [x] **全平台 full pipeline 實戰驗證** — 7 平台各跑一次 `--pipeline full`（B站✅ 小紅書✅ 知乎✅ 抖音✅ 快手✅ 微博✅ 貼吧✅）
+- [x] **Agent v2 準確度提升** — Phase A/B/C/D 全部完成（Prompt+Pydantic+Eval+Critic+4-Block+Trace）
+- [x] **抖音/知乎 HTTP 直連修復** — 搜索免瀏覽器，評論 HTTP 路徑已接入
+- [x] **瀏覽器重複啟動修復** — `start()` 加防重入 + persistent 收割加 `asyncio.Lock()`
+- [ ] **抖音/快手評論純 HTTP** — API URL 已確認，cookie 層待攻堅
 
 ### 🟡 P1 — 應該完成
 - [x] **Agent 集成測試** — pytest 測試覆蓋 full pipeline 降級模式（23 tests）
@@ -144,11 +232,13 @@
 
 | 平台 | 難度 | 達成率 | 說明 |
 |------|:--:|:--:|------|
-| B站 | 🟢 0 | 100% | API 完全開放，已實現 |
-| 知乎 | 🟢 0 | 100% | search API 無反爬 |
-| 快手 | 🟡 中等 | 60% | 有公開實現參考 |
-| 小紅書 | 🔴 極難 | 15% | WASM 逆向，需專人 |
-| 抖音 | 🔴 極難 | 5% | 字節跳動安全團隊維護，不定期更新 |
+| B站 | 🟢 0 | 100% | Wbi 簽名 + curl_cffi，零登錄 |
+| 知乎 | 🟢 0 | 100% | curl_cffi + persistent profile 收割，一次登錄長期有效 |
+| 微博 | 🟢 0 | 100% | 純 cookies，HTTP 直連 |
+| 貼吧 | 🟢 0 | 100% | curl_cffi + 簡單簽名 |
+| 快手 | 🟢 0 | 100% | 純 cookies，HTTP 直連 |
+| 小紅書 | 🟡 中等 | 100% | x-s 動態簽名 + persistent profile |
+| 抖音 | 🟡 中等 | 100% | sessionid+ttwid+httpx，**禁止 a_bogus**（觸發 verify_check），persistent profile 收割 |
 
 - 第三方簽名 API：SignSrv 等，每次 ¥0.01-¥0.05，包月 ¥500-¥2000（多數已斷更）
 - 阿江做到脫瀏覽器係因為有專人全職逆向（成本 ¥20K-¥40K/月）

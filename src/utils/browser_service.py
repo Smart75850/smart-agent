@@ -68,6 +68,8 @@ class BrowserService:
 
     async def start(self, cookies_dict: dict = None, proxy: str = None,
                     cookie_domain: str = ".douyin.com"):
+        if self.is_running:
+            return
         engine = environ.get("BROWSER_ENGINE") or ENGINE
         if engine == "auto":
             engine = "cdp" if _check_cdp(CDP_PORT) else "playwright"

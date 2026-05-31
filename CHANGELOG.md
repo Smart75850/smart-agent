@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.0.0 (2026-05-30) — 正式版發布 🚀
+
+### Agent v2 準確度提升
+- **Phase A**: 7 Agent Prompt 重寫 — Role + Few-Shot + Quality Criteria + Edge Cases
+- **Phase B**: Pydantic 結構化輸出 — JSON parse fail 5-10% → 0%
+- **Phase C**: Evaluation Framework — 5 維度自動評分 + LLM-as-Judge + Regression Runner
+- **Phase D**: Critic 自我修正 — review-retry loop，壞輸出攔截率 100%
+- **4-Block Prompt**: Anthropic 2026 最佳實踐，SentimentReader +26 分
+- **Dynamic Few-Shot**: trace_collector 接入，高分輸出自動成為示例
+- **最終驗收**: 161 條數據，平均 84.6 分，6/6 平台全通
+
+### WebUI MVP 重設計
+- 左側固定導航欄 + Dashboard 首頁 + Agent 時間線 + Chip 選擇器 + Dark/Light 主題
+
+### HTTP 直連突破
+- 抖音搜索免 a_bogus（sessionid+ttwid 純 HTTP）
+- B站評論純 HTTP（Wbi 簽名 + curl_cffi + BV→AV 轉換）
+- 知乎/微博/貼吧 session 輕量健康檢查
+
+### 基礎設施
+- 瀏覽器重複啟動修復（`is_running` 檢查 + `asyncio.Lock`）
+- `api/main.py` UsageMiddleware import 順序修復
+- session_manager 三層 fallback（CDP → Persistent → 賬號輪換）
+
+---
+
 ## v0.3.0 (2026-05-26) — 部署 & 高性能版
 
 ### 新增

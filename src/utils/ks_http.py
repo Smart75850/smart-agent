@@ -175,3 +175,50 @@ async def search_all(keyword: str, limit: int = 40) -> list[dict]:
         if not pcursor or pcursor == "no_more":
             break
     return all_results[:limit]
+
+
+COMMENT_URL = "https://www.kuaishou.com/rest/v/photo/comment/list"
+
+
+async def fetch_comments(photo_id: str, count: int = 20) -> list[dict]:
+    """快手纯 HTTP 评论获取 — cookies + httpx，零浏览器。"""
+    sess = _load_session()
+    if not sess.is_valid():
+        logger.warning("快手评论: session 无效")
+        return []
+
+    params = {
+        "photo_id": photo_id,
+        "pcursor": "",
+        "count": str(min(count, 30)),
+    }
+
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "cookie": sess.cookies_str,
+        "referer": f"https://www.kuaishou.com/photo/{photo_id}",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    }
+
+    try:
+        from src.utils.http_client import create_httpx_client
+        async with create_httpx_client(15) as client:
+            resp = await client.get(COMMENT_URL, params=params, headers=headers)
+            body = resp.json()
+    except Exception as exc:
+        logger.warning(f"快手评论 HTTP 失败: {exc}")
+        return []
+
+    if body.get("result", -1) != 1:
+        return []
+
+    comments = body.get("rootCommentsV2") or body.get("comments") or []
+    results = []
+    for c in comments:
+        results.append({
+            "author": c.get("author_name", c.get("user_name", "")),
+            "content": c.get("content", c.get("text", "")),
+            "likes": c.get("likeCount", c.get("like_count", 0)),
+            "time": c.get("timestamp", c.get("time", 0)),
+        })
+    return results

@@ -243,8 +243,17 @@ async def kuaishou_detail(photo_id: str) -> str:
 
 
 async def kuaishou_comment(photo_id: str) -> str:
-    """爬取快手视频评论，需登入先有完整内容。回传 JSON 字串。"""
+    """快手评论 — 优先纯 HTTP，失败回退浏览器。"""
     logger.info(f"快手评论: photo_id={photo_id}")
+    try:
+        from src.utils.ks_http import fetch_comments
+        items = await fetch_comments(photo_id)
+        if items:
+            logger.info(f"快手评论 HTTP 完成: {len(items)} 条")
+            return json.dumps(items)
+    except Exception as e:
+        logger.debug(f"快手评论 HTTP 失败: {e}")
+
     page = await browser.new_page()
     try:
         await page.goto(f"https://www.kuaishou.com/photo/{photo_id}", wait_until="domcontentloaded")

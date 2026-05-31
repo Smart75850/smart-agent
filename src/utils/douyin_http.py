@@ -61,28 +61,47 @@ def _make_search_id() -> str:
     return f"{ts}{rand_hex}"
 
 
-def _build_headers(session: DouyinSession, keyword: str, search_id: str) -> dict:
+def _build_headers(sess: DouyinSession, keyword: str, search_id: str) -> dict:
     return {
         "accept": "application/json, text/plain, */*",
         "accept-language": "zh-CN,zh;q=0.9",
-        "cookie": session.to_cookie_header(),
+        "cookie": sess.to_cookie_header(),
         "referer": f"https://www.douyin.com/search/{quote(keyword)}",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
         "sec-ch-ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
-        "uifid": session.uifid,
+        "uifid": sess.uifid,
         "sec-fetch-site": "same-origin",
         "sec-fetch-mode": "cors",
         "sec-fetch-dest": "empty",
     }
 
 
+# ── Session 管理 ──────────────────────────────────────────
+_FILE = __import__('pathlib').Path(__file__).resolve().parent.parent.parent / "browser_data" / "douyin_http_session.json"
+
+def _load_file_session() -> DouyinSession:
+    if _FILE.exists():
+        try:
+            data = json.loads(_FILE.read_text("utf-8"))
+            return DouyinSession(ttwid=data.get("ttwid",""), sessionid=data.get("sessionid",""), uifid=data.get("uifid",""), odin_tt=data.get("odin_tt",""), passport_csrf_token=data.get("passport_csrf_token",""), cookies_str=data.get("cookies_str",""))
+        except: pass
+    return DouyinSession()
+
+def _get_best_session() -> DouyinSession:
+    fs = _load_file_session()
+    if fs.is_valid() and fs.sessionid: return fs
+    ss = session_store.session
+    if ss.is_valid(): return ss
+    return fs if fs.is_valid() else DouyinSession()
+
+
 async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
     """纯 HTTP 抖音搜索，返回视频列表。"""
-    session = session_store.session
-    if not session.is_valid():
-        logger.warning("会话上下文无效，请先运行收割脚本")
+    sess = _get_best_session()
+    if not sess.is_valid():
+        logger.warning("会话上下文无效，请先运行 harvest_persistent()")
         return []
 
     search_id = _make_search_id()
@@ -91,18 +110,12 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
     params["keyword"] = keyword
     params["count"] = str(min(count, 20))
     params["offset"] = str(offset)
-    params["uifid"] = session.uifid
+    params["uifid"] = sess.uifid
     params["search_id"] = search_id
 
-    # 本地生成 a_bogus 签名
-    try:
-        from src.utils.abogus import ABogus, DEFAULT_UA
-        ab = ABogus(user_agent=DEFAULT_UA)
-        params["a_bogus"] = ab.get_value(params, method="GET")
-    except Exception as e:
-        logger.debug(f"a_bogus 生成失败: {e}")
+    # 注意: 不添加 a_bogus！实测 a_bogus 会触发 verify_check
 
-    headers = _build_headers(session, keyword, search_id)
+    headers = _build_headers(sess, keyword, search_id)
 
     from src.utils.http_client import create_httpx_client
     async with create_httpx_client(15) as client:

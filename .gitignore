@@ -56,6 +56,13 @@ quick_test_*.py
 config/accounts.json
 !config/accounts.example.json
 
+# Debug temp files
+_cot_*.py
+_cot_*.txt
+_cq_*.py
+_debug*.py
+eval/traces/
+
 # Go
 smart-agent-go.exe
 go/sidecar.log

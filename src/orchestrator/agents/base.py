@@ -2,10 +2,14 @@
 
 import json
 import re
+from typing import TypeVar
 
 import httpx
+from pydantic import BaseModel
 
 from config.settings import settings
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class BaseAgent:
@@ -36,6 +40,38 @@ class BaseAgent:
             )
             data = resp.json()
             return data["choices"][0]["message"]["content"]
+
+    async def _call_llm_structured(self, prompt, output_model, temperature=0.3, max_tokens=4000):
+        schema = output_model.model_json_schema()
+        schema_str = json.dumps(schema, ensure_ascii=False)
+        full_prompt = f"{prompt}\n\n---\n输出必须严格符合以下 JSON Schema，只返回纯 JSON 对象：\n```json\n{schema_str}\n```"
+        content = await self._call_llm(full_prompt, temperature=temperature, json_mode=True, max_tokens=max_tokens)
+        parsed = self._parse_json(content)
+        return output_model.model_validate(parsed)
+
+    async def _call_llm_with_critic(self, prompt, output_model, agent_type, temperature=0.3, max_tokens=4000):
+        from src.orchestrator.agents.critic import CriticAgent, CRITIC_CONFIG
+        from src.orchestrator.agents.trace_collector import build_dynamic_fewshot, record_trace
+        dyn_fs = build_dynamic_fewshot(agent_type, min_score=80)
+        if dyn_fs: prompt = f"{prompt}\n\n{dyn_fs}"
+        if not CRITIC_CONFIG.get("enabled", True): return await self._call_llm_structured(prompt, output_model, temperature, max_tokens)
+        if agent_type not in CRITIC_CONFIG.get("agents", []): return await self._call_llm_structured(prompt, output_model, temperature, max_tokens)
+        critic = CriticAgent(agent_type)
+        feedback = ""
+        for attempt in range(CRITIC_CONFIG.get("max_retry", 2) + 1):
+            fb_prompt = f"## ⚠️ 上次输出质量问题（请务必修正）\n{feedback}\n\n---\n\n{prompt}" if feedback else prompt
+            output = await self._call_llm_structured(fb_prompt, output_model, temperature, max_tokens)
+            if attempt >= CRITIC_CONFIG.get("max_retry", 2): return output
+            output_dict = output.model_dump()
+            critic_result = await critic.review(output_dict, "", feedback)
+            if critic_result.passed:
+                try: record_trace(agent_type, {"score": critic_result.score}, output_dict, critic_result.score)
+                except: pass
+                return output
+            from src.utils.logger import logger
+            logger.info(f"Critic [{agent_type}] retry{attempt+1} score={critic_result.score}")
+            feedback = critic_result.feedback
+        return output
 
     @staticmethod
     def _parse_json(text: str) -> dict:

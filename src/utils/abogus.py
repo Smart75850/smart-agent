@@ -1,10 +1,28 @@
-"""抖音 a_bogus 签名 — Python 原生实现，基于 TikTokDownloader 同 gmssl SM3"""
+"""抖音 a_bogus 签名 — Python 原生实现，基于 TikTokDownloader 同 gmssl SM3。
+
+⚠️ 维护警告 (2026-05-29 实测):
+  a_bogus 签名本身功能正常，但在抖音搜索 API 中加入 a_bogus 参数
+  会触发 verify_check（反爬验证），反而导致空结果。
+
+  当前工作路径：httpx + sessionid + ttwid，不加 a_bogus。
+  详见 src/utils/douyin_http.py 的 search() 函数。
+
+  如果日后抖音变更策略，需要重新启用 a_bogus，只需：
+  1. 在 douyin_http.py 的 search() 中取消注释 a_bogus 生成代码
+  2. 确认 gmssl 已安装（pip install gmssl）
+  3. 用真实 sessionid+ttwid 测试是否触发 verify_check
+"""
+
 from random import choice, randint, random
 from re import compile
 from time import time
 from urllib.parse import quote, urlencode
 
-from gmssl import func, sm3
+try:
+    from gmssl import func, sm3
+except ImportError:
+    func = None
+    sm3 = None
 
 DEFAULT_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

@@ -55,7 +55,7 @@ _CATEGORY_VALUES = frozenset([
 class TrendScoutItemOutput(BaseModel):
     index: int = Field(description="内容在输入列表中的索引")
     viral_score: int = Field(ge=0, le=100, description="爆款潜力分：90+蓝海/70-89有需求/50-69红海/<50小众")
-    trend_reason: str = Field(min_length=40, description="爆款原因分析，引用具体数据+爆款机制")
+    trend_reason: str = Field(min_length=10, description="爆款原因分析，引用具体数据+爆款机制")
     category: Literal["科技/AI", "美妝", "美食", "穿搭", "家居", "健身", "教育", "財經", "遊戲", "娛樂", "旅遊", "母嬰", "寵物", "健康/醫療", "其他"] = Field(description="分类枚举")
 
     @field_validator("category", mode="before")

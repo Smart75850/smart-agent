@@ -76,6 +76,11 @@ def _build_cookie_str(cookies: list[dict]) -> str:
 async def _douyin_search_http(keyword: str, count: int = 40) -> str:
     """SignSrv 直连模式：httpx + a_bogus 签名，不用浏览器。
 
+    ⚠️ 维护警告 (2026-05-29):
+      a_bogus 签名在抖音搜索 API 中会触发 verify_check，导致空结果。
+      当前首选路径已改为 sessionid+ttwid 纯直连（见 douyin_http.py），
+      此 SignSrv 路径作为历史备份保留，勿作为首选。
+
     需要 CookieBridge 同步过的 Cookies（browser_data/douyin_cookies.json）。
     若无 Cookies，自动回退到 CDP 浏览器模式。
     """
@@ -450,7 +455,7 @@ async def douyin_detail(video_id: str) -> str:
 
 
 async def douyin_comment(video_id: str, count: int = 50) -> str:
-    """抖音视频评论 — 拦截 + 主动翻页 comment API。"""
+    """抖音视频评论 — 浏览器提取。"""
     logger.info(f"抖音評論: video_id={video_id} count={count}")
     try:
         page = await browser.new_page()

@@ -290,6 +290,72 @@ async def search_all(keyword: str, limit: int = 40) -> list[dict]:
     return all_results[:limit]
 
 
+# ── bvid ↔ aid 转换 ────────────────────────────────────────
+_BVID_TABLE = "fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF"
+_BVID_MAP = {c: i for i, c in enumerate(_BVID_TABLE)}
+_BVID_XOR = 177451812
+_BVID_ADD = 8728348608
+_BVID_S = [11, 10, 3, 8, 4, 6]  # 取 BV 号中这 6 个位置
+
+
+def bvid_to_aid(bvid: str) -> int:
+    """将 B站 BV 号转换为 AV 号（纯数学运算，零 API 调用）。"""
+    if bvid.startswith("BV") and len(bvid) >= 12:
+        result = 0
+        for i, s in enumerate(_BVID_S):
+            c = bvid[s]  # s 是对完整 BV 字符串的索引（含 "BV" 前缀）
+            if c in _BVID_MAP:
+                result += _BVID_MAP[c] * (58 ** i)
+        return (result - _BVID_ADD) ^ _BVID_XOR
+    return 0
+
+
+async def fetch_comments(oid: int = 0, bvid: str = "", count: int = 20, page: int = 1) -> list[dict]:
+    """B站纯 HTTP 评论获取 — Wbi 签名 + curl_cffi，零浏览器。
+
+    Args:
+        oid: 视频 aid 号
+        bvid: 视频 BV 号（oid=0 时自动转换）
+        count: 每页数量
+        page: 页码
+
+    Returns:
+        评论列表 [{"author": ..., "content": ..., "likes": ..., "time": ...}, ...]
+    """
+    if oid == 0 and bvid:
+        oid = bvid_to_aid(bvid)
+    if oid == 0:
+        logger.warning("[bilibili-http] fetch_comments: oid=0，需要提供 aid 或 bvid")
+        return []
+
+    params = {
+        "oid": str(oid),
+        "type": "1",
+        "mode": "3",
+        "ps": str(min(count, 20)),
+        "pn": str(page),
+    }
+    data = await _wbi_get(
+        "https://api.bilibili.com/x/v2/reply/wbi/main",
+        params,
+        f"https://www.bilibili.com/video/av{oid}",
+    )
+    if not data:
+        return []
+
+    results = []
+    for reply in (data.get("replies") or []):
+        results.append({
+            "author": (reply.get("member") or {}).get("uname", ""),
+            "content": reply.get("content", {}).get("message", "") if isinstance(reply.get("content"), dict) else str(reply.get("content", "")),
+            "likes": reply.get("like", 0),
+            "time": reply.get("ctime", 0),
+            "mid": str((reply.get("member") or {}).get("mid", "")),
+            "rpid": str(reply.get("rpid", "")),
+        })
+    return results
+
+
 async def get_video_url(bvid: str) -> str:
     """纯 HTTP 获取 B站视频 CDN 下载地址（无需浏览器）。
 
