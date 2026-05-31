@@ -96,6 +96,25 @@ CRITERIA: dict[str, dict] = {
         "pass_threshold": 70,
         "max_retry": 2,
     },
+    "content_remixer_analyze": {
+        "checks": [
+            "competition_level 判断是否有数据支撑（非模糊「中」）",
+            "entry_barrier 描述是否具体（>=30字，含资金/技术/资源量化）",
+            "recommended_angles 是否具体可执行（>=40字，含目标人群+差异化+执行路径）",
+            "recommendations 是否 actionable（含优先级+资源需求）",
+        ],
+        "pass_threshold": 65,
+        "max_retry": 1,
+    },
+    "content_remixer_rewrite": {
+        "checks": [
+            "改寫是否体现平台差异（非仅加emoji）",
+            "changes_summary 是否含语言/节奏/信息密度/情绪四个维度",
+            "rewritten 内容长度是否合理（>=30字）",
+        ],
+        "pass_threshold": 65,
+        "max_retry": 1,
+    },
     "pic_tactic": {
         "checks": [
             "prompt 是否为英文（Midjourney/SD 兼容）",
@@ -338,7 +357,8 @@ class CriticAgent(BaseAgent):
 CRITIC_CONFIG = {
     "enabled": True,
     "agents": ["trend_scout", "video_analyst", "product_miner",
-               "sentiment_reader", "copy_writer", "content_remixer", "pic_tactic"],
+               "sentiment_reader", "copy_writer", "content_remixer_analyze",
+               "content_remixer_rewrite", "pic_tactic"],
     "max_retry": 2,
     "critic_model": "deepseek-chat",
 }
