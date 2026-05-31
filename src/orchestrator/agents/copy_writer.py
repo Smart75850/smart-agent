@@ -24,7 +24,7 @@ from src.utils.logger import logger
 
 class CopyVariantOutput(BaseModel):
     variant: Literal["headline", "short", "medium", "long"] = Field(description="变体类型")
-    text: str = Field(min_length=15, description="完整文案")
+    text: str = Field(min_length=8, description="完整文案")
     tone: str = Field(min_length=4, description="语气风格")
     target_platform: Literal["douyin", "xiaohongshu", "bilibili", "zhihu", "kuaishou"] = Field(description="目标平台")
     hook: str = Field(min_length=6, description="具体钩子手法，15字以上，如'时间锚定+价格反差'")
