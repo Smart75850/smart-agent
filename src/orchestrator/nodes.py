@@ -240,7 +240,14 @@ async def account_deep_analyze(state: PipelineState) -> dict[str, Any]:
 
 
 async def comment_harvest(state: PipelineState) -> dict[str, Any]:
-    """评论收割：对搜索结果每个平台取 Top3 视频拉评论（HTTP 优先，浏览器兜底）。"""
+    """评论收割：优先 HTTP 直连平台（B站/知乎/快手），对搜索结果 Top5 拉评论。
+
+    策略：
+      - B站/知乎/快手用纯 HTTP 评论 API（不需浏览器，快速）
+      - 抖音评论需要浏览器 → 检查 CDP 可用才尝试
+      - 微博/贴吧评论 API 不稳定 → 跳过
+      - 小红书需登录 → 跳过
+    """
     items = state.get("merged_items", [])
     platforms = state.get("platforms", [])
 
@@ -248,35 +255,141 @@ async def comment_harvest(state: PipelineState) -> dict[str, Any]:
         logger.info("comment_harvest: 无内容")
         return {"harvested_comments": {}}
 
-    all_comments: dict[str, list[dict]] = {}  # platform_id → comments
+    # 平台评论 API 分级
+    HTTP_PLATFORMS = {"bilibili", "zhihu", "kuaishou"}     # 纯 HTTP，优先
+    CDP_PLATFORMS = {"douyin"}                               # 需浏览器
+    SKIP_PLATFORMS = {"weibo", "tieba", "xiaohongshu"}      # API不稳定/需登录
+
+    all_comments: dict[str, list[dict]] = {}
+
     for platform in platforms:
+        if platform in SKIP_PLATFORMS:
+            logger.debug(f"comment_harvest: 跳过 {platform}（API不稳定/需登录）")
+            continue
+
         plat_items = [it for it in items if it.get("platform") == platform]
         if not plat_items:
             continue
-        try:
-            adapter = _get_adapter(platform)
-        except Exception:
+
+        # 只取有有效 ID 的内容
+        valid_items = []
+        for item in plat_items:
+            item_id = (item.get("bvid") or item.get("aweme_id") or item.get("photo_id")
+                       or item.get("note_id") or item.get("platform_id") or "")
+            if item_id:
+                valid_items.append((item_id, item))
+        if not valid_items:
+            logger.debug(f"comment_harvest: {platform} 无有效ID，跳过")
             continue
 
-        for item in plat_items[:3]:
-            item_id = (item.get("bvid") or item.get("aweme_id") or item.get("photo_id")
-                       or item.get("note_id") or item.get("weibo_id") or item.get("tid")
-                       or item.get("platform_id", ""))
-            if not item_id or item_id in all_comments:
+        logger.info(f"comment_harvest [{platform}]: 候选 {len(valid_items)} 个内容")
+
+        if platform in HTTP_PLATFORMS:
+            await _harvest_http(platform, valid_items[:5], all_comments)
+        elif platform in CDP_PLATFORMS:
+            await _harvest_cdp(platform, valid_items[:3], all_comments)
+        else:
+            try:
+                adapter = _get_adapter(platform)
+                for item_id, item in valid_items[:3]:
+                    if item_id in all_comments:
+                        continue
+                    try:
+                        comments = await adapter.comment(str(item_id), limit=10)
+                        if comments:
+                            for c in (comments if isinstance(comments, list) else []):
+                                c["source_title"] = item.get("title", "")
+                                c["source_author"] = item.get("author", "")
+                            all_comments[item_id] = comments
+                    except Exception as e:
+                        logger.debug(f"comment_harvest [{platform}] {item_id}: {e}")
+            except Exception:
+                continue
+
+    total = sum(len(v) for v in all_comments.values())
+    logger.info(f"comment_harvest: {total} 条评论 ({len(all_comments)} 个内容)")
+    return {"harvested_comments": all_comments}
+
+
+async def _harvest_http(platform: str, valid_items: list, all_comments: dict):
+    """HTTP 直连评论收割 — 使用各平台 HTTP 客户端。"""
+    if platform == "bilibili":
+        from src.utils.bilibili_http import fetch_comments as bili_comments
+        for item_id, item in valid_items:
+            if item_id in all_comments:
                 continue
             try:
-                comments = await adapter.comment(str(item_id), limit=10)
-                for c in (comments if isinstance(comments, list) else []):
+                comments = await bili_comments(bvid=item_id, count=20)
+                for c in comments:
                     c["source_title"] = item.get("title", "")
                     c["source_author"] = item.get("author", "")
                 if comments:
                     all_comments[item_id] = comments
+                    logger.info(f"  B站 {item_id}: {len(comments)} 条评论")
             except Exception as e:
-                logger.debug(f"comment_harvest [{platform}] {item_id}: {e}")
+                logger.debug(f"  B站 {item_id} 评论失败: {e}")
 
-    total = sum(len(v) for v in all_comments.values())
-    logger.info(f"comment_harvest: {total} 条评论 ({len(all_comments)} 个内容, {len(platforms)} 平台)")
-    return {"harvested_comments": all_comments}
+    elif platform == "kuaishou":
+        from src.utils.ks_http import fetch_comments as ks_comments
+        for item_id, item in valid_items:
+            if item_id in all_comments:
+                continue
+            try:
+                comments = await ks_comments(photo_id=item_id, count=20)
+                for c in comments:
+                    c["source_title"] = item.get("title", "")
+                    c["source_author"] = item.get("author", "")
+                if comments:
+                    all_comments[item_id] = comments
+                    logger.info(f"  快手 {item_id}: {len(comments)} 条评论")
+            except Exception as e:
+                logger.debug(f"  快手 {item_id} 评论失败: {e}")
+
+    elif platform == "zhihu":
+        try:
+            adapter = _get_adapter("zhihu")
+            for item_id, item in valid_items:
+                if item_id in all_comments:
+                    continue
+                try:
+                    comments = await adapter.comment(str(item_id), limit=10)
+                    if comments and isinstance(comments, list):
+                        for c in comments:
+                            c["source_title"] = item.get("title", "")
+                            c["source_author"] = item.get("author", "")
+                        all_comments[item_id] = comments
+                        logger.info(f"  知乎 {item_id}: {len(comments)} 条评论")
+                except Exception as e:
+                    logger.debug(f"  知乎 {item_id} 评论失败: {e}")
+        except Exception:
+            pass
+
+
+async def _harvest_cdp(platform: str, valid_items: list, all_comments: dict):
+    """CDP 浏览器评论收割 — 检查浏览器可用性后尝试。"""
+    if platform == "douyin":
+        try:
+            from src.utils.browser_service import BrowserService
+            bs = BrowserService()
+            if not bs.is_running:
+                logger.debug("comment_harvest: 浏览器未启动，跳过抖音评论")
+                return
+            adapter = _get_adapter("douyin")
+            for item_id, item in valid_items:
+                if item_id in all_comments:
+                    continue
+                try:
+                    comments = await adapter.comment(str(item_id), limit=10)
+                    if comments and isinstance(comments, list):
+                        for c in comments:
+                            c["source_title"] = item.get("title", "")
+                            c["source_author"] = item.get("author", "")
+                        all_comments[item_id] = comments
+                        logger.info(f"  抖音 {item_id}: {len(comments)} 条评论")
+                except Exception as e:
+                    logger.debug(f"  抖音 {item_id} 评论失败: {e}")
+        except Exception:
+            pass
 
 
 async def merge_results(state: PipelineState) -> dict[str, Any]:
