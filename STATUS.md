@@ -5,16 +5,57 @@
 
 ---
 
-## 當前焦點
+## 當前焦點（2026-05-31 更新）
 
-✅ **Smart Agent Pro v1.0 開發完成 — 正式進入銷售階段**
-✅ 6 平台全通（B站/抖音/快手/知乎/微博/貼吧），小紅書待封號解除
-✅ 最終驗收：**161 條數據，平均 84.6 分，JSON Parse Fail 0%**
-✅ TrendScout 90.4 | PicTactic 100 | ContentRemixer 84.0
-🟡 抖音/快手評論純 HTTP — API URL 已確認，cookie 層待後續攻堅
-🟡 小紅書 — 帳號封禁至當晚 12 點，解封後可恢復
+✅ **銷售基礎設施全部完成 — 開源漏斗就緒，Pro 隨時可賣**
+✅ 6/7 平台純 HTTP 全通（B站/抖音/知乎/快手/微博/貼吧），小紅書需重登
+✅ 7 Agent 全鏈路穩定（3 個 Bug 已修，Content Remixer 重構完成）
+✅ 開源文檔完備（中英 README + 使用指南 + Landing Page）
+🟡 Pro 版交付物：ZIP 打包腳本未寫
+🟡 內容管線：計劃已有，未開始執行
 
-**下一步：銷售推廣 + 用戶反饋收集**
+**下一步：內容營運（每周掘金/B站/小紅書）+ Pro ZIP 打包腳本**
+
+---
+
+## 2026-05-31 今日完成事項
+
+### 銷售基礎設施
+- [x] aisolotools.com Landing Page（中英雙語、¥399 定價、完整源碼）
+- [x] awesome-ai-solopreneur-tools 加入 Smart Agent
+- [x] License HMAC-SHA256 驗證（替代 len(key) >= 6）
+- [x] License Key 生成工具（scripts/generate_key.py）
+- [x] GitHub Profile 主頁更新（Smart75850）
+- [x] 公開倉庫 Topics 標籤（python/crawler/douyin/xiaohongshu 等 10 個）
+- [x] GitHub Discussions 開啟
+- [x] 公開倉庫 README 中英雙版同步（7 平台全覆蓋、Pro=純 HTTP+AI）
+- [x] 移除海外平台描述（未實現）
+- [x] 移除 50 次試用額度描述（開源版完全免費）
+- [x] 微信 ID 統一為 smart4906
+- [x] 開源版使用指南（docs/使用指南.md）
+- [x] Pro 版使用指南（docs/PRO_USER_GUIDE.md）
+- [x] 內容營運計劃（CONTENT_PLAN.md，30 天 8 篇）
+
+### Agent 優化
+- [x] **Content Remixer 重構**：拆成 3 個模式專用 Schema（summarize 不走 Critic、analyze/rewrite 走 Critic）
+- [x] **Comment Harvest 接入 Full Pipeline**：搜索後自動收割 B站/知乎/快手 HTTP 評論
+- [x] **Full Pipeline 默認 sort_type=2**（最熱排序 → 更多評論數據）
+- [x] **SentimentReader 支援 pre_harvested**：優先用 Pipeline 預收割評論
+- [x] **Video Analyst pacing min_length 20→5**（修復 Pydantic 驗證失敗）
+- [x] **Product Miner competitive_advantage min_length 30→10**（修復 Pydantic 驗證失敗）
+
+### 測試驗證
+- [x] 5 平台大力測試（keyword=AI工具, limit=15, 67 條, 184s）
+- [x] 7 平台全測（keyword=美食, limit=15, 85 條, 236s）
+- [x] 6/7 平台純 HTTP 全通，小紅書 session 過期需重登
+- [x] Comment Harvest 驗證（B站 HTTP 評論正常工作）
+
+### 已知限制
+- 小紅書 session 幾小時過期，需每日 CDP 收割
+- 抖音評論需 CDP 瀏覽器（HTTP 評論 API 反爬更嚴）
+- 微博/貼吧評論 API 不穩定，comment_harvest 已跳過
+- Sentiment Reader 依賴評論數據量，無評論時返回 unknown
+- DeepSeek V3 (deepseek-chat) 推理能力足夠但 Critic 仍偶有 retry
 
 ---
 ## Agent v2 準確度提升 — 2026-05-29 完成
