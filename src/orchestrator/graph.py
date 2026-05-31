@@ -105,7 +105,7 @@ def _route_after_merge(state: PipelineState) -> str:
     if mode == "sentiment":
         return "comment_harvest"
     if mode == "full":
-        return "trend_scout"
+        return "comment_harvest"
     return _route_simple(state)
 
 
@@ -177,9 +177,18 @@ def build_graph() -> StateGraph:
             "format_output": "format_output",
         },
     )
+    def _route_after_harvest(state: PipelineState) -> str:
+        """comment_harvest 后的路由：full模式继续Agent链，其他模式直接输出。"""
+        if state.get("pipeline_mode") == "full":
+            return "trend_scout"
+        return "format_output"
+
     builder.add_edge("account_deep_analyze", "format_output")
     builder.add_edge("download_selected", "format_output")
-    builder.add_edge("comment_harvest", "format_output")
+    builder.add_conditional_edges(
+        "comment_harvest", _route_after_harvest,
+        {"trend_scout": "trend_scout", "format_output": "format_output"},
+    )
 
     # Phase 2: 两阶段并行 Agent 链
     # Stage 1: trend_scout → fanout (product_miner | video_analyst | sentiment_reader)

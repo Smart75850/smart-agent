@@ -240,34 +240,43 @@ async def account_deep_analyze(state: PipelineState) -> dict[str, Any]:
 
 
 async def comment_harvest(state: PipelineState) -> dict[str, Any]:
-    """舆情采集：对搜索结果 Top5 视频拉评论。"""
+    """评论收割：对搜索结果每个平台取 Top3 视频拉评论（HTTP 优先，浏览器兜底）。"""
     items = state.get("merged_items", [])
-    platform = state.get("platforms", ["bilibili"])[0] if state.get("platforms") else "bilibili"
-    limit = state.get("limit", 30)
+    platforms = state.get("platforms", [])
 
     if not items:
         logger.info("comment_harvest: 无内容")
-        return {"comment_data": []}
+        return {"harvested_comments": {}}
 
-    adapter = _get_adapter(platform)
-    all_comments = []
-    for item in items[:5]:
-        item_id = (item.get("bvid") or item.get("aweme_id") or item.get("photo_id")
-                   or item.get("note_id") or item.get("weibo_id") or item.get("tid")
-                   or item.get("platform_id", ""))
-        if not item_id:
+    all_comments: dict[str, list[dict]] = {}  # platform_id → comments
+    for platform in platforms:
+        plat_items = [it for it in items if it.get("platform") == platform]
+        if not plat_items:
             continue
         try:
-            comments = await adapter.comment(str(item_id), limit=min(limit, 20))
-            for c in comments:
-                c["source_title"] = item.get("title", "")
-                c["source_author"] = item.get("author", "")
-            all_comments.extend(comments)
-        except Exception as e:
-            logger.debug(f"comment_harvest {item_id}: {e}")
+            adapter = _get_adapter(platform)
+        except Exception:
+            continue
 
-    logger.info(f"comment_harvest: {len(all_comments)} 条评论")
-    return {"comment_data": all_comments}
+        for item in plat_items[:3]:
+            item_id = (item.get("bvid") or item.get("aweme_id") or item.get("photo_id")
+                       or item.get("note_id") or item.get("weibo_id") or item.get("tid")
+                       or item.get("platform_id", ""))
+            if not item_id or item_id in all_comments:
+                continue
+            try:
+                comments = await adapter.comment(str(item_id), limit=10)
+                for c in (comments if isinstance(comments, list) else []):
+                    c["source_title"] = item.get("title", "")
+                    c["source_author"] = item.get("author", "")
+                if comments:
+                    all_comments[item_id] = comments
+            except Exception as e:
+                logger.debug(f"comment_harvest [{platform}] {item_id}: {e}")
+
+    total = sum(len(v) for v in all_comments.values())
+    logger.info(f"comment_harvest: {total} 条评论 ({len(all_comments)} 个内容, {len(platforms)} 平台)")
+    return {"harvested_comments": all_comments}
 
 
 async def merge_results(state: PipelineState) -> dict[str, Any]:

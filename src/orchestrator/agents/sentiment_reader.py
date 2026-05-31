@@ -66,20 +66,28 @@ class SentimentReport:
 class SentimentReader(BaseAgent):
     """評論情緒分析 Agent。"""
 
-    async def run(self, items: list, platform: str = "", fetch_comments: bool = True) -> SentimentReport:
+    async def run(self, items: list, platform: str = "", fetch_comments: bool = True,
+                  pre_harvested: dict = None) -> SentimentReport:
         """主入口。
 
         Args:
             items: 內容列表 (dict with title/platform_id)
             platform: 平台名
             fetch_comments: 是否拉取真實評論 (需 CDP browser)
+            pre_harvested: Pipeline 预收割的评论 {platform_id: [comments]}
         """
         if not items:
             return SentimentReport(platform=platform, total_analyzed=0)
 
-        # 嘗試拉取評論
+        # 优先用预收割评论，其次自行拉取
         comments_data = {}
-        if fetch_comments:
+        if pre_harvested:
+            for item in items:
+                item_id = (item.get("platform_id") or item.get("bvid")
+                           or item.get("aweme_id") or item.get("note_id") or "")
+                if item_id and item_id in pre_harvested:
+                    comments_data[item_id] = pre_harvested[item_id]
+        elif fetch_comments:
             comments_data = await self._fetch_comments(items, platform)
 
         if not self._api_key:
@@ -89,6 +97,7 @@ class SentimentReader(BaseAgent):
 
     async def as_node(self, state: dict) -> dict:
         trend_reports = state.get("trend_reports", {})
+        harvested = state.get("harvested_comments", {})
         all_sentiments = []
         summaries = []
 
@@ -96,7 +105,12 @@ class SentimentReader(BaseAgent):
             items = report_dict.get("items", [])
             if items:
                 raw_items = [it.get("raw", {}) for it in items if isinstance(it, dict)]
-                report = await self.run(items=raw_items[:5], platform=p, fetch_comments=True)
+                # 用 Pipeline 预收割的评论（key=platform_id），直接传入不重复拉取
+                report = await self.run(
+                    items=raw_items[:5], platform=p,
+                    fetch_comments=False,
+                    pre_harvested=harvested,
+                )
                 all_sentiments.extend(report.items)
                 if report.summary:
                     summaries.append(report.summary)

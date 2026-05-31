@@ -22,7 +22,8 @@ class PipelineState(TypedDict, total=False):
     include_raw: bool            # 是否在输出中保留原始API字段
     search_results: Annotated[dict, _merge_dicts]   # {platform: [原始items]}
     download_results: list[str]   # 下载成功的文件路径列表
-    comment_data: list[dict]      # 舆情采集的评论列表
+    comment_data: list[dict]      # 舆情采集的评论列表 (sentiment模式)
+    harvested_comments: dict      # full模式预收割: {platform_id: [comments]}
     merged_items: list[dict]      # 归一化 + L1去重后
     filtered_items: list[dict]    # LLM过滤后 (仅 llm_filter=True)
     scored_items: list[dict]      # LLM打分排序后 (仅 llm_filter=True)
