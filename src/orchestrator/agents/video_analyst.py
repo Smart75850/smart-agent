@@ -26,7 +26,7 @@ class VideoBreakdownOutput(BaseModel):
     index: int = Field(description="内容在输入列表中的索引")
     hook_type: Literal["數字衝擊", "疑問懸念", "情感共鳴", "反直覺", "權威背書", "前後對比", "教程實用", "故事敍事", "無法判斷"] = Field(description="钩子类型")
     hook_effectiveness: int = Field(ge=0, le=100, description="钩子效果评分")
-    pacing: str = Field(min_length=20, description="节奏分析，含节奏变化点")
+    pacing: str = Field(min_length=5, description="节奏分析，含节奏变化点")
     structure_template: str = Field(description="结构模板，含阶段数命名+各阶段说明")
     conversion_point: str = Field(description="转化点，具体位置+转化动作")
     viral_mechanism: str = Field(default="", description="爆款机制，40字以上，解释为什么这个结构能传播")
