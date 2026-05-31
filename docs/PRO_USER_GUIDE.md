@@ -2,212 +2,216 @@
 
 ## 目录
 
-1. [功能介绍](#功能介绍)
-2. [安装部署](#安装部署)
+1. [安装部署](#安装部署)
+2. [每日起步（2 分鐘）](#每日起步)
 3. [WebUI 使用](#webui-使用)
 4. [CLI 命令行](#cli-命令行)
-5. [AI 分析详解](#ai-分析详解)
-6. [配置说明](#配置说明)
-7. [常见问题](#常见问题)
-
----
-
-## 功能介绍
-
-Smart Agent Pro 集成三大核心能力：
-
-### 🔐 数据采集引擎
-
-| 平台 | 搜索 | 热榜 | 详情 | 评论 | 用户 |
-|------|:---:|:---:|:---:|:---:|:---:|
-| B站 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 抖音 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 小红书 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 知乎 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 快手 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 微博 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 贴吧 | ✅ | ✅ | ✅ | ✅ | ✅ |
-
-### 🤖 AI 智能分析（7 个 Agent）
-
-| Agent | 功能 | 输出 |
-|------|------|------|
-| 🔥 爆款识别 | 自动识别高传播潜力内容 | 爆款评分 + 流行原因 |
-| 📦 选品分析 | 挖掘可带货商品 | 变现潜力 + 竞争优势 |
-| 🎬 视频拆解 | 拆解视频结构与钩子 | 结构模板 + 转化点 |
-| 💬 评论情绪 | 分析评论正负面情绪 | 情绪占比 + 受众反应 |
-| ✍️ 营销文案 | 生成多平台营销文案 | 标题/正文/CTA |
-| 🔄 内容改写 | 跨平台内容适配 | 改写文案 + 赛道分析 |
-| 🖼️ 配图策略 | AI 生成封面设计策略 | 风格/配色/绘画提示词 |
-
-### ⚡ 高性能引擎
-
-- **Go 高性能版**：6.7MB 单文件，零依赖
-- **Docker 一键部署**：一行命令启动
-- **纯 HTTP 采集**：无需浏览器，毫秒级响应
+5. [AI 全流程分析](#ai-全流程分析)
+6. [评论采集](#评论采集)
+7. [配置说明](#配置说明)
+8. [常见问题](#常见问题)
 
 ---
 
 ## 安装部署
 
-### Docker（推荐）
+### 方式一：Docker（推荐）
 
 ```bash
-# 1. 解压项目文件
-unzip smart-agent-pro.zip
-cd smart-agent-pro
-
-# 2. 配置 DeepSeek API Key
-cp .env.example .env
-# 编辑 .env，填入你的 DEEPSEEK_API_KEY
-
-# 3. 启动
 docker compose up -d
-
-# 4. 访问
-# WebUI: http://localhost:8000
-# API文档: http://localhost:8000/docs
+# 打开 http://localhost:8000
 ```
 
-### 更新
+### 方式二：Windows 一键部署
+
+双击 `deploy.bat`，自动安装依赖并启动 WebUI。
+
+### 方式三：手动安装
 
 ```bash
-docker compose pull
-docker compose up -d
+pip install -r requirements.txt
+playwright install chromium
+python -m api.main
+# 打开 http://localhost:8000
 ```
+
+---
+
+## 每日起步（2 分鐘）
+
+Pro 版嘅纯 HTTP 直连需要从浏览器收割一次会话。**每日做一次**，之后全日唔使再开浏览器。
+
+### Step 1：启动 CDP Chrome
+
+```bash
+# Windows：双击 scripts\start_cdp_chrome.ps1
+# 或手动：
+chrome --remote-debugging-port=9222
+```
+
+### Step 2：登录平台
+
+喺呢个 Chrome 视窗手动登录：
+- 抖音：扫码登录
+- 小红书：扫码登录
+- 其他平台：如需要也可以登录（非必须）
+
+### Step 3：收割会话
+
+```bash
+python -c "import asyncio; from src.utils.session_manager import harvest_all; asyncio.run(harvest_all())"
+```
+
+输出显示全部 OK 即完成。可以关 Chrome，之后全日纯 HTTP 直连。
+
+> **提示**：WebUI 启动时会自动开启会话守护（15 分钟巡检），如果 Chrome 一直开着，会话过期会自动重新收割。
 
 ---
 
 ## WebUI 使用
 
-### 多平台采集
+启动后打开 `http://localhost:8000`。
 
-1. 选择目标平台（可多选）
-2. 选择操作类型：搜索 / 热榜 / 详情 / 评论 / 用户
+### 单平台采集
+
+1. 左侧导航 → 「多平台采集」
+2. 选择平台（可多选）
 3. 输入关键词
 4. 点击「开始采集」
-5. 结果导出：JSON / CSV
+5. 下载结果（JSON/CSV）
 
 ### 全流程 AI 分析
 
-1. 切换到「全流程分析」标签
-2. 选择分析模式：关键词分析 / 对标账号 / 舆情分析
-3. 输入分析关键词（如「AI绘画」「蓝牙耳机」）
-4. 选择分析深度：深度分析 / 快速搜索
+1. 左侧导航 → 「全流程分析」
+2. 输入关键词
+3. 选择平台
+4. 选择分析 Agent（默认全选）
 5. 点击「开始分析」
-6. 等待 30-90 秒，查看 AI 分析报告
-
-### 结果操作
-
-- **点击行**：查看详情弹窗
-- **筛选栏**：按关键词/平台过滤
-- **列排序**：点击表头排序
-- **分页**：每页 50 条，底部翻页
+6. 等待 Agent 链完成，查看报告
 
 ---
 
 ## CLI 命令行
 
+### 单平台搜索
+
 ```bash
-# 进入容器
-docker exec -it smart-agent bash
+# 纯 HTTP 直连（Pro 版全部 7 平台支持）
+python main.py --platform douyin --keyword AI工具         # 抖音
+python main.py --platform xiaohongshu --keyword 穿搭       # 小红书
+python main.py --platform bilibili --keyword Python        # B站
+python main.py --platform all --keyword 美食               # 全平台
+```
 
-# 单平台搜索
-python main.py --platform bilibili --keyword "AI绘画" --limit 20
+### 全流程 AI 分析
 
-# 全平台搜索
-python main.py --platform all --keyword "美食"
+```bash
+# 一键搜索 + 7 Agent 全链路分析
+python main.py --keyword AI工具 --pipeline full --platform bilibili,douyin,zhihu
 
-# 热榜
-python main.py --platform zhihu --type hot
+# 只做舆情分析（搜索 + 评论采集）
+python main.py --keyword 美食 --pipeline sentiment --platform bilibili
+```
 
-# 全流程 AI 分析
-python main.py --platform bilibili --keyword "AI绘画" --pipeline full
+### 断点续爬
 
-# 导出 CSV
-STORE_BACKEND=csv python main.py --platform bilibili --keyword "Python"
+```bash
+# 中断后自动续传
+python main.py --platform bilibili --keyword AI --limit 200 --resume
 ```
 
 ---
 
-## AI 分析详解
+## AI 全流程分析
 
-### 工作流程
+`--pipeline full` 会依次执行 7 个 AI Agent：
 
 ```
-输入关键词 → 7平台并发搜索 → 结果合并去重
-    ↓
-趋势分析 → 选品/视频/情绪并行分析 → 文案/改写/配图并行生成
-    ↓
-结构化报告输出
+搜索（5 平台并发）
+  → 评论收割（每平台 Top5）
+  → Trend Scout（爆款识别）
+  → Product Miner（选品分析）∥ Video Analyst（视频拆解）∥ Sentiment Reader（评论情绪）
+  → Copy Writer（营销文案）∥ Content Remixer（内容改写）∥ Pic Tactic（配图策略）
+  → 输出完整报告
 ```
 
-### 费用说明
+### 7 个 Agent 说明
 
-AI 分析使用 DeepSeek API，由用户自行申请：
+| Agent | 做什么 | 输出 |
+|------|------|------|
+| Trend Scout | 识别爆款潜力内容 | 爆款评分 + 趋势分析 |
+| Product Miner | 挖掘可带货商品 | 商品列表 + 变现潜力 |
+| Video Analyst | 拆解视频结构 | 钩子类型 + 结构模板 |
+| Sentiment Reader | 分析评论情绪 | 情绪分布 + 购买信号 |
+| Copy Writer | 生成营销文案 | 多平台多版本文案 |
+| Content Remixer | 赛道分析/内容改写 | 竞争格局 + 切入建议 |
+| Pic Tactic | 封面配图策略 | AI 绘画提示词 + 构图 |
 
-- 每次完整分析（7 Agent）：约 ¥0.01-0.05
-- 充值 ¥10 可用数百次
-- 申请地址：https://platform.deepseek.com
+### 无 API Key 降级模式
+
+未配置 DeepSeek API Key 时，Agent 会自动降级为模板模式（纯热度排序+模板输出），仍可正常使用。
+
+---
+
+## 评论采集
+
+Pro 版支持纯 HTTP 评论采集（无需浏览器）：
+
+| 平台 | 评论采集 | 方式 |
+|------|:--:|------|
+| B站 | ✅ | HTTP 直连（Wbi 签名） |
+| 知乎 | ✅ | HTTP 直连 |
+| 快手 | ✅ | HTTP 直连 |
+| 抖音 | ⚠️ | 需 CDP 浏览器 |
+| 小红书 | ⚠️ | 需登录 |
+| 微博 | ⚠️ | API 不稳定 |
+| 贴吧 | ⚠️ | API 不稳定 |
 
 ---
 
 ## 配置说明
 
-### .env 文件
+编辑 `.env` 文件：
 
-| 变量 | 必填 | 说明 |
-|------|:--:|------|
-| `DEEPSEEK_API_KEY` | ✅ | AI 分析必须 |
-| `PROXY_URL` | ❌ | 代理 IP（大规模采集建议） |
-| `STORE_BACKEND` | ❌ | 输出格式：csv/json/excel |
-| `BROWSER_ENGINE` | ❌ | playwright / cdp / camoufox |
+```bash
+# DeepSeek API（可选，不配置则用降级模式）
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_MODEL=deepseek-chat       # 或 deepseek-reasoner
 
-### 端口
+# 浏览器引擎（auto = 优先 CDP，无则 Playwright）
+BROWSER_ENGINE=auto
 
-| 服务 | 端口 | 说明 |
-|------|:--:|------|
-| WebUI + API | 8000 | Web 界面 |
-| SignSrv | 9001 | 签名引擎（内部） |
+# 代理（可选）
+HTTP_PROXY=http://127.0.0.1:7890
+
+# 存储后端（默认 JSON）
+STORE_BACKEND=json
+```
 
 ---
 
 ## 常见问题
 
-### 抖音/小红书搜不到数据？
+**Q: 纯 HTTP 和浏览器模式有什么区别？**
+A: 纯 HTTP 直连速度快 10 倍（~500ms vs ~3s），不需开浏览器，适合服务器部署。
 
-首次使用需要在浏览器登录对应平台。操作：
-1. 打开 WebUI → 右上角「会话管理」
-2. 点击「收割全部平台」
-3. 在弹出的 Chrome 中扫码登录
-4. 等待收割完成后即可使用
+**Q: 为什么要每日收割会话？**
+A: 抖音和小红书的登录 Cookie 有时效（几小时到 1-2 天），收割一次后保存到本地，之后纯 HTTP 直连复用。
 
-### AI 分析报错？
+**Q: 收割后可以关 Chrome 吗？**
+A: 可以。收割的会话保存到 `browser_data/` 目录，关了 Chrome 也能用。下次过期了再开 Chrome 收割一次。
 
-1. 检查 `.env` 中 `DEEPSEEK_API_KEY` 是否正确
-2. 确认 DeepSeek 账户有余额
-3. 查看 `logs/` 目录下的日志文件
+**Q: 全流程分析很慢？**
+A: 正常。7 个 Agent 依次调用 LLM，5 平台约 3-4 分钟。可减少平台数或 limit 提速度。
 
-### 如何查看运行日志？
+**Q: 没有 DeepSeek API Key 能用吗？**
+A: 能。Agent 自动降级为模板模式，搜索和评论采集不受影响。
 
-```bash
-docker logs -f smart-agent
-```
-
-或 WebUI 中的「运行日志」面板。
-
-### 如何备份数据？
-
-```bash
-# 数据存储在以下目录
-./output/       # 采集结果
-./browser_data/ # 登录会话
-./logs/         # 运行日志
-
-# 备份整个目录即可
-tar -czf backup.tar.gz ./output ./browser_data
-```
+**Q: 怎么更新？**
+A: 重新下载最新 ZIP 包覆盖即可。如有新功能会通知。
 
 ---
 
-*如有问题，请联系微信：smart4906*
+## 免责声明
+
+本软件仅供学习与学术研究使用，严禁用于任何商业用途。使用者须遵守各平台的用户协议与相关法律法规。因使用本软件产生的任何法律责任由使用者自行承担。
