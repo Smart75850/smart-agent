@@ -28,7 +28,7 @@ class ProductItemOutput(BaseModel):
     category: str = Field(description="品类")
     price_hint: str = Field(description="价格区间，如 ¥50-200")
     target_audience: str = Field(description="目标人群，年龄+场景+消费力")
-    competitive_advantage: str = Field(min_length=30, description="竞争优势，含具体差异化点")
+    competitive_advantage: str = Field(min_length=10, description="竞争优势，含具体差异化点")
     monetization_potential: int = Field(ge=0, le=100, description="变现潜力：90+蓝海/70-89可突围/50-69红海/<50小众")
     signal_type: Literal["direct", "indirect", "no_signal"] = Field(description="信号类型")
     source_index: int = Field(description="来源内容在输入列表中的索引")
