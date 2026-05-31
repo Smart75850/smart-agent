@@ -16,11 +16,14 @@ def _build_initial_state(
     llm_filter: bool,
     pipeline_mode: str = "simple",
     analysis_mode: str = "keyword",
-    sort_type: int = 0,
+    sort_type: int | None = None,
     publish_time: int = 0,
     search_channel: str = "",
     include_raw: bool = False,
 ) -> PipelineState:
+    # full 模式默认按最热排序，确保高互动内容优先（评论更多→SentimentReader 能用）
+    if sort_type is None:
+        sort_type = 2 if pipeline_mode == "full" else 0
     return {
         "keyword": keyword,
         "analysis_mode": analysis_mode,
@@ -56,7 +59,7 @@ async def run_pipeline(
     llm_filter: bool = False,
     pipeline_mode: str = "simple",
     analysis_mode: str = "keyword",
-    sort_type: int = 0,
+    sort_type: int | None = None,
     publish_time: int = 0,
     search_channel: str = "",
     include_raw: bool = False,
