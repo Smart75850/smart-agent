@@ -1,27 +1,38 @@
 """Smart Agent Pro - 使用额度跟踪器。
 
 试用版：50 次搜索额度，用完提示购买永久版。
+Pro 激活使用 HMAC-SHA256 签名验证，离线校验无需网络。
 """
+import hashlib
+import hmac
 import json
 import os
 import time
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 from pathlib import Path
 from datetime import datetime
 
 USAGE_FILE = os.environ.get("USAGE_FILE", "/app/config/usage.json")
 
+# HMAC 签名密钥 —— 只有持有此密钥才能生成有效 license key
+# 换密钥后所有旧 key 失效，生成新 key 用 generate_license_key()
+_SIGNING_SECRET = os.environ.get(
+    "LICENSE_SECRET",
+    "sm-agent-pro-2026-hmac-secret-v1-d7f3a8b2c1e4"
+)
+
 DEFAULT_CONFIG = {
-    "license": "trial",          # trial / pro
-    "total_limit": 50,           # trial 限 50 次，pro 限 999999
+    "license": "trial",
+    "total_limit": 50,
     "used": 0,
     "first_use": None,
     "last_use": None,
     "wechat": "smart4906",
+    "licensed_to": "",
 }
 
 
 def _load() -> dict:
-    """加载使用记录。"""
     path = Path(USAGE_FILE)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,7 +47,6 @@ def _load() -> dict:
 
 
 def _save(config: dict):
-    """保存使用记录。"""
     path = Path(USAGE_FILE)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -44,17 +54,6 @@ def _save(config: dict):
 
 
 def check_quota() -> dict:
-    """检查剩余额度。
-
-    Returns:
-        {
-            "allowed": bool,       # 是否允许使用
-            "remaining": int,      # 剩余次数
-            "total": int,          # 总额度
-            "license": str,        # trial / pro
-            "message": str         # 提示信息
-        }
-    """
     config = _load()
     license_type = config.get("license", "trial")
     total = config.get("total_limit", 50)
@@ -97,7 +96,6 @@ def check_quota() -> dict:
 
 
 def consume_one() -> dict:
-    """消耗一次额度，返回检查结果。"""
     config = _load()
     license_type = config.get("license", "trial")
 
@@ -126,28 +124,83 @@ def consume_one() -> dict:
     }
 
 
+def _sign_hmac(username: str, secret: str | None = None) -> str:
+    """对用户名做 HMAC-SHA256 签名，返回 URL-safe base64 字符串。"""
+    key = (secret or _SIGNING_SECRET).encode("utf-8")
+    sig = hmac.new(key, username.encode("utf-8"), hashlib.sha256).digest()
+    return urlsafe_b64encode(sig).rstrip(b"=").decode("ascii")
+
+
+def generate_license_key(username: str) -> str:
+    """生成 license key：base64(username:hmac_signature)。
+
+    在你自己的电脑上运行此函数生成 key，然后发给付费用户。
+    示例：
+        generate_license_key("zhangsan")
+        # → 'emhhbmdzYW46SGVsbG8gV29ybGQ='
+    """
+    sig = _sign_hmac(username)
+    payload = f"{username}:{sig}"
+    return urlsafe_b64encode(payload.encode("utf-8")).rstrip(b"=").decode("ascii")
+
+
+def verify_license_key(key: str) -> tuple[bool, str]:
+    """验证 license key 是否有效。
+
+    Returns:
+        (valid: bool, username: str) — 无效时 username 为空字符串。
+    """
+    if not key or ":" not in key:
+        return False, ""
+
+    # 补齐 base64 padding
+    padding = 4 - len(key) % 4
+    if padding != 4:
+        key += "=" * padding
+
+    try:
+        decoded = urlsafe_b64decode(key).decode("utf-8")
+    except Exception:
+        return False, ""
+
+    parts = decoded.split(":", 1)
+    if len(parts) != 2:
+        return False, ""
+
+    username, provided_sig = parts
+    expected_sig = _sign_hmac(username)
+
+    if hmac.compare_digest(provided_sig, expected_sig):
+        return True, username
+    return False, ""
+
+
 def activate_pro(key: str) -> bool:
-    """激活 Pro 版（简单验证）。"""
-    if key and len(key) >= 6:
-        config = _load()
-        config["license"] = "pro"
-        config["total_limit"] = 999999
-        _save(config)
-        return True
-    return False
+    """激活 Pro 版（HMAC-SHA256 签名验证）。"""
+    valid, username = verify_license_key(key)
+    if not valid:
+        return False
+
+    config = _load()
+    config["license"] = "pro"
+    config["total_limit"] = 999999
+    config["licensed_to"] = username
+    _save(config)
+    return True
 
 
 def get_status() -> str:
-    """获取当前状态摘要。"""
     config = _load()
     license_type = config.get("license", "trial")
     used = config.get("used", 0)
     total = config.get("total_limit", 50)
     first = config.get("first_use", "未使用")
     last = config.get("last_use", "未使用")
+    licensed_to = config.get("licensed_to", "")
 
     if license_type == "pro":
-        return f"状态：Pro 永久版 | 已使用：{used} 次"
+        who = f"（用户：{licensed_to}）" if licensed_to else ""
+        return f"状态：Pro 永久版{who} | 已使用：{used} 次"
 
     remaining = max(0, total - used)
     return (
