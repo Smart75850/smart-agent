@@ -3,7 +3,7 @@
 从 CDP Chrome 一次性收割 x-s + x-s-common + cookies，
 之后直接发 HTTP POST 请求到搜索 API，x-s 可跨请求复用。
 """
-import asyncio, json, random, string, logging
+import asyncio, json, random, string, logging, time
 from pathlib import Path
 from datetime import datetime
 
@@ -14,6 +14,20 @@ logger = logging.getLogger(__name__)
 
 SEARCH_URL = "https://edith.xiaohongshu.com/api/sns/web/v1/search/notes"
 SESSION_FILE = Path(__file__).resolve().parent.parent.parent / "browser_data/xhs_http_session.json"
+
+# ═══════════ 反检测安全措施（MediaCrawler 同款策略） ═══════════
+# 参考：阿江 MediaCrawler — x-s 签名 + 去 sec_token + 多账号 + 随机延迟
+# 我哋已有 xhshow.py 生成 x-s 签名，HTTP 直连可行
+
+_MIN_DELAY = 1.5        # 请求间最小间隔（秒）— 模拟人类
+_MAX_DELAY = 4.0        # 请求间最大间隔（秒）
+_SAFE_PAGE_SIZE = 20    # 正常页大小（x-s 签名有效时可 20）
+
+
+def _rate_limit():
+    """随机延迟（模拟人类行为）。MediaCrawler 同款策略。"""
+    delay = random.uniform(_MIN_DELAY, _MAX_DELAY)
+    time.sleep(delay)
 
 
 class XhsSession:
@@ -239,10 +253,13 @@ async def search(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
         logger.warning("XHS 会话无效，请先运行收割脚本")
         return []
 
+    # 强制限流（防封号）
+    _rate_limit()
+
     body = {
         "keyword": keyword,
         "page": page,
-        "page_size": min(count, 20),
+        "page_size": min(count, _SAFE_PAGE_SIZE),
         "search_id": ''.join(random.choices(string.hexdigits.lower(), k=32)),
         "sort": "general",
         "source": "web_search_result",
@@ -251,7 +268,7 @@ async def search(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
     headers = _build_headers(sess, method="POST", uri="/api/sns/web/v1/search/notes", payload=body)
 
     from src.utils.http_client import create_httpx_client
-    async with create_httpx_client(15) as client:
+    async with create_httpx_client(30) as client:
         resp = await client.post(SEARCH_URL, headers=headers, json=body)
         resp.raise_for_status()
         data = resp.json()
@@ -266,11 +283,12 @@ async def search(keyword: str, count: int = 20, page: int = 1) -> list[dict]:
 
 
 async def search_all(keyword: str, limit: int = 40) -> list[dict]:
+    """分页搜索 — x-s 签名 + 随机延迟（MediaCrawler 同款策略）。"""
     all_results = []
     seen_ids = set()
     page = 1
-    while len(all_results) < limit:
-        items = await search(keyword, count=20, page=page)
+    while len(all_results) < limit and page < 15:
+        items = await search(keyword, count=_SAFE_PAGE_SIZE, page=page)
         if not items:
             break
         new_items = [i for i in items if i["note_id"] not in seen_ids]

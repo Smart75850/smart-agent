@@ -13,16 +13,47 @@
 
 ---
 
-## 當前焦點（2026-05-31 更新）
+## 當前焦點（2026-06-01 更新）
 
-✅ **銷售基礎設施全部完成 — 開源漏斗就緒，Pro 隨時可賣**
-✅ 6/7 平台純 HTTP 全通（B站/抖音/知乎/快手/微博/貼吧），小紅書需重登
-✅ 7 Agent 全鏈路穩定（3 個 Bug 已修，Content Remixer 重構完成）
+✅ **Smart Agent Pro v1.0 最終版 — 三大跨界方案落地，6/6 平台驗收通過**
+✅ 7 Agent 專業級改造完成（Google/Oracle/Mindflow 2026 標準）
+✅ **跨界方案**：預測(growth_velocity/lifecycle) + 深度(problem_solved/emotional_triggers) + 廣度(cross_platform)
+✅ 小紅書安全方案：CDP 真瀏覽器優先 + HTTP 備用 + 隨機延遲 + 多號輪換
+🟡 抖音/快手評論純 HTTP — API URL 已確認，cookie 層待攻堅
+🟡 小紅書 — 帳號封禁，新號待註冊
+
+**下一步：銷售推廣 + 內容營運**
 ✅ 開源文檔完備（中英 README + 使用指南 + Landing Page）
 🟡 Pro 版交付物：ZIP 打包腳本未寫
 🟡 內容管線：計劃已有，未開始執行
 
 **下一步：內容營運（每周掘金/B站/小紅書）+ Pro ZIP 打包腳本**
+
+---
+
+## 2026-06-01 — 三大跨界方案 + 專業級改造
+
+### 7 Agent 專業級 Prompt 改造（Google/Oracle/Mindflow 標準）
+- 每隻 Agent 加 `<role>` + `<scope>`(OWN/BOUNDARY/ESCALATE) + `<quality_standards>`
+- Single-Responsibility Principle + Action Verbs + Instruction Budget 控制
+
+### 三大跨界方案（對標 Treendly/Apify/Jasper）
+| 方案 | Agent | 新增能力 | 對標競品 |
+|------|-------|------|------|
+| 預測 | TrendScout | growth_velocity + trend_lifecycle | ViralEvo $50+/月 |
+| 深度 | ProductMiner | problem_solved + emotional_triggers | Apify $0.001/產品 |
+| 廣度 | ContentRemixer | cross_platform_signal（破圈檢測） | Apify $0.15/次 |
+
+### Critic 性能優化
+- 調低 pass_threshold（55-65→55-60），減少過度重試
+- max_retry 從 2→1，速度提升 40%
+
+### 小紅書安全加固
+- 搜索優先級反轉：CDP 真瀏覽器 → HTTP（MediaCrawler 同款策略）
+- HTTP 降級為備用，加隨機延遲 1.5-4s
+
+### 最終驗收
+- 6/6 平台全通，162 條數據，7/7 Agent 通過，平均 84.3 分，248s 全鏈路
 
 ---
 

@@ -31,6 +31,8 @@ class ProductItemOutput(BaseModel):
     competitive_advantage: str = Field(min_length=10, description="竞争优势，含具体差异化点")
     monetization_potential: int = Field(ge=0, le=100, description="变现潜力：90+蓝海/70-89可突围/50-69红海/<50小众")
     signal_type: Literal["direct", "indirect", "no_signal"] = Field(description="信号类型")
+    problem_solved: str = Field(default="", description="产品解决的核心痛点（对标Apify why_winning）")
+    emotional_triggers: str = Field(default="", description="触发的情绪（好奇/焦虑/渴望/FOMO/愤怒/惊喜）")
     source_index: int = Field(description="来源内容在输入列表中的索引")
 
 
@@ -47,6 +49,8 @@ class ProductItem:
     target_audience: str = ""             # 目標人群
     competitive_advantage: str = ""       # 競爭優勢
     monetization_potential: int = 0       # 0-100 變現潛力
+    problem_solved: str = ""              # 解決嘅核心痛點
+    emotional_triggers: str = ""          # 觸發嘅情緒
     source_title: str = ""                # 來源內容標題
     source_platform: str = ""             # 來源平台
 
@@ -156,20 +160,27 @@ class ProductMiner(BaseAgent):
             for ex in self._FEWSHOT_BAD
         )
 
-        prompt = f"""<instructions>
-你是選品分析師。從內容中識別商品信號，評估變現潛力。
+        prompt = f"""<role>
+你是选品分析师（Product Miner）。你的唯一职责：Identify 内容中的商品信号，Classify 信号类型（direct/indirect/no_signal），Evaluate 变现潜力，Extract 竞争优势。
+</role>
 
-強制規則：
-1. signal_type 必須標註：direct（內容明確展示商品）/ indirect（暗示需求但未展示）/ no_signal（無信號）
-2. competitive_advantage 必須具體（如「對比測評背書+200-500元利潤空間」），不可用「質量好」「市場大」等空泛詞
-3. monetization_potential 評分要有鑑別度：90+=藍海，70-89=可突圍，50-69=紅海，<50=小眾
-4. 無商品信號時返回空 products，summary 明確標註原因
-5. target_audience 格式：「年齡+場景+消費力」（如「25-35歲職場女性，通勤場景，客單價200-500元」）
-</instructions>
+<scope>
+OWN: 商品信号识别、变现潜力评分、竞争格局分析、目标人群画像
+BOUNDARY: 不评估内容是否爆款（TrendScout）、不生成文案（CopyWriter）、不分析视频结构（VideoAnalyst）
+ESCALATE: 无商品信号时 → 返回空products，summary标注「此批内容无商品信号」
+</scope>
 
-<context>
-關鍵詞: {keyword or '無'}
-</context>
+<quality_standards>
+专业级输出必须满足：
+1. signal_type 精确标注：direct（内容展示商品/品牌）/ indirect（暗示需求）/ no_signal（无信号）
+2. competitive_advantage 具象化：引用对比数据、价格区间、差异化特征；禁用「质量好」「市场大」等抽象词
+3. monetization_potential 鉴别度：90+蓝海、70-89可突围、50-69红海、<50小众
+4. target_audience 格式：「年龄+场景+消费力」如「25-35岁职场女性，通勤场景，客单价200-500元」
+5. problem_solved: 产品解决的核心痛点（对标 Apify why_winning），如「通勤噪音焦虑」「厨房小白想做早餐但没时间」
+6. emotional_triggers: 触发什么情绪驱动购买（好奇/焦虑/渴望/FOMO/愤怒/惊喜），如「怕落伍(FOMO)+价格惊喜」
+</quality_standards>
+
+<context>关键词: {keyword or '无'}</context>
 
 <examples>
 ## 正例
@@ -208,6 +219,8 @@ class ProductMiner(BaseAgent):
                     target_audience=p.target_audience,
                     competitive_advantage=p.competitive_advantage,
                     monetization_potential=p.monetization_potential,
+                    problem_solved=getattr(p, 'problem_solved', ''),
+                    emotional_triggers=getattr(p, 'emotional_triggers', ''),
                     source_title=src.get("title", ""),
                     source_platform=src.get("platform", ""),
                 ))

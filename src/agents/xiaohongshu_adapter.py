@@ -1,12 +1,22 @@
 import asyncio
 import json
 import os
+import random
+import socket
 from pathlib import Path
 from typing import Optional
 
 from base.platform_base import PlatformAdapter
 from src.utils.browser_service import browser
 from src.utils.logger import logger
+
+
+def _check_cdp_available(port: int = 9222) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except (OSError, TimeoutError):
+        return False
 
 _COOKIE_FILE = Path(__file__).parent.parent.parent / "output" / "xiaohongshu_cookies.json"
 _PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "pw_xhs_live"
@@ -136,10 +146,45 @@ _DETAIL_JS = """\
 
 
 async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
-    """搜索小紅薯筆記 — 纯 HTTP Session 优先，浏览器兜底。"""
+    """搜索小紅薯筆記 — 浏览器优先（防封号），纯 HTTP 备用。"""
     logger.info(f"小紅薯搜索: keyword={keyword} count={count}")
 
-    # ── Path 1: 纯 HTTP Session（零浏览器）─────────────────
+    # ── Path 1: CDP 浏览器优先（真浏览器最安全，不会被识别为机器人）─
+    try:
+        if _check_cdp_available():
+            page, cleanup = await _setup_xhs_context()
+            try:
+                search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
+                await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(5000)
+                body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
+                if "登录后查看" in body:
+                    logger.warning("小紅薯未登入，回退 HTTP")
+                    raise Exception("登录墙")
+                all_results = []
+                seen = set()
+                max_scrolls = max((count // 15) + 3, 5)  # 减少滚动次数防风控
+                for _ in range(max_scrolls):
+                    items = await page.evaluate(_SEARCH_JS)
+                    new_count = 0
+                    for item in items:
+                        key = item.get("link", "") or item.get("title", "")
+                        if key and key not in seen:
+                            seen.add(key)
+                            all_results.append(item)
+                            new_count += 1
+                    if new_count == 0 and len(all_results) > 0: break
+                    if len(all_results) >= count: break
+                    await page.evaluate("window.scrollBy(0, 800)")
+                    await page.wait_for_timeout(random.randint(2000, 4000))  # 人类滚动间隔
+                logger.info(f"[xhs-browser] 浏览器搜索完成: {len(all_results)} 条")
+                return json.dumps(all_results[:count], ensure_ascii=False)
+            finally:
+                await cleanup()
+    except Exception as exc:
+        logger.warning(f"XHS 浏览器搜索失败: {exc}，回退 HTTP")
+
+    # ── Path 2: 纯 HTTP（备用，仅浏览器不可用时使用）─────────
     try:
         from src.utils.session_manager import ensure_session
         if await ensure_session("xiaohongshu"):
@@ -149,9 +194,9 @@ async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
                 logger.info(f"[xhs-session] 纯HTTP直连成功: {len(items)} 条")
                 return json.dumps(items, ensure_ascii=False)
     except Exception as exc:
-        logger.warning(f"XHS Session HTTP 失败: {exc}，回退浏览器")
+        logger.warning(f"XHS Session HTTP 失败: {exc}")
 
-    # ── Path 2: CDP 浏览器（兜底）─────────────────────────
+    # ── Path 3: 独立浏览器（最后兜底）─────────────────────────
 
     page, cleanup = await _setup_xhs_context()
 

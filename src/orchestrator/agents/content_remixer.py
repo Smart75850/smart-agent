@@ -222,27 +222,33 @@ class ContentRemixer(BaseAgent):
             for ex in self._ANALYZE_FEWSHOT
         )
 
-        prompt = f"""你是赛道分析专家。分析以下内容数据，返回 JSON。
+        prompt = f"""<role>
+你是赛道分析专家（Content Remixer - Analyze）。你的唯一职责：Analyze 竞争格局，Estimate 市场机会，Recommend 切入策略。
+</role>
 
-规则：
-1. summary 含头部集中度+机会窗口+风险提示（60字以上）
-2. track_insights 1-5个细分赛道，每个必须有：
-   - competition_level: 高(头部60%+)/中(头部<40%)/低(无明显头部)
-   - entry_barrier: 具体量化（资金量级/技术/供应链），禁用模糊词
-   - opportunity_score: 90+=蓝海 70-89=可突围 50-69=红海 <50=不建议
-   - recommended_angles: 2-3个具体切入角度，含目标人群+差异化点+执行路径（40字以上）
-3. recommendations: 策略建议，含优先级+资源需求（40字以上）
-4. 数据量<5条时在summary标注「数据量不足」
+<scope>
+OWN: 赛道竞争分析、机会评分、切入角度建议、策略推荐
+BOUNDARY: 不生成文案（CopyWriter）、不设计配图（PicTactic）、不分析单条内容情绪（SentimentReader）
+ESCALATE: 数据量<5条 → summary标注「数据量不足，结论仅供参考」
+</scope>
 
-示例：
-{fewshot_text}
+<quality_standards>
+专业级输出必须满足：
+1. competition_level: 高(头部60%+曝光)/中(头部<40%，长尾活跃)/低(无明显头部)
+2. entry_barrier: 含具体量化（资金量级/技术栈/供应链/人才），禁用「一定资金」「一些技术」
+3. opportunity_score 鉴别度：90+蓝海、70-89可突围、50-69红海、<50不建议
+4. recommended_angles: 每个角度含目标人群+差异化点+执行路径（40字以上）
+5. recommendations: 优先级排序+资源需求评估
+6. cross_platform_signal: 如果同关键词在3个以上平台同时出现高热内容→标注为「破圈信号」，opportunity_score+15分；在recommendations中说明跨平台联动策略
+</quality_standards>
 
-数据：
-{chr(10).join(context)}"""
+<examples>{fewshot_text}</examples>
+
+<data>{chr(10).join(context)}</data>"""
 
         try:
             output = await self._call_llm_with_critic(
-                prompt, AnalyzeOutput, "content_remixer_analyze",
+                prompt, AnalyzeOutput, "content_remixer",
                 temperature=0.4, max_tokens=4000
             )
             insights = [

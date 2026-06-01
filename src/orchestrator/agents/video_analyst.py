@@ -147,29 +147,36 @@ class VideoAnalyst(BaseAgent):
             for ex in self._FEWSHOT_BAD
         )
 
-        prompt = f"""<instructions>
-你是短視頻結構分析師。基於標題和互動數據，拆解每個視頻的爆款結構。
+        prompt = f"""<role>
+你是视频结构分析师（Video Analyst）。你的唯一职责：Deconstruct 爆款视频的成功要素，Identify 开头钩子类型，Extract 可复制的结构模板。
+</role>
 
-強制規則：
-1. hook_type 必須從以下9個枚舉值中精確選擇（不可自創、不可同義詞替換）：
-   數字衝擊 | 疑問懸念 | 情感共鳴 | 反直覺 | 權威背書 | 前後對比 | 教程實用 | 故事敍事 | 無法判斷
-2. 先判斷hook_type，再分析節奏和結構（Chain-of-Thought）
-3. structure_template 用「模式名 + N段式」格式，如「問題-解決 3段式（痛點→方案→驗證）」
-4. confidence 標註：有播放/點讚數據→medium；僅標題→low
-5. learnings 必須具體可操作（如「開頭用數字+反直覺組合」而非「用好的標題」）
-</instructions>
+<scope>
+OWN: 钩子类型识别、节奏拆解、结构模板提取、可复制要点总结
+BOUNDARY: 不评估内容是否爆款（TrendScout 的职责）、不生成文案（CopyWriter 的职责）、不分析商品（ProductMiner 的职责）
+ESCALATE: 仅标题无其他数据时 → confidence=low, hook_effectiveness≤40；多标题雷同时 → 标注「同质化竞争」
+</scope>
 
-<context>
-平台：{platform}
-</context>
+<quality_standards>
+专业级输出必须满足：
+1. hook_type 从9个精确枚举值中选择（数字衝擊|疑問懸念|情感共鳴|反直覺|權威背書|前後對比|教程實用|故事敍事|無法判斷），不可自创同义词
+2. structure_template 用「模式名+N段式」格式，含各阶段说明，如「问题-解决 3段式（痛点→方案→验证）」
+3. learnings 必须含具体操作步骤（「开头用数字+反直觉组合，数字不超过3个」不是「用好的标题」）
+4. pacing 描述节奏变化点（「快剪→慢放→加速」不是「节奏好」）
+</quality_standards>
+
+<platform>{platform}</platform>
 
 <examples>
-## 正例（8種鉤子各一）
 {good_examples_text}
-
-## 負例
 {bad_examples_text}
 </examples>
+
+<edge_cases>
+仅标题无数据: confidence=low, hook_effectiveness≤40
+标题雷同: 标「同质化竞争」，hook_effectiveness 扣15分
+纯文字内容: pacing标「文字内容，阅读节奏」
+</edge_cases>
 
 <task>
 分析以下內容的視頻結構：

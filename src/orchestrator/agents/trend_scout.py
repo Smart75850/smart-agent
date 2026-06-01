@@ -57,6 +57,8 @@ class TrendScoutItemOutput(BaseModel):
     viral_score: int = Field(ge=0, le=100, description="爆款潜力分：90+蓝海/70-89有需求/50-69红海/<50小众")
     trend_reason: str = Field(min_length=10, description="爆款原因分析，引用具体数据+爆款机制")
     category: Literal["科技/AI", "美妝", "美食", "穿搭", "家居", "健身", "教育", "財經", "遊戲", "娛樂", "旅遊", "母嬰", "寵物", "健康/醫療", "其他"] = Field(description="分类枚举")
+    growth_velocity: Literal["exploding", "rising", "stable", "declining"] = Field(default="stable", description="增长速度：exploding(互动比>5%+新赛道)/rising(3-5%)/stable(1-3%)/declining(<1%)")
+    trend_lifecycle: Literal["early", "peak", "mature", "declining"] = Field(default="peak", description="生命周期：early(新赛道少竞品)/peak(爆发期竞品涌现)/mature(稳定饱和)/declining(互动下滑)")
 
     @field_validator("category", mode="before")
     @classmethod
@@ -93,6 +95,8 @@ class TrendItem:
     viral_score: int          # 0-100 爆款潛力分
     trend_reason: str         # 爆款原因分析
     category: str = ""        # 品類
+    growth_velocity: str = "" # exploding/rising/stable/declining
+    trend_lifecycle: str = "" # early/peak/mature/declining
     engagement: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
 
@@ -223,45 +227,73 @@ class TrendScout(BaseAgent):
         )
 
         context = f"平台: {platform}" + (f", 關鍵詞: {keyword}" if keyword else " (熱榜)")
-        prompt = f"""你是頂級內容趨勢分析師（Trend Scout），專門從社交媒體數據中識別具有爆款潛力的內容。
+        prompt = f"""<role>
+你是爆款趋势分析师（Trend Scout）。你的唯一职责：Analyze 社交媒体内容列表，Score 每条内容的爆款潜力，Classify 赛道分类，Extract 可复制的爆款机制。
+</role>
 
-## 任務
-分析以下 {context} 的內容列表，為每條內容評分並解釋爆款潛力。
+<scope>
+OWN: 内容趋势识别、爆款评分、赛道分类
+BOUNDARY: 不生成文案（那是 CopyWriter 的职责）、不分析视频结构（那是 VideoAnalyst 的职责）、不评估商品变现（那是 ProductMiner 的职责）
+ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以上无爆款信号 → 在 summary 中明确声明
+</scope>
 
-## 品質標準
-- 好的分析：有具體數據支撐、引用互動指標、指出可複製的爆款機制、分類精確
-- 差的分析：空泛描述如「內容不錯」「有潛力」、分類選「其他」偷懶、無視數據只憑標題猜
+<quality_standards>
+专业级输出必须满足：
+1. 每条 trend_reason 引用至少1个具体数据点（播放量/互动比/增长率），禁用「内容不错」「有潜力」等空泛评价
+2. viral_score 必须体现鉴别度：同一批中最高分与最低分差距 ≥20 分。如果所有内容确实类似，在 summary 说明原因
+3. category 精确到15类枚举值，「其他」仅限无主题的日常随拍，每批最多1个
+4. summary 必须包含：主导赛道判断 + 机会信号 + 风险提示
+</quality_standards>
 
-## 爆款判定規則
-一條內容被視為有爆款潛力，必須滿足以下 4 項中至少 2 項：
-1. **互動比異常** — 讚/播 > 3% 或 評論/播 > 0.5%（高於平台均值）
-2. **熱門賽道** — 屬於當前增長中的內容賽道
-3. **情緒觸發** — 標題含強烈情緒信號（好奇/共鳴/焦慮/憤怒/驚喜）
-4. **形式創新** — 內容形式有別於同賽道常規做法
+<viral_rules>
+爆款判定（4项中满足 ≥2项）：
+1. 互动比异常：赞/播 >3% 或 评论/播 >0.5%
+2. 热门赛道：属于当前增长中的内容品类
+3. 情绪触发：标题含好奇/共鸣/焦虑/愤怒/惊喜信号
+4. 形式创新：内容形式有别于同赛道常规做法
 
-## 分類枚舉（必須從以下選一，不得自創）
-科技/AI、美妝、美食、穿搭、家居、健身、教育、財經、遊戲、娛樂、旅遊、母嬰、寵物、健康/醫療、其他
-⚠️ 「其他」僅限以下情況才能用：內容無主題（如日常隨拍、純閒聊）。如果內容涉及任何產品/話題/領域，必須選擇最接近的分類。嚴禁因懶得判斷而選「其他」。每批最多 1 個「其他」，超過則按錯誤處理。如果不確定選哪個分類，選最接近的兩個分類中更具體的那個。
+评分锚点：
+90-100: 蓝海 — 互动比>5% + 新赛道 + 可复制
+70-89: 需求明确 — 互动比>3% + 热门赛道 + 可复制元素
+50-69: 红海 — 赛道拥挤，需差异化
+<50: 小众/低互动
+</viral_rules>
 
-## viral_score 評分錨點
-- 90-100：藍海信號 — 互動比 >5% + 新賽道/新形式 + 可大量複製
-- 70-89：有明確需求 — 互動比 >3% + 熱門賽道 + 有可複製元素
-- 50-69：紅海競爭 — 互動正常但賽道擁擠，需差異化才能突圍
-- <50：小眾或低互動 — 互動比低或受眾太窄
+<category_enum>
+科技/AI | 美妆 | 美食 | 穿搭 | 家居 | 健身 | 教育 | 财经 | 游戏 | 娱乐 | 旅游 | 母婴 | 宠物 | 健康/医疗 | 其他
+</category_enum>
 
-## Few-Shot 正例（學習這些分析的深度和具體度）
+<examples>
 {good_examples_text}
-
-## Few-Shot 負例（避免以下空洞/錯誤的分析）
 {bad_examples_text}
+</examples>
 
-## 邊界情況處理
-- 數據缺失（播放/讚為 0）：標註 confidence=low，viral_score 不超過 50
-- 標題含明顯廣告/營銷話術：標註為商業內容，viral_score 扣 20 分
-- 跨類別內容（如科技+教育）：選主類別，trend_reason 提及次要類別
+<prediction>
+每条内容必须标注两个预测维度（对标 ViralEvo/Treendly）：
 
-## 待分析內容
-{items_text}"""
+growth_velocity（增长速度）:
+- exploding: 互动比>5% + 新赛道/新形式（预测48h内爆发）
+- rising: 互动比3-5% + 有多条同类内容出现（上升趋势）
+- stable: 互动比1-3%（稳定）
+- declining: 互动比<1% 或明显下滑
+
+trend_lifecycle（生命周期）:
+- early: 赛道竞争者少(<5条同类)，有机会抢先入场
+- peak: 爆发期，大量竞品涌现，需差异化解锁
+- mature: 赛道饱和，头部已定，新入场困难
+- declining: 互动下滑，不建议投入
+</prediction>
+
+<edge_cases>
+数据缺失(播放/赞为0): viral_score≤50, growth_velocity=declining, 标注数据不足
+广告/营销话术: 标注商业内容, viral_score 扣20分
+跨类别: 选主类别, trend_reason 提及次要类别
+</edge_cases>
+
+<task>
+平台: {platform} | 关键词: {keyword}
+{items_text}
+</task>"""
 
         try:
             output = await self._call_llm_with_critic(prompt, TrendScoutOutput, "trend_scout", temperature=0.3)
@@ -276,6 +308,8 @@ class TrendScout(BaseAgent):
                     viral_score=ti.viral_score,
                     trend_reason=ti.trend_reason,
                     category=ti.category,
+                    growth_velocity=getattr(ti, 'growth_velocity', 'stable'),
+                    trend_lifecycle=getattr(ti, 'trend_lifecycle', 'peak'),
                     engagement={"plays": src.get("plays", "0"), "likes": src.get("likes", "0")},
                     raw=src,
                 ))
