@@ -1,22 +1,17 @@
 """签名执行引擎 — 统一接口。
 
 根据平台自动选择 Signer：
-  - py_mini_racer: douyin, kuaishou, weibo
-  - execjs:        xiaohongshu, zhihu, tieba
   - python:        bilibili (Wbi)
 """
 
 from sign_srv.cache import CacheManager
-from sign_srv.platforms.douyin import DouyinSigner
 from sign_srv.platforms.bilibili import BilibiliSigner
 from sign_srv.platforms.base import SignResult
 
 
 # 已实现的 Signer 注册表
 _SIGNERS = {
-    "douyin": DouyinSigner,
     "bilibili": BilibiliSigner,
-    # Phase 2/3 逐步添加
 }
 
 

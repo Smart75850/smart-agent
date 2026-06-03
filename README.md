@@ -144,8 +144,6 @@ smart-agent/
 │   │   ├── weibo_adapter.py       # 微博 — cookies + xsrf
 │   │   └── tieba_adapter.py       # 贴吧 — curl_cffi TLS
 │   └── utils/
-│       ├── douyin_http.py         # 抖音纯 HTTP 客户端
-│       ├── xhs_http.py            # 小红书纯 HTTP 客户端
 │       ├── ks_http.py             # 快手纯 HTTP 客户端
 │       ├── zh_http.py             # 知乎纯 HTTP 客户端
 │       ├── weibo_http.py          # 微博纯 HTTP 客户端

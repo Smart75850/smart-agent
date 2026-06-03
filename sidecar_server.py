@@ -1,4 +1,4 @@
-"""Smart Agent Pro — Python Sidecar 服务。
+﻿"""Smart Agent Pro — Python Sidecar 服务。
 
 Go 主进程通过 HTTP 调用本服务进行浏览器爬取和 Agent 分析。
 端口 18500（不与 WebUI 8000 冲突）。
@@ -57,8 +57,7 @@ async def lifespan(app: FastAPI):
             app.mount("/sign", sign_app)
             logger.info("[sidecar] SignSrv 已挂载: /sign")
 
-            # 预装已验证的 a_bogus JS（如果缓存为空）
-            _seed_douyin_js(sign_cache)
+            # 抖音 JS 种子已移至私有仓库 smart-agent-re，此处跳过
         except Exception as exc:
             logger.warning(f"[sidecar] SignSrv 加载失败: {exc}")
 

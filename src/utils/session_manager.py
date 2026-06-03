@@ -127,6 +127,24 @@ def _check_cdp_available(port: int = 9222) -> bool:
         return False
 
 
+def _check_session_file_valid(cfg: dict) -> bool:
+    """检查 session 文件是否存在且未过期（>24h）。"""
+    import time
+    session_path = Path(cfg["session_file"])
+    if not session_path.exists():
+        return False
+    try:
+        data = json.loads(session_path.read_text("utf-8"))
+        harvested_at = data.get("harvested_at", "")
+        if not harvested_at:
+            return True  # 冇时间戳就当有效
+        ts = datetime.fromisoformat(harvested_at.replace("Z", "+00:00"))
+        age_hours = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
+        return age_hours < 24
+    except Exception:
+        return False
+
+
 _health_cache: dict[str, tuple[float, bool]] = {}
 _HEALTH_CACHE_TTL = 60
 
@@ -158,9 +176,8 @@ async def check_health(platform: str) -> bool:
             else:
                 result = False
         elif platform == "xiaohongshu":
-            from src.utils.xhs_http import search
-            items = await search("美食", count=1)
-            result = len(items) >= 0
+            # 轻量检查：验证 session 文件存在且未过期
+            result = _check_session_file_valid(cfg)
         elif platform == "kuaishou":
             from src.utils.ks_http import search
             items = await search("美女", count=1)

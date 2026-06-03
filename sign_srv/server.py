@@ -27,19 +27,6 @@ def create_app() -> FastAPI:
 
     # ── Sign endpoints ──────────────────────────────────────
 
-    @app.post("/sign/douyin")
-    async def sign_douyin(req: dict):
-        result = await engine.generate(
-            "douyin",
-            url=req.get("url", ""),
-            user_agent=req.get("user_agent", ""),
-        )
-        return {
-            "a_bogus": result.params.get("a_bogus", ""),
-            "x_bogus": result.params.get("x_bogus", ""),
-            "raw": result.raw,
-        }
-
     @app.post("/sign/bilibili")
     async def sign_bilibili(req: dict):
         result = await engine.generate(

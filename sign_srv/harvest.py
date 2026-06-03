@@ -15,18 +15,6 @@ from src.utils.logger import logger
 
 # 各平台签名 JS 匹配规则
 PLATFORM_RULES = {
-    "douyin": {
-        "jump_urls": ["https://www.douyin.com/search/test?keyword=test"],
-        "patterns": [r"a_bogus.*\.js", r"x_bogus.*\.js", r"bogus"],
-        "min_js_size": 8000,
-        "js_keys": ["a_bogus", "x_bogus"],
-    },
-    "xiaohongshu": {
-        "jump_urls": ["https://www.xiaohongshu.com/explore"],
-        "patterns": [r"x-s-common.*\.js", r"xsec", r"sign"],
-        "min_js_size": 50000,
-        "js_keys": ["x_s_common"],
-    },
     "kuaishou": {
         "jump_urls": ["https://www.kuaishou.com"],
         "patterns": [r"sign", r"security", r"encrypt"],
