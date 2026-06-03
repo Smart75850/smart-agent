@@ -345,15 +345,15 @@ ESCALATE: 图片质量太差 → 标注 uncertainty；纯文字帧 → 单独标
 
     def _qwen_fallback(self, title: str) -> StyleAnalysisOutput:
         return StyleAnalysisOutput(
-            color_scheme=f"基于标题'{title[:30]}'推断：需安装 QWEN_API_KEY 获取精准分析",
-            lighting_style="（需 QWEN-VL）",
-            composition_pattern="（需 QWEN-VL）",
-            text_overlay_style="（需 QWEN-VL）",
-            transition_style="（需 QWEN-VL）",
-            color_grading="（需 QWEN-VL）",
-            pace_description="（需 QWEN-VL）",
-            objects_and_scenes="（需 QWEN-VL）",
-            overall_vibe="（需 QWEN-VL）",
+            color_scheme=f"基于标题「{title[:30]}」推断：需配置 QWEN_API_KEY 以获取精准视觉分析",
+            lighting_style="（需千问 QWEN-VL 多模态模型分析光线风格）",
+            composition_pattern="（需千问 QWEN-VL 多模态模型分析构图模式）",
+            text_overlay_style="（需千问 QWEN-VL 多模态模型分析文字字幕风格）",
+            transition_style="（需千问 QWEN-VL 多模态模型分析转场风格）",
+            color_grading="（需千问 QWEN-VL 多模态模型分析调色倾向）",
+            pace_description="（需千问 QWEN-VL 多模态模型分析视频节奏变化）",
+            objects_and_scenes="（需千问 QWEN-VL 多模态模型识别画面物体与场景元素）",
+            overall_vibe="（需千问 QWEN-VL 多模态模型总结视觉氛围）",
         )
 
     # ── Step 4: DeepSeek 生成克隆方案 ────────────────────────
@@ -430,14 +430,37 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
         return VideoCloneOutput(
             style_analysis=style,
             canva_keywords=CanvaKeywordsOutput(
-                cn_keywords=["科技产品介绍", "数码测评", "工具展示"],
-                en_keywords=["tech review", "product demo"],
-                jianying_keywords=["科技测评", "数码介绍"],
+                cn_keywords=["科技产品介绍", "数码测评", "工具展示模板"],
+                en_keywords=["tech review template", "product demo design", "minimalist presentation"],
+                jianying_keywords=["科技测评模板", "数码产品介绍", "工具软件展示"],
             ),
-            rewritten_copy="（需 DeepSeek API Key 生成改写文案）",
-            bgm_recommendations=[BGMTrack(genre="电子", bpm_range="110-130", mood="科技感", search_keyword="科技背景音乐")],
-            shooting_script=[ShotInstruction(shot_number=1, duration_seconds=8, camera_angle="中景", action_description="产品展示")],
-            summary="（降级模式，需 API Key 获取完整方案）",
+            rewritten_copy="（需 DeepSeek API Key 生成改写文案，请检查 DEEPSEEK_API_KEY 配置）",
+            bgm_recommendations=[
+                BGMTrack(genre="电子", bpm_range="110-130", mood="科技感十足 快节奏有力", search_keyword="科技背景音乐 快节奏电子"),
+                BGMTrack(genre="轻音乐", bpm_range="80-100", mood="简洁清新 轻快流畅", search_keyword="轻快背景音乐 科技视频配乐"),
+                BGMTrack(genre="氛围", bpm_range="90-110", mood="专业大气 商务沉稳", search_keyword="商务科技 背景音乐大气"),
+            ],
+            shooting_script=[
+                ShotInstruction(
+                    shot_number=1, duration_seconds=5, camera_angle="特写",
+                    action_description="产品主图展示，配合标题文字弹出动画",
+                    text_overlay="产品名称 + 一句话卖点", voiceover_hint="今天给大家介绍一款...",
+                    transition_to_next="淡入淡出",
+                ),
+                ShotInstruction(
+                    shot_number=2, duration_seconds=8, camera_angle="中景",
+                    action_description="产品实际使用场景演示，展示核心功能",
+                    text_overlay="功能要点1 / 功能要点2", voiceover_hint="它的核心功能是...",
+                    transition_to_next="硬切",
+                ),
+                ShotInstruction(
+                    shot_number=3, duration_seconds=5, camera_angle="全景",
+                    action_description="总结画面，三产品排列+行动号召文字",
+                    text_overlay="立即体验", voiceover_hint="快来试试吧",
+                    transition_to_next="淡出",
+                ),
+            ],
+            summary="（降级模式：需同时配置 QWEN_API_KEY + DEEPSEEK_API_KEY 获取完整克隆方案）",
         )
 
 
