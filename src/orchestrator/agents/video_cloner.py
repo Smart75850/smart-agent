@@ -105,6 +105,7 @@ class CloneReport:
     rewritten_copy: str = ""
     bgm_recommendations: list[dict] = field(default_factory=list)
     shooting_script: list[ShotInstructionDTO] = field(default_factory=list)
+    template_links: dict[str, str] = field(default_factory=dict)
     summary: str = ""
     errors: list[str] = field(default_factory=list)
 
@@ -198,6 +199,11 @@ class VideoCloneAgent(BaseAgent):
                 for s in clone_output.shooting_script
             ]
             report.summary = clone_output.summary
+            report.template_links = self._build_template_links(
+                clone_output.canva_keywords.cn_keywords,
+                clone_output.canva_keywords.en_keywords,
+                clone_output.canva_keywords.jianying_keywords,
+            )
 
         except Exception as exc:
             logger.error(f"VideoCloneAgent 失败: {exc}")
@@ -443,6 +449,22 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
             except Exception as exc2:
                 logger.warning(f"DeepSeek 生成失败，使用回退: {exc2}")
                 return self._clone_fallback(style, platform)
+
+    @staticmethod
+    def _build_template_links(cn_keywords: list[str], en_keywords: list[str], jianying_keywords: list[str]) -> dict[str, str]:
+        """生成模板平台一键搜索直达链接，零 API 依赖。"""
+        from urllib.parse import quote
+        cn_q = quote(" ".join(cn_keywords[:4]) if cn_keywords else "科技测评 模板")
+        en_q = quote(" ".join(en_keywords[:4]) if en_keywords else "tech review template")
+        jy_q = quote(" ".join(jianying_keywords[:4]) if jianying_keywords else "科技测评")
+        return {
+            "canva_cn": f"https://www.canva.com/templates/?query={cn_q}",
+            "canva_en": f"https://www.canva.com/templates/?query={en_q}",
+            "gamma": f"https://gamma.app/create?prompt={en_q}",
+            "laihua": f"https://www.laihua.com/templates?keyword={cn_q}",
+            "jianying_hint": f"剪映桌面版搜索：{jy_q}",
+            "beautiful_ai": f"https://www.beautiful.ai/gallery?search={en_q}",
+        }
 
     @staticmethod
     def _pad_clone_output(data: dict):
