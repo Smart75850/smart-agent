@@ -79,38 +79,56 @@ class MediaExtractor:
         link = item.get("link", "") or f"https://www.douyin.com/video/{item.get('aweme_id', '')}"
         if not link:
             return ""
-        captured_url = []
+        video_urls: list[tuple[str, int]] = []  # (url, content_length)
 
         async def on_response(resp):
-            if captured_url:
-                return
             url = resp.url
-            if "video" in url and ("play_addr" in url or "play" in url or ".mp4" in url):
+            ct = resp.headers.get("content-type", "")
+            try:
+                cl = int(resp.headers.get("content-length", "0"))
+            except Exception:
+                cl = 0
+            # 收集所有视频 URL
+            if "video/mp4" in ct or "douyinvod.com" in url or ".mp4" in url:
+                video_urls.append((url, cl))
+            elif "play_addr" in url or ("video" in url and "play" in url):
                 try:
                     body = await resp.json()
                     addr = body.get("play_addr", body)
                     url_list = addr.get("url_list", []) if isinstance(addr, dict) else []
                     if url_list:
-                        captured_url.append(url_list[0])
+                        video_urls.append((url_list[0], 0))
                 except Exception:
                     pass
 
         page = await self.browser.new_page()
         try:
             page.on("response", lambda r: asyncio.ensure_future(on_response(r)))
-            await page.goto(link, wait_until="domcontentloaded", timeout=20000)
-            await page.wait_for_timeout(4000)
-            if not captured_url:
-                video_el = await page.evaluate("""() => {
-                    const v = document.querySelector('video');
-                    return v ? v.src : '';
-                }""")
-                if video_el:
-                    captured_url.append(video_el)
+            await page.goto(link, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(10000)  # 等足够耐俾完整视频加载
+            # Play video to trigger full load
+            try:
+                await page.click("video", timeout=3000)
+                await page.wait_for_timeout(3000)
+            except Exception:
+                pass
+            # DOM <video> fallback
+            try:
+                src = await page.evaluate("() => {const v=document.querySelector('video');return v?v.src:'';}")
+                if src and src not in [u for u, _ in video_urls]:
+                    video_urls.append((src, 0))
+            except Exception:
+                pass
         finally:
             await page.close()
 
-        return captured_url[0] if captured_url else ""
+        if not video_urls:
+            return ""
+        # 按 content-length 降序，选最大嘅（真正视频，唔系加载动画）
+        video_urls.sort(key=lambda x: x[1], reverse=True)
+        best_url, best_size = video_urls[0]
+        logger.info(f"douyin 视频候选: {len(video_urls)} 个, 选择 {best_size} bytes: {best_url[:100]}")
+        return best_url
 
     # ── kuaishou ──────────────────────────────────────────
 

@@ -114,7 +114,9 @@ class CloneReport:
 
 _PLATFORM_URL_MAP = {
     "douyin.com": "douyin",
+    "v.douyin.com": "douyin",
     "bilibili.com": "bilibili",
+    "b23.tv": "bilibili",
     "xiaohongshu.com": "xiaohongshu",
     "xhslink.com": "xiaohongshu",
     "kuaishou.com": "kuaishou",
@@ -127,6 +129,116 @@ def detect_platform(url: str) -> str:
         if domain in url:
             return plat
     return "unknown"
+
+
+# ── 操作清单生成 ─────────────────────────────────────────────
+
+def format_checklist(report: CloneReport) -> str:
+    """将 CloneReport 转为可执行的复刻操作清单（Markdown格式）。"""
+    lines = [
+        "# 视频复刻操作清单",
+        "",
+        f"## 原视频分析",
+        f"- 平台：{report.platform}",
+        f"- 时长：{report.duration_seconds:.0f}秒",
+        f"- 配色：{report.color_scheme}",
+        f"- 风格：{report.overall_vibe}",
+        f"- 构图：{report.composition_pattern}",
+        "",
+        "---",
+        "",
+        "## 第一步：准备素材",
+    ]
+    if report.objects_and_scenes:
+        lines.append(f"画面要素：{report.objects_and_scenes}")
+    lines.append("")
+    lines.append("1. 用 OBS/Bandicam 录操作过程")
+    lines.append("2. 截取关键界面的高清截图")
+    lines.append("3. 准备产品Logo/品牌水印")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## 第二步：剪映桌面版操作")
+    lines.append("")
+    lines.append("### 2.1 导入素材")
+    lines.append("- 打开剪映桌面版 → 新建项目")
+    lines.append("- 拖入录屏视频 + 截图素材")
+    lines.append("")
+    lines.append("### 2.2 按分镜脚本排列")
+    lines.append("")
+    lines.append("| 镜头 | 时长 | 机位 | 画面内容 | 文字叠加 | 配音提示 | 转场 |")
+    lines.append("|:---:|:---:|:---:|------|------|------|:---:|")
+    for s in report.shooting_script:
+        lines.append(
+            f"| {s.shot_number} | {s.duration_seconds}s | {s.camera_angle} | "
+            f"{s.action_description[:40]} | {s.text_overlay[:20]} | "
+            f"{s.voiceover_hint[:20]} | {s.transition_to_next} |"
+        )
+    lines.append("")
+    lines.append("### 2.3 加动画效果")
+    lines.append("- 文字标注：动画 → 「逐行淡入」")
+    lines.append("- 箭头/框框：贴纸 → 「指示箭头」拖入")
+    lines.append("- 画面局部放大：右键素材 → 「关键帧缩放」")
+    lines.append("- 鼠标点击高亮：贴纸 → 「点击光圈」")
+    lines.append(f"- 转场：{report.transition_style}")
+    lines.append("")
+    lines.append("### 2.4 调色")
+    lines.append(f"- 滤镜方向：{report.color_grading}")
+    lines.append(f"- 光线参考：{report.lighting_style}")
+    if "暖" in report.color_grading:
+        lines.append("- 色温：+10 暖色")
+    elif "冷" in report.color_grading or "蓝" in report.color_grading:
+        lines.append("- 色温：-5 冷色")
+    lines.append("- 对比度：+8")
+    lines.append("- 饱和度：+5")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## 第三步：配音")
+    lines.append("")
+    lines.append("### 配音稿（贴入剪映「文本朗读」）")
+    lines.append("")
+    lines.append(f'"""{report.rewritten_copy}"""')
+    lines.append("")
+    lines.append("### 操作步骤")
+    lines.append("1. 剪映 → 文本 → 新建文本 → 贴入配音稿")
+    lines.append('2. 选中文本 → 「朗读」→ 选「解说男声」或「知性女声」')
+    lines.append(f"3. 调整语速：参考原片 {report.pace_description}")
+    lines.append("4. 字幕自动生成 → 样式统一")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## 第四步：BGM")
+    lines.append("")
+    for i, bgm in enumerate(report.bgm_recommendations, 1):
+        lines.append(f"{i}. 剪映音频搜：「{bgm.get('search_keyword', '')}」")
+        lines.append(f"   - {bgm.get('genre', '')} | BPM {bgm.get('bpm_range', '')} | {bgm.get('mood', '')}")
+        lines.append("")
+    lines.append("- BGM音量：降到20-30%（不要压过配音）")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## 第五步：导出")
+    lines.append("")
+    lines.append("- 分辨率：1080p")
+    lines.append("- 帧率：30fps")
+    lines.append("- 格式：MP4")
+    lines.append("- 导出 → 上传平台")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## 模板参考链接")
+    lines.append("")
+    for name, url in report.template_links.items():
+        if url.startswith("http"):
+            lines.append(f"- [{name}]({url})")
+        else:
+            lines.append(f"- **{name}**: {url}")
+    lines.append("")
+    if report.summary:
+        lines.append(f"> 💡 {report.summary}")
+
+    return "\n".join(lines)
 
 
 # ── Agent ─────────────────────────────────────────────────────
@@ -223,24 +335,61 @@ class VideoCloneAgent(BaseAgent):
 
     async def _step_download(self, video_url: str, platform: str):
         from src.downloader.media_downloader import MediaExtractor, MediaDownloader
+        from src.utils.browser_service import browser
 
-        item = {"link": video_url, "aweme_id": video_url.rsplit("/", 1)[-1].split("?")[0]}
+        # 确保浏览器已启动
+        await browser.start()
+
+        # 短链接先通过浏览器解析
+        resolved_url = video_url
+        if any(s in video_url for s in ("v.douyin.com", "b23.tv", "xhslink.com")):
+            try:
+                page = await browser.new_page()
+                try:
+                    await page.goto(video_url, wait_until="domcontentloaded", timeout=15000)
+                    await page.wait_for_timeout(2000)
+                    resolved_url = page.url
+                    logger.info(f"短链接已解析: {video_url[:40]} -> {resolved_url[:60]}")
+                finally:
+                    await page.close()
+            except Exception as exc:
+                logger.warning(f"短链接解析失败，使用原始链接: {exc}")
+
+        vid = resolved_url.rsplit("/", 1)[-1].split("?")[0]
+        out_dir = str(_DOWNLOAD_DIR / "clone_videos")
+        os.makedirs(out_dir, exist_ok=True)
+        filename = f"{platform}_{int(time.time())}.mp4"
+        filepath = os.path.join(out_dir, filename)
+
+        # Path 1: yt-dlp（最可靠，支持抖音/B站/几乎所有平台）
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "yt-dlp", "-o", filepath, "--format", "best[height<=1080]", "--no-playlist",
+                resolved_url,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            if proc.returncode == 0 and os.path.getsize(filepath) > 10000:
+                logger.info(f"yt-dlp 下载成功: {os.path.getsize(filepath)} bytes")
+                dur = await self._get_duration(filepath)
+                return DownloadedVideo(platform=platform, video_id=vid, filepath=filepath,
+                                        title="", duration_seconds=dur)
+            logger.warning(f"yt-dlp 失败，回退 CDP 浏览器: {stderr.decode(errors='replace')[:100]}")
+        except Exception as exc:
+            logger.warning(f"yt-dlp 不可用，回退 CDP 浏览器: {exc}")
+
+        # Path 2: CDP 浏览器提取
+        item = {"link": resolved_url, "aweme_id": vid}
         item.setdefault("cover_url", "")
-
         extractor = MediaExtractor()
         video_src = await extractor.extract_video(platform, item)
         if not video_src:
             raise RuntimeError(f"无法提取视频 URL: {video_url}")
 
-        out_dir = str(_DOWNLOAD_DIR / "clone_videos")
-        os.makedirs(out_dir, exist_ok=True)
-
         dl = MediaDownloader()
         try:
             results = await dl.download_urls(
-                urls=[video_src],
-                output_dir=out_dir,
-                filenames=[f"{platform}_{int(time.time())}.mp4"],
+                urls=[video_src], output_dir=out_dir, filenames=[filename],
             )
         finally:
             await dl.close()
@@ -249,22 +398,16 @@ class VideoCloneAgent(BaseAgent):
             raise RuntimeError(f"下载失败: {results[0].error if results else '未知'}")
 
         filepath = results[0].filepath
+        dur = await self._get_duration(filepath)
+        return DownloadedVideo(platform=platform, video_id=vid, filepath=filepath,
+                                title="", duration_seconds=dur)
 
-        # 获取时长
+    async def _get_duration(self, filepath: str) -> float:
         try:
             from src.utils.ffmpeg_utils import probe_duration
-            duration = await probe_duration(filepath)
+            return await probe_duration(filepath)
         except Exception:
-            duration = 0.0
-
-        downloaded = DownloadedVideo(
-            platform=platform,
-            video_id=item["aweme_id"],
-            filepath=filepath,
-            title="",
-            duration_seconds=duration,
-        )
-        return downloaded
+            return 0.0
 
     # ── Step 2: 抽帧 ────────────────────────────────────────
 
@@ -408,15 +551,15 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
 </context>
 
 <quality_standards>
-1. Canva关键词必须精确（含中英文），能在Canva直接搜到相似风格模板
-2. 剪映关键词针对剪映模板库优化
-3. 改写文案查重率<15%，保留核心信息点但改变句式/用词/顺序
-4. BGM推荐至少3首，每首含曲风+BPM范围+情绪+搜索关键词
-5. 分镜脚本可执行，含具体时长+机位+画面+文字+转场
+1. style_analysis: 直接引用上方「视觉风格分析」的内容，确保每项不少于12字
+2. canva_keywords: 使用短词（2-4字/词），中文用空格分隔，英文全小写
+3. rewritten_copy: 200字以上完整配音稿，保留核心信息但改写句式用词
+4. bgm_recommendations: 至少3首，mood字段不低于8字（如"科技感十足 快速节奏有力"）
+5. shooting_script: 3-8个镜头，每个action_description不低于15字
 </quality_standards>
 
 <task>
-基于以上视觉风格分析，为该视频生成一套完整的复刻方案。
+基于上方视觉风格分析，生成完整复刻方案。注意：style_analysis 字段直接复制上方分析的原文，确保足够长度。
 </task>
 
 <output_format>
@@ -440,14 +583,18 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
             self._pad_clone_output(data)
             return VideoCloneOutput(**data)
         except Exception as exc:
-            logger.warning(f"DeepSeek 结构化输出验证失败，尝试宽松解析: {exc}")
+            logger.warning(f"DeepSeek 验证失败，重试宽松模式: {exc}")
             try:
                 raw = await self._call_llm(prompt, temperature=0.3, json_mode=True, max_tokens=4000)
                 parsed = self._parse_json(raw)
-                self._pad_clone_output(parsed)
-                return VideoCloneOutput(**parsed)
+                if isinstance(parsed, str):
+                    parsed = self._parse_json(parsed)
+                if isinstance(parsed, dict):
+                    self._pad_clone_output(parsed)
+                    return VideoCloneOutput(**parsed)
+                raise ValueError(f"无法解析为dict: {type(parsed)}")
             except Exception as exc2:
-                logger.warning(f"DeepSeek 生成失败，使用回退: {exc2}")
+                logger.warning(f"DeepSeek 失败，使用回退: {exc2}")
                 return self._clone_fallback(style, platform)
 
     @staticmethod

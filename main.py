@@ -315,12 +315,23 @@ async def main():
         from dataclasses import asdict
         agent = VideoCloneAgent()
         logger.info(f"开始分析视频: {args.url}")
+        from src.orchestrator.agents.video_cloner import detect_platform
+        plat = args.platform if args.platform not in ("all", "bilibili") else ""
+        if not plat:
+            plat = detect_platform(args.url)
+        logger.info(f"平台: {plat or '自动检测失败'}")
         report = await agent.run(
             video_url=args.url,
-            platform=args.platform if args.platform != "all" else "",
+            platform=plat,
             max_frames=args.max_frames,
         )
-        print(json.dumps(asdict(report), ensure_ascii=False, indent=2))
+        # 输出操作清单（可直接跟住做）
+        from src.orchestrator.agents.video_cloner import format_checklist
+        print(format_checklist(report))
+        if args.output:
+            out_path = Path(args.output)
+            out_path.write_text(format_checklist(report), encoding="utf-8")
+            logger.info(f"清单已保存: {out_path}")
         return
 
     # ── schedule ──────────────────────────────────────────
