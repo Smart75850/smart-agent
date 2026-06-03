@@ -1,6 +1,6 @@
 # Smart Agent
 
-多平台内容采集框架 — 7 平台纯 HTTP 直连，毫秒级响应，零浏览器依赖。
+多平台内容采集框架 — 5 平台纯 HTTP 直连 + 7 平台全浏览器支持。
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()
 [![License](https://img.shields.io/badge/License-NonCommercial-blue)]()
@@ -10,23 +10,23 @@
 
 ## 核心优势
 
-- **纯 HTTP 直连** — 7 个平台全部实现绕过反爬，无需打开浏览器
-- **毫秒级响应** — 平均延迟 3-4 秒即可完成搜索
+- **纯 HTTP 直连** — 5 个平台（B站/知乎/快手/微博/贴吧）实现纯HTTP采集
+- **浏览器 CDP 兜底** — 抖音/小红书走 CDP 浏览器模式，双路径容错不中断
 - **会话自动管理** — 过期自动收割，无需手动维护
-- **双路径容错** — HTTP 优先，浏览器 CDP 兜底，永不中断
 - **6 种存储后端** — JSON / CSV / JSONL / Excel / SQLite / MySQL
+- **开箱即用** — Docker 部署 / WebUI 仪表板 / MCP Server 协议接口
 
 ## 平台支持
 
-| 平台 | 搜索 | 热榜 | 详情 | 评论 | 用户 | HTTP 直连 | 签名方案 |
+| 平台 | 搜索 | 热榜 | 详情 | 评论 | 用户 | 采集方式 | 说明 |
 |------|:---:|:---:|:---:|:---:|:---:|:---:|------|
-| B站 | ✅ | ✅ | — | ✅ | — | ✅ | 纯 Python Wbi (hashlib) |
-| 小红书 | ✅ | — | ✅ | ✅ | — | ✅ | x-s 会话级令牌复用 |
-| 抖音 | ✅ | — | ✅ | ✅ | ✅ | ✅ | sessionid + ttwid 会话上下文 |
-| 知乎 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 纯 cookies，无需 x-zse-96 |
-| 快手 | ✅ | ✅ | — | — | — | ✅ | 纯 cookies，零签名 |
-| 微博 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | cookies + x-xsrf-token |
-| 贴吧 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | curl_cffi Chrome TLS 指纹 |
+| B站 | ✅ | ✅ | — | ✅ | — | 纯HTTP | Wbi hashlib，无需登录 |
+| 小红书 | ✅ | — | ✅ | ✅ | — | 浏览器 | CDP Chrome 真浏览器 |
+| 抖音 | ✅ | — | ✅ | ✅ | ✅ | 浏览器 | CDP Chrome 真浏览器 |
+| 知乎 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯HTTP | curl_cffi + cookies |
+| 快手 | ✅ | ✅ | — | — | — | 纯HTTP | 纯 cookies，零签名 |
+| 微博 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯HTTP | cookies + xsrf-token |
+| 贴吧 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯HTTP | curl_cffi Chrome TLS |
 
 ## 快速开始
 
@@ -159,37 +159,16 @@ smart-agent/
     └── 使用指南.md                 # 详细使用文档
 ```
 
-## 压测数据
+## 扩展功能
 
-7 平台 × 5 关键词并发搜索，纯 HTTP 模式：
+本仓库同时包含以下可直接使用的扩展模块：
 
-```
-平台             成功  失败  平均延迟
-douyin           5     0    4768ms
-xiaohongshu      5     0    4151ms
-kuaishou         5     0    4233ms
-zhihu            5     0    4066ms
-weibo            5     0    3774ms
-tieba            5     0    1843ms
-B站              5     0    <500ms
-─────────────────────────────────
-总计             35    0    3805ms
-```
-
-35 次搜索，100% 成功率，零失败。
-
-## Pro 版（闭源）
-
-Smart Agent Pro 是基于开源版内核的增强版本，面向有更高采集需求的开发者和小团队，额外提供：
-
-- **Go 重构核心** — 网络层由 Python 迁移至 Golang，并发性能提升 5-10 倍，内存占用降低 80%
-- **Docker 一键部署** — `docker compose up` 即开即用，无需折腾 Python 环境
-- **新增 5 个海外平台** — YouTube、Instagram、TikTok、Twitter/X、Reddit
-- **MCP Server** — 标准 MCP 协议接口，可直接接入 Claude Desktop / Cursor / Continue 等 AI 工具链
-- **数据推送** — 采集结果自动推送至飞书/钉钉/企业微信/Telegram
-- **断点续爬 + 增量采集** — 支持大规模长时间采集任务，中断后自动续传
-
-有意了解请联系。
+- **MCP Server** — 标准 MCP 协议接口（25 个工具），可接入 Claude Desktop / Cursor 等 AI 工具链
+- **Docker 部署** — `docker compose up` 即开即用
+- **断点续爬 + 去重** — SQLite 持久化，中断后自动续传，支持 `--resume`
+- **AI Agent 管线** — LangGraph + DeepSeek LLM 驱动，9 个分析 Agent（趋势/选品/视频/情绪/文案/配图等）
+- **批量下载器** — 视频 + 封面图批量下载
+- **Go 高性能模式** — Go 二进制（6.7MB）替代 Python CLI，并发性能提升 5-10 倍
 
 ## 免责声明
 

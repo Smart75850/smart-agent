@@ -13,21 +13,12 @@
 
 ---
 
-## 當前焦點（2026-06-01 更新）
+## 當前焦點（2026-06-03 更新）
 
-✅ **Smart Agent Pro v1.0 最終版 — 三大跨界方案落地，6/6 平台驗收通過**
-✅ 7 Agent 專業級改造完成（Google/Oracle/Mindflow 2026 標準）
-✅ **跨界方案**：預測(growth_velocity/lifecycle) + 深度(problem_solved/emotional_triggers) + 廣度(cross_platform)
-✅ 小紅書安全方案：CDP 真瀏覽器優先 + HTTP 備用 + 隨機延遲 + 多號輪換
-🟡 抖音/快手評論純 HTTP — API URL 已確認，cookie 層待攻堅
-🟡 小紅書 — 帳號封禁，新號待註冊
-
-**下一步：銷售推廣 + 內容營運**
-✅ 開源文檔完備（中英 README + 使用指南 + Landing Page）
-🟡 Pro 版交付物：ZIP 打包腳本未寫
-🟡 內容管線：計劃已有，未開始執行
-
-**下一步：內容營運（每周掘金/B站/小紅書）+ Pro ZIP 打包腳本**
+✅ **开源版已发布** — 5平台纯HTTP + 7平台浏览器，56/56测试通过
+✅ **逆向签名文件已移除** — 抖音+小红书逆向放私有备份 `桌面\Smart-Agent逆向签名-私有\`
+🟡 **内容营运**：计划已有，B站/掘金/知乎待开始执行
+🟡 **销售推广**：策略已定（见知识星图节点30）
 
 ---
 
@@ -182,12 +173,12 @@
 
 | Repo | 可見性 | Branch | 用途 |
 |------|:------:|--------|------|
-| `Smart75850/smart-agent` | 🔓 公開 | `main` | 開源版（舊 code，未同步） |
-| `Smart75850/smart-agent-pro` | 🔒 私人 | `main` | **Pro 版開發中（最新 code）** |
-| `Smart75850/smart-agent-pro` | 🔒 私人 | `pro` | Pro 版備份 branch |
+| `Smart75850/smart-agent` | 🔓 公開 | `main` | **開源版（最新 code）** |
+| `Smart75850/smart-agent-pro` | 🔒 私人 | `main` | Pro 版舊倉庫（已廢棄） |
 
-**開發目錄：** `C:\Users\guohu\smart-agent\`
-**Remote：** `pro-origin` → `Smart75850/smart-agent-pro`
+**開發目錄：** `C:\Users\guohu\Desktop\smart-agent\`
+**Remote：** `old-public` → `Smart75850/smart-agent`
+**逆向備份：** `C:\Users\guohu\Desktop\Smart-Agent逆向签名-私有\`
 
 ---
 
