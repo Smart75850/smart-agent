@@ -37,3 +37,5 @@ class PipelineState(TypedDict, total=False):
     copy_report: dict             # CopyReport asdict
     remix_report: dict            # RemixReport asdict
     visual_report: dict           # VisualReport asdict
+    clone_report: dict            # CloneReport asdict (VideoCloneAgent)
+    video_url: str                # 视频克隆用的 URL

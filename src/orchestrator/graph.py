@@ -67,6 +67,7 @@ _AGENT_FACTORY = {
     "copy_writer":      ("src.orchestrator.agents", "CopyWriter"),
     "content_remixer":  ("src.orchestrator.agents", "ContentRemixer"),
     "pic_tactic":       ("src.orchestrator.agents", "PicTactic"),
+    "video_cloner":     ("src.orchestrator.agents", "VideoCloneAgent"),
 }
 
 

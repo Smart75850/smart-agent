@@ -73,6 +73,14 @@ class Settings:
     DEEPSEEK_API_URL: str = "https://api.deepseek.com/v1"
     DEEPSEEK_MODEL: str = "deepseek-chat"
 
+    # QWEN-VL (通义千问视觉模型) — 视频分析
+    QWEN_API_KEY: str = ""
+    QWEN_API_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    QWEN_MODEL: str = "qwen-vl-max"
+
+    # Canva — 模板搜索 (Phase 2)
+    CANVA_API_KEY: str = ""
+
     # MySQL（可選後端）
     MYSQL_HOST: str = "localhost"
     MYSQL_PORT: int = 3306
@@ -116,6 +124,10 @@ class Settings:
             DEEPSEEK_API_KEY=environ.get("DEEPSEEK_API_KEY", ""),
             DEEPSEEK_API_URL=environ.get("DEEPSEEK_API_URL", "https://api.deepseek.com/v1"),
             DEEPSEEK_MODEL=environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+            QWEN_API_KEY=environ.get("QWEN_API_KEY", ""),
+            QWEN_API_URL=environ.get("QWEN_API_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            QWEN_MODEL=environ.get("QWEN_MODEL", "qwen-vl-max"),
+            CANVA_API_KEY=environ.get("CANVA_API_KEY", ""),
             CAMOUFOX_HEADLESS=environ.get("CAMOUFOX_HEADLESS", "false").lower() == "true",
             CAMOUFOX_HUMANIZE=environ.get("CAMOUFOX_HUMANIZE", "true").lower() != "false",
             CAMOUFOX_BLOCK_WEBRTC=environ.get("CAMOUFOX_BLOCK_WEBRTC", "true").lower() != "false",

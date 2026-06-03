@@ -46,6 +46,7 @@ from api.routers.data import router as data_router
 from api.routers.ws import router as ws_router
 from api.routers.pipeline import router as pipeline_router
 from api.routers.usage import router as usage_router
+from api.routers.clone import router as clone_router
 from api.middleware import UsageMiddleware
 
 # 使用额度中间件（试用版限 50 次）
@@ -57,6 +58,7 @@ app.include_router(data_router)
 app.include_router(ws_router)
 app.include_router(pipeline_router)
 app.include_router(usage_router)
+app.include_router(clone_router)
 
 # ── Session 守护 ─────────────────────────────────────────────
 from src.utils.session_manager import get_health_status, start_session_guardian, harvest_all

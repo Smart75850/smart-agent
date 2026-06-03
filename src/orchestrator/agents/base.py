@@ -1,6 +1,8 @@
 """Agent 基类 — 共享 LLM 配置和 HTTP 调用。"""
 
+import base64
 import json
+import os
 import re
 from typing import TypeVar
 
@@ -17,6 +19,10 @@ class BaseAgent:
         self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
         self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
         self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
+        # QWEN-VL 多模态配置
+        self._qwen_api_key = settings.QWEN_API_KEY or settings.LLM_API_KEY or self._api_key
+        self._qwen_api_url = settings.QWEN_API_URL or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        self._qwen_model = settings.QWEN_MODEL or "qwen-vl-max"
 
     async def _call_llm(self, prompt: str, temperature: float = 0.7, json_mode: bool = False, max_tokens: int = 2000) -> str:
         """调用 DeepSeek LLM，返回原始响应文本。"""
@@ -39,6 +45,55 @@ class BaseAgent:
                 json=body,
             )
             data = resp.json()
+            return data["choices"][0]["message"]["content"]
+
+    async def _call_qwen_vl(
+        self,
+        prompt: str,
+        images: list[str],
+        temperature: float = 0.3,
+        max_tokens: int = 2000,
+    ) -> str:
+        """调用 QWEN-VL 多模态模型，发送图片+文本并返回响应。
+
+        Args:
+            prompt: 文本提示
+            images: 图片文件路径列表
+            temperature: 采样温度
+            max_tokens: 最大输出 token 数
+        """
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for img_path in images:
+            if not os.path.exists(img_path):
+                continue
+            ext = os.path.splitext(img_path)[1].lower().lstrip(".")
+            mime = "jpeg" if ext in ("jpg", "jpeg") else ext
+            with open(img_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/{mime};base64,{b64}"},
+            })
+
+        body = {
+            "model": self._qwen_model,
+            "messages": [{"role": "user", "content": content}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                f"{self._qwen_api_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._qwen_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
+            data = resp.json()
+            if "choices" not in data:
+                raise RuntimeError(f"QWEN-VL API 错误: {data}")
             return data["choices"][0]["message"]["content"]
 
     async def _call_llm_structured(self, prompt, output_model, temperature=0.3, max_tokens=4000):

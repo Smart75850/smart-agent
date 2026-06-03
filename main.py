@@ -63,7 +63,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--type", default="search",
-        choices=["search", "hot", "rank", "detail", "comment", "user", "aggregate", "trend"],
+        choices=["search", "hot", "rank", "detail", "comment", "user", "aggregate", "trend", "clone"],
         help="操作類型（預設 search，按平台決定可用選項）",
     )
     parser.add_argument(
@@ -93,6 +93,14 @@ def parse_args(argv=None):
     parser.add_argument(
         "--download", action="store_true",
         help="搜索后自动下载视频/封面 (仅 --type=search 时有效)",
+    )
+    parser.add_argument(
+        "--url", default="",
+        help="视频链接（--type=clone 时需要）",
+    )
+    parser.add_argument(
+        "--max-frames", type=int, default=30,
+        help="视频抽帧上限（--type=clone 时有效，预设30）",
     )
     parser.add_argument(
         "--stream", action="store_true",
@@ -297,6 +305,23 @@ async def main():
             print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
+
+    # ── clone: 视频克隆分析 ────────────────────────────────
+    if args.type == "clone":
+        if not args.url:
+            logger.error("--type clone 需要 --url 参数（视频链接）")
+            sys.exit(1)
+        from src.orchestrator.agents.video_cloner import VideoCloneAgent
+        from dataclasses import asdict
+        agent = VideoCloneAgent()
+        logger.info(f"开始分析视频: {args.url}")
+        report = await agent.run(
+            video_url=args.url,
+            platform=args.platform if args.platform != "all" else "",
+            max_frames=args.max_frames,
+        )
+        print(json.dumps(asdict(report), ensure_ascii=False, indent=2))
+        return
 
     # ── schedule ──────────────────────────────────────────
     if args.schedule:

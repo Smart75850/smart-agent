@@ -7,6 +7,7 @@ from src.orchestrator.agents.content_remixer import (
     ContentRemixer, RemixInput, RemixReport, TrackInsight, ContentRewrite,
 )
 from src.orchestrator.agents.pic_tactic import PicTactic, VisualTactic, VisualReport
+from src.orchestrator.agents.video_cloner import VideoCloneAgent, CloneReport, ShotInstructionDTO
 
 __all__ = [
     "TrendScout", "TrendItem", "TrendReport",
@@ -16,4 +17,5 @@ __all__ = [
     "CopyWriter", "CopyVariant", "CopyReport",
     "ContentRemixer", "RemixInput", "RemixReport", "TrackInsight", "ContentRewrite",
     "PicTactic", "VisualTactic", "VisualReport",
+    "VideoCloneAgent", "CloneReport", "ShotInstructionDTO",
 ]
