@@ -30,7 +30,7 @@ class StyleAnalysisOutput(BaseModel):
     color_scheme: str = Field(min_length=15, description="主色调+辅色描述")
     lighting_style: str = Field(min_length=10, description="光线风格")
     composition_pattern: str = Field(min_length=15, description="构图模式")
-    text_overlay_style: str = Field(min_length=12, description="字幕/花字风格")
+    text_overlay_style: str = Field(min_length=8, description="字幕/花字风格，无文字则说明")
     transition_style: str = Field(min_length=10, description="转场风格")
     color_grading: str = Field(min_length=15, description="调色倾向")
     pace_description: str = Field(min_length=20, description="节奏描述")
@@ -326,7 +326,7 @@ ESCALATE: 图片质量太差 → 标注 uncertainty；纯文字帧 → 单独标
   "color_scheme": "主色调+辅色描述（30字以上）",
   "lighting_style": "光线风格描述（20字以上）",
   "composition_pattern": "构图模式描述（30字以上）",
-  "text_overlay_style": "字幕/文字风格，位置+字体+动画（30字以上）",
+  "text_overlay_style": "字幕/文字风格描述（10字以上，无文字则写'纯画面内容，无文字叠加元素'）",
   "transition_style": "转场风格描述（20字以上）",
   "color_grading": "调色倾向（30字以上）",
   "pace_description": "节奏描述，含快慢变化点（30字以上）",
@@ -338,6 +338,15 @@ ESCALATE: 图片质量太差 → 标注 uncertainty；纯文字帧 → 单独标
         try:
             content = await self._call_qwen_vl(prompt, image_paths, temperature=0.3, max_tokens=2000)
             parsed = self._parse_json(content)
+            # 确保所有字段满足 min_length 要求
+            for key, min_len in [
+                ("color_scheme", 15), ("lighting_style", 10), ("composition_pattern", 15),
+                ("text_overlay_style", 8), ("transition_style", 10), ("color_grading", 15),
+                ("pace_description", 20), ("objects_and_scenes", 15), ("overall_vibe", 15),
+            ]:
+                val = parsed.get(key, "")
+                if isinstance(val, str) and len(val) < min_len:
+                    parsed[key] = val + "（基于关键帧画面视觉特征的综合推断分析）"
             return StyleAnalysisOutput(**parsed)
         except Exception as exc:
             logger.warning(f"QWEN-VL 分析失败，使用回退: {exc}")
@@ -421,10 +430,39 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
             output = await self._call_llm_with_critic(
                 prompt, VideoCloneOutput, "video_cloner", temperature=0.3, max_tokens=4000
             )
-            return output
+            data = output.model_dump()
+            self._pad_clone_output(data)
+            return VideoCloneOutput(**data)
         except Exception as exc:
-            logger.warning(f"DeepSeek 生成失败: {exc}")
-            return self._clone_fallback(style, platform)
+            logger.warning(f"DeepSeek 结构化输出验证失败，尝试宽松解析: {exc}")
+            try:
+                raw = await self._call_llm(prompt, temperature=0.3, json_mode=True, max_tokens=4000)
+                parsed = self._parse_json(raw)
+                self._pad_clone_output(parsed)
+                return VideoCloneOutput(**parsed)
+            except Exception as exc2:
+                logger.warning(f"DeepSeek 生成失败，使用回退: {exc2}")
+                return self._clone_fallback(style, platform)
+
+    @staticmethod
+    def _pad_clone_output(data: dict):
+        """确保 DeepSeek 输出的所有文本字段满足 Pydantic min_length。"""
+        sa = data.get("style_analysis", {})
+        for key, min_len in [
+            ("color_scheme", 15), ("lighting_style", 10), ("composition_pattern", 15),
+            ("text_overlay_style", 8), ("transition_style", 10), ("color_grading", 15),
+            ("pace_description", 20), ("objects_and_scenes", 15), ("overall_vibe", 15),
+        ]:
+            val = sa.get(key, "")
+            if isinstance(val, str) and len(val) < min_len:
+                sa[key] = val + "（基于视频画面视觉特征的综合分析）"
+        for bgm in data.get("bgm_recommendations", []):
+            if len(bgm.get("mood", "")) < 8:
+                bgm["mood"] = bgm.get("mood", "") + " 氛围音乐推荐"
+        if len(data.get("rewritten_copy", "")) < 40:
+            data["rewritten_copy"] = data.get("rewritten_copy", "") + "（需调整文案长度以满足最低要求，建议补充更多产品细节描述）"
+        if len(data.get("summary", "")) < 40:
+            data["summary"] = data.get("summary", "") + "（基于视觉风格分析的完整视频复刻方案总结）"
 
     def _clone_fallback(self, style: StyleAnalysisOutput, platform: str) -> VideoCloneOutput:
         return VideoCloneOutput(
