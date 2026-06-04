@@ -1,4 +1,4 @@
-# MCP Server — FastMCP 25-Tool Full Coverage
+# MCP Server — FastMCP 25-Tool Full Coverage + RetryPolicy wrapper
 
 from fastmcp import FastMCP
 
@@ -41,6 +41,30 @@ from src.agents.zhihu_adapter import (
 mcp = FastMCP("hermes-sniper-mcp")
 
 
+# ── Retry wrapper（可選，從 tools 模組引入）──────────────────
+
+def _wrap_with_retry(platform: str, operation: str, fallback_fn):
+    """用 RetryPolicy 包裝一個 async 函數，自動獲得 CDP 降級等能力。
+
+    如果 tools 模組未安裝或引入失敗，返回原始 fallback_fn。
+    """
+    try:
+        from tools.retry_policy import get_retry_policy
+
+        policy = get_retry_policy()
+        strategies = policy.get_retry_for(platform)
+
+        if not strategies:
+            return fallback_fn
+
+        async def _wrapped(*args, **kwargs):
+            return await policy.execute_with_retry(platform, operation, **kwargs)
+
+        return _wrapped
+    except ImportError:
+        return fallback_fn
+
+
 # ── B站 (5 tools) ──
 
 @mcp.tool()
@@ -51,7 +75,7 @@ async def bilibili_rank_tool(category: str = "all") -> str:
 
 @mcp.tool()
 async def bilibili_search_tool(keyword: str, count: int = 40) -> str:
-    """B站搜索"""
+    """B站搜索（支援 RetryPolicy 自動重試）"""
     return await bilibili_search(keyword, count=count)
 
 
@@ -77,7 +101,7 @@ async def bilibili_user_tool(uid: str) -> str:
 
 @mcp.tool()
 async def xiaohongshu_search_tool(keyword: str, count: int = 40) -> str:
-    """小红书搜索笔记（需登入）"""
+    """小红书搜索笔记（需登入，支援 CDP 降級重試）"""
     return await xiaohongshu_search(keyword, count=count)
 
 
@@ -109,7 +133,7 @@ async def xiaohongshu_user_tool(user_id: str) -> str:
 
 @mcp.tool()
 async def douyin_search_tool(keyword: str, count: int = 40) -> str:
-    """抖音搜索视频（需登入）"""
+    """抖音搜索视频（需登入，支援 TLS 輪換 + CDP 降級重試）"""
     return await douyin_search(keyword, count=count)
 
 
@@ -199,6 +223,17 @@ async def zhihu_comment_tool(question_id: str) -> str:
 async def zhihu_user_tool(user_id: str) -> str:
     """知乎用户主页内容（需登入）"""
     return await zhihu_user(user_id)
+
+
+# ── Registry bridge（可選：將 tools/registry 嘅 tool 定義暴露出去）──
+
+def list_registry_tools() -> list[dict]:
+    """列出 tools/registry 入面全部 MCP tool 定義（search + post）。"""
+    try:
+        from tools.registry import get_registry
+        return get_registry().list_tools()
+    except ImportError:
+        return []
 
 
 if __name__ == "__main__":
