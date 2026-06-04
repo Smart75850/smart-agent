@@ -57,6 +57,7 @@ class ShotInstruction(BaseModel):
     camera_angle: str = Field(description="机位/角度")
     action_description: str = Field(min_length=15, description="画面内容详述")
     text_overlay: str = Field(default="", description="画面文字")
+    image_hint: str = Field(default="", description="配图建议：截图/录屏/素材")
     voiceover_hint: str = Field(default="", description="配音提示")
     transition_to_next: str = Field(default="硬切", description="转场方式")
 
@@ -79,6 +80,7 @@ class ShotInstructionDTO:
     camera_angle: str = ""
     action_description: str = ""
     text_overlay: str = ""
+    image_hint: str = ""
     voiceover_hint: str = ""
     transition_to_next: str = "硬切"
 
@@ -106,6 +108,7 @@ class CloneReport:
     bgm_recommendations: list[dict] = field(default_factory=list)
     shooting_script: list[ShotInstructionDTO] = field(default_factory=list)
     template_links: dict[str, str] = field(default_factory=dict)
+    publishing_warnings: list[str] = field(default_factory=list)
     summary: str = ""
     errors: list[str] = field(default_factory=list)
 
@@ -166,13 +169,13 @@ def format_checklist(report: CloneReport) -> str:
     lines.append("")
     lines.append("### 2.2 按分镜脚本排列")
     lines.append("")
-    lines.append("| 镜头 | 时长 | 机位 | 画面内容 | 文字叠加 | 配音提示 | 转场 |")
-    lines.append("|:---:|:---:|:---:|------|------|------|:---:|")
+    lines.append("| 镜头 | 时长 | 画面内容 | 配图建议 | 文字叠加 | 配音 | 转场 |")
+    lines.append("|:---:|:---:|------|------|------|------|:---:|")
     for s in report.shooting_script:
         lines.append(
-            f"| {s.shot_number} | {s.duration_seconds}s | {s.camera_angle} | "
-            f"{s.action_description[:40]} | {s.text_overlay[:20]} | "
-            f"{s.voiceover_hint[:20]} | {s.transition_to_next} |"
+            f"| {s.shot_number} | {s.duration_seconds}s | "
+            f"{s.action_description[:30]} | {s.image_hint[:20]} | "
+            f"{s.text_overlay[:15]} | {s.voiceover_hint[:15]} | {s.transition_to_next} |"
         )
     lines.append("")
     lines.append("### 2.3 加动画效果")
@@ -224,6 +227,16 @@ def format_checklist(report: CloneReport) -> str:
     lines.append("- 帧率：30fps")
     lines.append("- 格式：MP4")
     lines.append("- 导出 → 上传平台")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## 发文避忌检查")
+    lines.append("")
+    if report.publishing_warnings:
+        for w in report.publishing_warnings:
+            lines.append(f"- {w}")
+    else:
+        lines.append("- ✅ 文案未检测到明显违规项")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -305,12 +318,14 @@ class VideoCloneAgent(BaseAgent):
                     camera_angle=s.camera_angle,
                     action_description=s.action_description,
                     text_overlay=s.text_overlay,
+                    image_hint=s.image_hint,
                     voiceover_hint=s.voiceover_hint,
                     transition_to_next=s.transition_to_next,
                 )
                 for s in clone_output.shooting_script
             ]
             report.summary = clone_output.summary
+            report.publishing_warnings = self._check_publishing_rules(clone_output.rewritten_copy)
             report.template_links = self._build_template_links(
                 clone_output.canva_keywords.cn_keywords,
                 clone_output.canva_keywords.en_keywords,
@@ -555,7 +570,7 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
 2. canva_keywords: 使用短词（2-4字/词），中文用空格分隔，英文全小写
 3. rewritten_copy: 200字以上完整配音稿，保留核心信息但改写句式用词
 4. bgm_recommendations: 至少3首，mood字段不低于8字（如"科技感十足 快速节奏有力"）
-5. shooting_script: 3-8个镜头，每个action_description不低于15字
+5. shooting_script: 3-8个镜头，每个action_description不低于15字，image_hint写配图建议(截图/录屏/素材)
 </quality_standards>
 
 <task>
@@ -570,7 +585,7 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
    "jianying_keywords": ["剪映关键词1","剪映关键词2",...]}}}},
  "rewritten_copy": "改写后的完整文案（200字以上）",
  "bgm_recommendations": [{{{{"genre":"电子","bpm_range":"110-130","mood":"科技感 快节奏","search_keyword": "科技背景音乐 快节奏"}}}}, ...],
- "shooting_script": [{{{{"shot_number":1,"duration_seconds":8,"camera_angle":"特写","action_description":"产品慢慢靠近镜头","text_overlay":"这东西太好用了","voiceover_hint":"这东西太好用了...","transition_to_next":"淡入"}}}}, ...],
+ "shooting_script": [{{{{"shot_number":1,"duration_seconds":8,"camera_angle":"特写","action_description":"产品慢慢靠近镜头","text_overlay":"太好用了","image_hint":"产品高清特写截图","voiceover_hint":"这东西太好用了...","transition_to_next":"淡入"}}}}, ...],
  "summary": "50字以上总结，含总体风格方向+适用场景"
 }}}}
 </output_format>"""
@@ -596,6 +611,32 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
             except Exception as exc2:
                 logger.warning(f"DeepSeek 失败，使用回退: {exc2}")
                 return self._clone_fallback(style, platform)
+
+    @staticmethod
+    def _check_publishing_rules(copy_text: str) -> list[str]:
+        """检查文案中的发文避忌，返回违规提示列表（空列表=通过）。"""
+        warnings: list[str] = []
+        # 绝对红线
+        for kw in ["¥", "￥", "微信", "微信号", "二维码", "加我", "私信", "联系我", "商务合作"]:
+            if kw in copy_text:
+                warnings.append(f"❌ 含「{kw}」— 绝对禁止，必须删除")
+        # 绝对化用语
+        for kw in ["最好用", "最强", "第一", "顶级", "100%", "永久", "碾压", "比XX好用"]:
+            if kw in copy_text:
+                warnings.append(f"⚠️ 含「{kw}」— 绝对化用语，建议改为中性表述")
+        # 商业字眼
+        for kw in ["购买", "售价", "定价", "付费", "¥399", "Pro版", "商用"]:
+            if kw in copy_text:
+                warnings.append(f"⚠️ 含「{kw}」— 商业字眼，公开平台禁用")
+        # 价格数字
+        import re
+        price_patterns = re.findall(r'[¥￥]\s*\d+', copy_text)
+        for p in price_patterns:
+            warnings.append(f"❌ 含价格「{p}」— 任何平台绝不出现价格")
+        # 检查是否有 GitHub 链接（安全做法）
+        if "github.com" in copy_text.lower():
+            warnings.append("✅ 含GitHub链接 — 掘金/知乎/B站/开源中国允许")
+        return warnings
 
     @staticmethod
     def _build_template_links(cn_keywords: list[str], en_keywords: list[str], jianying_keywords: list[str]) -> dict[str, str]:
@@ -651,20 +692,20 @@ BOUNDARY: 不修改原视频风格方向、不生成与原文案高度相似的�
                 ShotInstruction(
                     shot_number=1, duration_seconds=5, camera_angle="特写",
                     action_description="产品主图展示，配合标题文字弹出动画",
-                    text_overlay="产品名称 + 一句话卖点", voiceover_hint="今天给大家介绍一款...",
-                    transition_to_next="淡入淡出",
+                    text_overlay="产品名称 + 一句话卖点", image_hint="产品高清截图或渲染图",
+                    voiceover_hint="今天给大家介绍一款...", transition_to_next="淡入淡出",
                 ),
                 ShotInstruction(
                     shot_number=2, duration_seconds=8, camera_angle="中景",
                     action_description="产品实际使用场景演示，展示核心功能",
-                    text_overlay="功能要点1 / 功能要点2", voiceover_hint="它的核心功能是...",
-                    transition_to_next="硬切",
+                    text_overlay="功能要点1 / 功能要点2", image_hint="操作录屏截图",
+                    voiceover_hint="它的核心功能是...", transition_to_next="硬切",
                 ),
                 ShotInstruction(
                     shot_number=3, duration_seconds=5, camera_angle="全景",
                     action_description="总结画面，三产品排列+行动号召文字",
-                    text_overlay="立即体验", voiceover_hint="快来试试吧",
-                    transition_to_next="淡出",
+                    text_overlay="立即体验", image_hint="产品合集图或品牌logo",
+                    voiceover_hint="快来试试吧", transition_to_next="淡出",
                 ),
             ],
             summary="（降级模式：需同时配置 QWEN_API_KEY + DEEPSEEK_API_KEY 获取完整克隆方案）",
