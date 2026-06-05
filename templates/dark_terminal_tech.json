@@ -1,0 +1,68 @@
+{
+  "name": "暗黑科技终端风格",
+  "source": "Codex产品更新海报",
+  "created": "2026-06-04",
+  "style_analysis": {
+    "color_scheme": "深黑背景(#0a0a0a), 深灰绿边框(#1a1a1a), 荧光绿强调(#00ff00), 黄/蓝/紫辅助语法高亮",
+    "lighting_style": "无光源，纯平面暗黑模式设计",
+    "composition_pattern": "垂直分层：版本信息→主标题→终端窗口(模拟macOS三色圆点)→功能标签→总结文案。留白充足，视觉重心居中",
+    "text_overlay_style": "无衬线SF Pro/Helvetica主标题(超大加粗)+等宽Monaco终端文字(灰绿)。左对齐。代码符号(→ ✓ $)增强技术感",
+    "transition_style": "静态切换，无动画",
+    "color_grading": "暗黑+荧光经典科技风，高对比度，信息密度适中",
+    "pace_description": "静态单帧，适合社交媒体推文图/产品公告",
+    "objects_and_scenes": "macOS终端窗口UI(红黄绿圆点)，命令行伪代码，功能标签[COMPUTER_USE/BROWSER/IMAGE_GEN/MEMORY]，✓状态指示器",
+    "overall_vibe": "极简、代码化、未来主义、专业、技术感"
+  },
+  "canva_keywords_cn": [
+    "暗黑科技海报",
+    "终端代码界面",
+    "软件更新公告",
+    "深色模式设计",
+    "荧光绿文字",
+    "开发者营销"
+  ],
+  "canva_keywords_en": [
+    "dark tech poster",
+    "terminal code interface",
+    "software update banner",
+    "dark mode design",
+    "neon green text",
+    "developer marketing"
+  ],
+  "jianying_keywords": [
+    "科技感",
+    "暗黑",
+    "代码",
+    "终端",
+    "荧光"
+  ],
+  "bgm_recommendations": [
+    {
+      "genre": "电子",
+      "bpm_range": "100-120",
+      "mood": "科技感未来感",
+      "search_keyword": "科技电子 背景音乐 暗黑风"
+    },
+    {
+      "genre": "氛围",
+      "bpm_range": "80-100",
+      "mood": "深沉专业大气",
+      "search_keyword": "深沉科技 背景音乐"
+    }
+  ],
+  "fonts": [
+    "SF Pro Display",
+    "Helvetica Neue",
+    "Monaco",
+    "Fira Code"
+  ],
+  "tags": [
+    "暗黑",
+    "终端",
+    "代码",
+    "科技",
+    "荧光绿",
+    "极简",
+    "产品海报"
+  ]
+}

@@ -240,6 +240,26 @@ def format_checklist(report: CloneReport) -> str:
     lines.append("")
     lines.append("---")
     lines.append("")
+    # 匹配风格模板库
+    lines.append("## 风格模板库匹配")
+    lines.append("")
+    templates = list_templates()
+    if templates:
+        # 用关键词匹配模板
+        all_kw = " ".join(report.canva_cn_keywords + report.canva_en_keywords).lower() if report.canva_cn_keywords else ""
+        for t in templates:
+            tags = " ".join(t.get("tags", [])).lower()
+            match_score = sum(1 for tag in t.get("tags", []) if tag.lower() in all_kw or tag.lower() in report.overall_vibe.lower())
+            if match_score >= 2:
+                lines.append(f"- **{t.get('name', '?')}** ({t.get('source', '?')}) — 匹配{min(match_score, 5)}/5个标签")
+                lines.append(f"  字体参考: {', '.join(t.get('fonts', ['?']))}")
+        if not any(True for t in templates if sum(1 for tag in t.get("tags", []) if tag.lower() in all_kw) >= 2):
+            lines.append("- 暂无匹配的风格模板（可手动创建: `downloads/clone_templates/`）")
+    else:
+        lines.append("- 模板库为空，运行「图片逆向」分析可添加新模板")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
     lines.append("## 模板参考链接")
     lines.append("")
     for name, url in report.template_links.items():
@@ -252,6 +272,40 @@ def format_checklist(report: CloneReport) -> str:
         lines.append(f"> 💡 {report.summary}")
 
     return "\n".join(lines)
+
+
+# ── Agent ─────────────────────────────────────────────────────
+
+# ── 模板库 ─────────────────────────────────────────────────
+
+_TEMPLATES_DIR = _PROJECT_ROOT / "downloads" / "clone_templates"
+
+
+def list_templates() -> list[dict]:
+    """列出所有已保存的风格模板。"""
+    import json
+    templates = []
+    if _TEMPLATES_DIR.exists():
+        for f in sorted(_TEMPLATES_DIR.glob("*.json")):
+            try:
+                data = json.loads(f.read_text("utf-8"))
+                data["_file"] = f.name
+                templates.append(data)
+            except Exception:
+                pass
+    return templates
+
+
+def load_template(name: str) -> dict | None:
+    """按名称加载风格模板。"""
+    import json
+    path = _TEMPLATES_DIR / f"{name}.json"
+    if path.exists():
+        return json.loads(path.read_text("utf-8"))
+    for t in list_templates():
+        if t.get("name") == name:
+            return t
+    return None
 
 
 # ── Agent ─────────────────────────────────────────────────────
