@@ -278,32 +278,40 @@ def format_checklist(report: CloneReport) -> str:
 
 # ── 模板库 ─────────────────────────────────────────────────
 
-_TEMPLATES_DIR = _PROJECT_ROOT / "downloads" / "clone_templates"
+_TEMPLATES_DIRS = [
+    _PROJECT_ROOT / "templates",
+    _PROJECT_ROOT / "downloads" / "clone_templates",
+]
 
 
 def list_templates() -> list[dict]:
-    """列出所有已保存的风格模板。"""
+    """列出所有已保存的风格模板（从 templates/ 和 downloads/clone_templates/）。"""
     import json
     templates = []
-    if _TEMPLATES_DIR.exists():
-        for f in sorted(_TEMPLATES_DIR.glob("*.json")):
-            try:
-                data = json.loads(f.read_text("utf-8"))
-                data["_file"] = f.name
-                templates.append(data)
-            except Exception:
-                pass
+    for d in _TEMPLATES_DIRS:
+        if d.exists():
+            for f in sorted(d.glob("*.json")):
+                try:
+                    data = json.loads(f.read_text("utf-8"))
+                    data["_file"] = f.name
+                    if not any(t.get("name") == data.get("name") for t in templates):
+                        templates.append(data)
+                except Exception:
+                    pass
     return templates
 
 
 def load_template(name: str) -> dict | None:
-    """按名称加载风格模板。"""
+    """按名称或文件名加载风格模板。"""
     import json
-    path = _TEMPLATES_DIR / f"{name}.json"
-    if path.exists():
-        return json.loads(path.read_text("utf-8"))
+    for d in _TEMPLATES_DIRS:
+        path = d / f"{name}.json"
+        if not path.exists():
+            path = d / name
+        if path.exists():
+            return json.loads(path.read_text("utf-8"))
     for t in list_templates():
-        if t.get("name") == name:
+        if t.get("name") == name or t.get("_file") == name:
             return t
     return None
 
