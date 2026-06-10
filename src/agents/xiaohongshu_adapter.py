@@ -1,8 +1,6 @@
 import asyncio
 import json
 import os
-import random
-import socket
 from pathlib import Path
 from typing import Optional
 
@@ -10,91 +8,8 @@ from base.platform_base import PlatformAdapter
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
-
-def _check_cdp_available(port: int = 9222) -> bool:
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-            return True
-    except (OSError, TimeoutError):
-        return False
-
 _COOKIE_FILE = Path(__file__).parent.parent.parent / "output" / "xiaohongshu_cookies.json"
 _PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "pw_xhs_live"
-_CAMOUFOX_PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "cf_xhs_live"
-
-
-async def _setup_xhs_context():
-    """根据 BROWSER_ENGINE 返回 (page, cleanup_coro)。
-
-    Camoufox 走 AsyncCamoufox persistent profile；
-    Chromium 走 launch_persistent_context。
-    自动注入 CookieBridge 保存的 cookies。
-    """
-    engine = os.environ.get("BROWSER_ENGINE", "")
-    from config.settings import settings
-
-    if engine == "camoufox":
-        from playwright.async_api import async_playwright
-        from camoufox.async_api import AsyncNewBrowser
-        pw = await async_playwright().start()
-        context = await AsyncNewBrowser(
-            pw,
-            persistent_context=True,
-            headless=False,
-            humanize=True,
-            locale="zh-CN",
-            os=settings.CAMOUFOX_OS or "windows",
-            block_webrtc=True,
-            user_data_dir=str(_CAMOUFOX_PERSIST_DIR),
-            screen={"width": 1920, "height": 1080},
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
-
-        async def cleanup():
-            await context.close()
-            await pw.stop()
-
-        return page, cleanup
-
-    else:
-        from playwright.async_api import async_playwright
-        pw = await async_playwright().start()
-        context = await pw.chromium.launch_persistent_context(
-            user_data_dir=str(_PERSIST_DIR),
-            headless=False,
-            viewport={"width": 1920, "height": 1080},
-            locale="zh-CN",
-            timezone_id="Asia/Shanghai",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            args=["--no-sandbox"],
-        )
-
-        # 注入 CookieBridge cookies
-        await _inject_cookies(context)
-
-        page = context.pages[0] if context.pages else await context.new_page()
-
-        async def cleanup():
-            await context.close()
-            await pw.stop()
-
-        return page, cleanup
-
-
-async def _inject_cookies(context):
-    """从 CookieBridge JSON 文件注入 cookies 到上下文。"""
-    cookie_dir = Path("browser_data")
-    if not cookie_dir.exists():
-        return
-    for filepath in list(cookie_dir.glob("cookies_*.json")) + list(cookie_dir.glob("*_cookies.json")):
-        try:
-            cookies = json.loads(filepath.read_text(encoding="utf-8"))
-            if cookies:
-                await context.add_cookies(cookies)
-                platform = filepath.stem.replace("_cookies", "")
-                logger.info(f"XHS CookieBridge: {platform} 注入 {len(cookies)} 个 cookie")
-        except Exception:
-            pass
 
 _SEARCH_JS = """\
 () => {
@@ -110,9 +25,7 @@ _SEARCH_JS = """\
             || el.textContent.trim().slice(0, 80);
         const author = el.querySelector('.author, .name, [class*="author"], [class*="name"]')?.textContent?.trim() || '';
         const likes = el.querySelector('.like, [class*="like"], [class*="count"], [class*="engage"]')?.textContent?.trim() || '';
-        const coverEl = el.querySelector('img') || el.querySelector('[class*="cover"] img') || el.querySelector('[class*="image"] img');
-        const cover = coverEl ? (coverEl.getAttribute('src') || coverEl.getAttribute('data-src') || '') : '';
-        if (title.length > 3) out.push({title: title, author: author, likes: likes, link: href, cover_url: cover});
+        if (title.length > 3) out.push({title: title, author: author, likes: likes, link: href});
     });
     if (out.length === 0) {
         document.querySelectorAll('a[href*="/explore/"]').forEach(a => {
@@ -146,100 +59,64 @@ _DETAIL_JS = """\
 
 
 async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
-    """搜索小紅薯筆記 — 浏览器优先（防封号），纯 HTTP 备用。"""
+    """搜索小紅薯筆記，scroll 翻頁，需登入。回傳 JSON 字串。"""
     logger.info(f"小紅薯搜索: keyword={keyword} count={count}")
 
-    # ── Path 1: CDP 浏览器优先（真浏览器最安全，不会被识别为机器人）─
-    try:
-        if _check_cdp_available():
-            page, cleanup = await _setup_xhs_context()
-            try:
-                search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
-                await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(5000)
-                body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
-                if "登录后查看" in body:
-                    logger.warning("小紅薯未登入，回退 HTTP")
-                    raise Exception("登录墙")
-                all_results = []
-                seen = set()
-                max_scrolls = max((count // 15) + 3, 5)  # 减少滚动次数防风控
-                for _ in range(max_scrolls):
-                    items = await page.evaluate(_SEARCH_JS)
-                    new_count = 0
-                    for item in items:
-                        key = item.get("link", "") or item.get("title", "")
-                        if key and key not in seen:
-                            seen.add(key)
-                            all_results.append(item)
-                            new_count += 1
-                    if new_count == 0 and len(all_results) > 0: break
-                    if len(all_results) >= count: break
-                    await page.evaluate("window.scrollBy(0, 800)")
-                    await page.wait_for_timeout(random.randint(2000, 4000))  # 人类滚动间隔
-                logger.info(f"[xhs-browser] 浏览器搜索完成: {len(all_results)} 条")
-                return json.dumps(all_results[:count], ensure_ascii=False)
-            finally:
-                await cleanup()
-    except Exception as exc:
-        logger.warning(f"XHS 浏览器搜索失败: {exc}，回退 HTTP")
+    from playwright.async_api import async_playwright
 
-    # ── Path 2: 纯 HTTP（备用，仅浏览器不可用时使用）─────────
-    try:
-        from src.utils.session_manager import ensure_session
-        if await ensure_session("xiaohongshu"):
-            from src.utils.xhs_http import search_all
-            items = await search_all(keyword, limit=count)
-            if items:
-                logger.info(f"[xhs-session] 纯HTTP直连成功: {len(items)} 条")
-                return json.dumps(items, ensure_ascii=False)
-    except Exception as exc:
-        logger.warning(f"XHS Session HTTP 失败: {exc}")
+    async with async_playwright() as pw:
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=str(_PERSIST_DIR),
+            headless=False,
+            viewport={"width": 1920, "height": 1080},
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            args=["--no-sandbox"],
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
 
-    # ── Path 3: 独立浏览器（最后兜底）─────────────────────────
+        try:
+            search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
 
-    page, cleanup = await _setup_xhs_context()
+            # 檢查登入牆
+            body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
+            if "登录后查看" in body:
+                logger.warning("小紅薯未登入，請先執行 login_search_xhs.py 掃碼登入")
+                await context.close()
+                return json.dumps([], ensure_ascii=False)
 
-    try:
-        search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
-        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(5000)
+            all_results = []
+            seen = set()
+            max_scrolls = max((count // 30) + 3, 5)
 
-        # 檢查登入牆
-        body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
-        if "登录后查看" in body:
-            logger.warning("小紅薯未登入，請先執行 login_search_xhs.py 掃碼登入")
-            return json.dumps([], ensure_ascii=False)
+            for _ in range(max_scrolls):
+                items = await page.evaluate(_SEARCH_JS)
+                new_count = 0
+                for item in items:
+                    key = item.get("link", "") or item.get("title", "")
+                    if key and key not in seen:
+                        seen.add(key)
+                        all_results.append(item)
+                        new_count += 1
 
-        all_results = []
-        seen = set()
-        max_scrolls = max((count // 30) + 3, 5)
+                if new_count == 0 and len(all_results) > 0:
+                    break
 
-        for _ in range(max_scrolls):
-            items = await page.evaluate(_SEARCH_JS)
-            new_count = 0
-            for item in items:
-                key = item.get("link", "") or item.get("title", "")
-                if key and key not in seen:
-                    seen.add(key)
-                    all_results.append(item)
-                    new_count += 1
+                if len(all_results) >= count:
+                    break
 
-            if new_count == 0 and len(all_results) > 0:
-                break
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2500)
 
-            if len(all_results) >= count:
-                break
+            result = all_results[:count]
+            logger.info(f"小紅薯搜索完成: {len(result)} 條")
+            return json.dumps(result, ensure_ascii=False)
 
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(2500)
-
-        result = all_results[:count]
-        logger.info(f"小紅薯搜索完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
-
-    finally:
-        await cleanup()
+        finally:
+            await context.close()
 
 
 async def xiaohongshu_note_detail(note_id: str) -> str:
@@ -256,16 +133,28 @@ async def xiaohongshu_comment(note_id: str) -> str:
     """爬取小紅薯筆記評論，使用 persistent context 以保持登入態。"""
     logger.info(f"小紅薯評論: note_id={note_id}")
 
-    page, cleanup = await _setup_xhs_context()
+    from playwright.async_api import async_playwright
 
-    try:
-        await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(5000)
-        # 滚动触发评论加载
-        for _ in range(5):
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(1500)
-        result = await page.evaluate("""() => {
+    async with async_playwright() as pw:
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=str(_PERSIST_DIR),
+            headless=False,
+            viewport={"width": 1920, "height": 1080},
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            args=["--no-sandbox"],
+        )
+        page = context.pages[0] if context.pages else await context.new_page()
+
+        try:
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
+            # 滚动触发评论加载
+            for _ in range(5):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(1500)
+            result = await page.evaluate("""() => {
     const items = document.querySelectorAll('[class*="comment-item"], [class*="CommentItem"], .comment-item, [class*="comment"], [class*="Comment"]');
     const seen = new Set();
     const out = [];
@@ -292,101 +181,35 @@ async def xiaohongshu_comment(note_id: str) -> str:
     }
     return out;
 }""")
-        logger.info(f"小紅薯評論完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await cleanup()
+            logger.info(f"小紅薯評論完成: {len(result)} 條")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await context.close()
 
 
 async def xiaohongshu_hot() -> str:
-    """爬取小紅薯推薦 feed — 拦截 homefeed API + DOM 兜底。"""
+    """爬取小紅薯推薦 feed（近似熱榜），需登入先有內容。回傳 JSON 字串。"""
     logger.info("小紅薯熱榜: 開始爬取")
     page = await browser.new_page()
     try:
-        # 拦截 homefeed API 响应
-        api_items = []
-
-        async def on_response(resp):
-            if "/homefeed" in resp.url or "/feed" in resp.url:
-                try:
-                    body = await resp.json()
-                    items = body.get("data", {}).get("items", []) or body.get("data", [])
-                    if not isinstance(items, list):
-                        items = []
-                    for item in items:
-                        note = item.get("note_card") or item.get("note") or item
-                        if not isinstance(note, dict):
-                            continue
-                        title = note.get("display_title", "") or note.get("title", "")
-                        author_info = note.get("user", {}) or note.get("author", {})
-                        author = author_info.get("nickname", "") or author_info.get("name", "")
-                        likes = note.get("interact_info", {}).get("liked_count", "") or note.get("likes", "")
-                        cover = ""
-                        covers = note.get("cover", {}) or {}
-                        cover_list = covers.get("url_list", []) if isinstance(covers, dict) else []
-                        if cover_list and isinstance(cover_list, list):
-                            cover = cover_list[0] or ""
-                        if not cover:
-                            cover = note.get("cover_url", "") or note.get("cover", "")
-                        if isinstance(cover, dict):
-                            cover = cover.get("url_list", [{}])[0] if cover.get("url_list") else ""
-                        note_id = note.get("note_id", "") or item.get("id", "")
-                        link = f"https://www.xiaohongshu.com/explore/{note_id}" if note_id else ""
-                        if title and title not in {i["title"] for i in api_items}:
-                            api_items.append({
-                                "title": str(title)[:100],
-                                "author": str(author),
-                                "likes": str(likes),
-                                "plays": str(likes),
-                                "link": link,
-                                "cover_url": str(cover),
-                                "note_id": str(note_id),
-                            })
-                except Exception:
-                    pass
-
-        page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
-
-        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(6000)
-
-        # 滚动触发更多加载
-        for _ in range(3):
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(2000)
-
-        # 如果 API 没截到数据，DOM 兜底
-        if not api_items:
-            result = await page.evaluate("""() => {
+        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded")
+        await page.wait_for_timeout(5000)
+        result = await page.evaluate("""() => {
+    const items = document.querySelectorAll('.note-item, [class*="note-item"], [class*="feed"] [class*="item"]');
     const seen = new Set();
-    const out = [];
-    document.querySelectorAll('a[href*="/explore/"], a[href*="/search_result/"]').forEach(a => {
-        const rawHref = a.getAttribute('href') || '';
-        const href = rawHref.split('?')[0];
-        const fullLink = href.startsWith('http') ? href : 'https://www.xiaohongshu.com' + href;
-        if (!href || seen.has(fullLink)) return;
-        seen.add(fullLink);
-        const parent = a.closest('section, [class*="note"], [class*="item"], div');
-        const txt = (parent || a).textContent.trim();
-        const title = txt.slice(0, 100);
-        const authorEl = (parent || a).querySelector('[class*="author"], [class*="name"], [class*="nickname"]');
-        const likesEl = (parent || a).querySelector('[class*="like"], [class*="count"], [class*="engage"]');
-        const img = (parent || a).querySelector('img');
-        out.push({
-            title: title,
-            author: authorEl?.textContent?.trim() || '',
-            likes: likesEl?.textContent?.trim() || '',
-            plays: likesEl?.textContent?.trim() || '',
-            link: fullLink,
-            cover_url: img?.getAttribute('src') || img?.getAttribute('data-src') || '',
-        });
-    });
-    return out.slice(0, 30);
+    return Array.from(items).filter(el => {
+        const t = el.textContent.trim();
+        if (!t || t.length < 5 || seen.has(t)) return false;
+        seen.add(t);
+        return true;
+    }).slice(0, 30).map(el => ({
+        title: el.querySelector('.title, [class*="title"]')?.textContent?.trim() || '',
+        likes: el.querySelector('.like, [class*="like"], [class*="count"]')?.textContent?.trim() || '',
+        link: el.querySelector('a')?.getAttribute('href') || '',
+    }));
 }""")
-            api_items = list(result) if result else []
-
-        logger.info(f"小紅薯熱榜完成: {len(api_items)} 條 (API: {len(api_items) > 0 and 'homefeed' in str(api_items[0].get('link',''))})")
-        return json.dumps(api_items[:30], ensure_ascii=False)
+        logger.info(f"小紅薯熱榜完成: {len(result)} 條")
+        return json.dumps(result, ensure_ascii=False)
     finally:
         await page.close()
 
@@ -419,6 +242,9 @@ async def xiaohongshu_user(user_id: str) -> str:
 
 
 class XiaohongshuAdapter(PlatformAdapter):
+    _SEARCH_URL = "https://www.xiaohongshu.com/search_result?keyword={keyword}"
+    _CARD_SELECTOR = ".note-item, .feeds-page .note-item, [class*='note-item'], section.note-item"
+
     @property
     def name(self) -> str:
         return "xiaohongshu"
@@ -427,11 +253,14 @@ class XiaohongshuAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return True
 
-    async def search(self, keyword: str, limit: Optional[int] = None,
-                     sort_type: int = 0, publish_time: int = 0,
-                     search_channel: str = "") -> list[dict]:
-        data = json.loads(await xiaohongshu_search(keyword, count=limit or 40))
-        return data[:limit] if limit else data
+    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+        try:
+            data = json.loads(await xiaohongshu_search(keyword, count=limit or 40))
+            if data and len(data) > 0:
+                return data[:limit] if limit else data
+        except Exception as e:
+            logger.warning(f"[Xiaohongshu] API search failed: {e}, trying adaptive fallback")
+        return await self._adaptive_search(keyword, limit)
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:
         data = json.loads(await xiaohongshu_hot())

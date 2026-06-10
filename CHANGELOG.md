@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.1.0 (2026-06-10) — Scrapling 2.0 + CDP 修复 🛡️
+
+### 架构升级: Scrapling Adaptive Framework
+- **src/adaptive/** — Scrapling 反反爬引擎集成：TLS 指纹伪装 + 自適應元素定位 + SQLite 指紋存儲
+- **src/fetchers/** — 三層 Fetcher 架構：Light → Smart → Stealth，自動升級
+- **src/cache/** — Response cache with WAL mode SQLite
+
+### 抖音/小红书 CDP 修复
+- 抖音搜尋改為 CDP Chrome（真實 TLS 繞過 verify_check）
+- 小紅書搜尋改為 CDP Chrome（真實 TLS，防封殺）
+- `douyin_http.py` + `xhs_http.py` — 純 HTTP 客戶端（零瀏覽器依賴）
+- `anti_bot_escalator.py` — 反爬升級策略
+- 新增 `docs/DOUYIN_FIX_GUIDE.md` — 新機部署指南
+
+### MCP 工具
+- `mcp_tools/smart_fetch_server.py` — curl_cffi TLS 指紋偽裝 + 瀏覽器 UA
+
+### 已知限制
+- 抖音 a_bogus 簽名 + 小紅書 x-s 簽名僅在 Pro 版提供
+- `sign_srv/platforms/douyin.py` 為私有模組
+
 ## v1.0.0 (2026-05-30) — 正式版發布 🚀
 
 ### Agent v2 準確度提升
