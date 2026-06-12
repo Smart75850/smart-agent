@@ -1,179 +1,179 @@
-# Smart Agent
+# Smart Agent — 多平台 AI 内容分析引擎
 
-多平台内容采集框架 — 5 平台纯 HTTP 直连 + 7 平台全浏览器支持。
-
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()
-[![License](https://img.shields.io/badge/License-NonCommercial-blue)]()
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()  
+[![License](https://img.shields.io/badge/License-MIT-green)]()  
 [![Platform](https://img.shields.io/badge/Platform-7平台-orange)]()
 
-⚠️ 本项目仅供学习与学术研究使用，严禁用于商业用途。[详细免责声明](DISCLAIMER.md)
+> ⚠️ 本项目仅供学习与学术研究使用，严禁用于商业用途。[详细免责声明](DISCLAIMER.md)
 
-## 核心优势
+---
 
-- **纯 HTTP 直连** — 5 个平台（B站/知乎/快手/微博/贴吧）实现纯HTTP采集
-- **浏览器 CDP 兜底** — 抖音/小红书走 CDP 浏览器模式，双路径容错不中断
-- **会话自动管理** — 过期自动收割，无需手动维护
-- **6 种存储后端** — JSON / CSV / JSONL / Excel / SQLite / MySQL
-- **开箱即用** — Docker 部署 / WebUI 仪表板 / MCP Server 协议接口
+## 一句话介绍
 
-## 平台支持
+**输入一个关键词，自动搜索知乎/B站/小红书/抖音等 7 个平台，7 个 AI Agent 并联分析爆款趋势、竞品策略、用户情绪，输出结构化报告。**
 
-| 平台 | 搜索 | 热榜 | 详情 | 评论 | 用户 | 采集方式 | 说明 |
-|------|:---:|:---:|:---:|:---:|:---:|:---:|------|
-| B站 | ✅ | ✅ | — | ✅ | — | 纯HTTP | Wbi hashlib，无需登录 |
-| 小红书 | ✅ | — | ✅ | ✅ | — | 浏览器 | CDP Chrome 真浏览器 |
-| 抖音 | ✅ | — | ✅ | ✅ | ✅ | 浏览器 | CDP Chrome 真浏览器 |
-| 知乎 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯HTTP | curl_cffi + cookies |
-| 快手 | ✅ | ✅ | — | — | — | 纯HTTP | 纯 cookies，零签名 |
-| 微博 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯HTTP | cookies + xsrf-token |
-| 贴吧 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯HTTP | curl_cffi Chrome TLS |
+---
 
 ## 快速开始
-
-### 安装
 
 ```bash
 git clone https://github.com/Smart75850/smart-agent.git
 cd smart-agent
 pip install -r requirements.txt
-playwright install chromium
+
+# 单平台搜索
+python main.py --platform bilibili --keyword "AI工具"
+
+# 全平台并发搜索 + AI 全链路分析
+python main.py --platform all --keyword "一人公司" --type aggregate --engine langgraph --pipeline full
+
+# MCP Server 模式（推荐）
+python -m src.mcp_tools.server
 ```
 
-### 30 秒上手
+> 📖 完整指南：[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
 
-```bash
-# B站搜索（无需登录，即开即用）
-python main.py --platform bilibili --keyword Python
+---
 
-# 全平台并发搜索
-python main.py --platform all --keyword 美食
+## 核心能力
 
-# 知乎热榜
-python main.py --platform zhihu --type hot
+### 数据采集层
 
-# 输出 CSV
-set STORE_BACKEND=csv
-python main.py --platform bilibili --keyword Python
-```
+| 平台 | 搜索 | 热榜 | 详情 | 评论 | 用户 | 方式 |
+|------|:---:|:---:|:---:|:---:|:---:|------|
+| B站 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯 HTTP |
+| 小红书 | ✅ | ✅ | ✅ | ✅ | ✅ | CDP 浏览器 |
+| 抖音 | ✅ | ✅ | ✅ | ✅ | ✅ | CDP 浏览器 |
+| 知乎 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯 HTTP |
+| 快手 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯 HTTP |
+| 微博 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯 HTTP |
+| 贴吧 | ✅ | ✅ | ✅ | ✅ | ✅ | 纯 HTTP |
 
-### 纯 HTTP 模式（推荐，零浏览器）
+- 三层反爬引擎：Light(HTTP+TLS) / Stealth(浏览器+Cloudflare) / Smart(自动选择)
+- 断点续跑 + 去重 + 6 种存储后端（JSON/CSV/Excel/SQLite/MySQL/JSONL）
+- Camoufox C++ 反检测浏览器引擎
 
-大部分平台首次使用前需要从浏览器收割一次会话：
+### AI 分析层 — 7 个专业 Agent
 
-```bash
-# 1. 打开已登录的 Chrome（CDP 模式）
-chrome --remote-debugging-port=9222
+| Agent | 功能 | 典型输出 |
+|------|------|------|
+| **TrendScout** | 爆款识别与趋势分析 | 爆款评分、趋势周期、传播路径 |
+| **ProductMiner** | 产品/竞品深度分析 | 变现潜力、竞争优势、用户痛点 |
+| **VideoAnalyst** | 视频结构拆解 | 钩子类型、节奏分析、结构模板 |
+| **SentimentReader** | 评论情绪分析 | 正面/中性/负面比例、关键洞察 |
+| **CopyWriter** | 营销文案生成 | 标题/短文案/中长篇/长文四档 |
+| **ContentRemixer** | 内容改写与破圈检测 | 跨平台信号、改写建议 |
+| **PicTactic** | 智能配图策略 | 封面/社交/趋势三类配图方案 |
 
-# 2. 收割全部平台会话（一次性操作）
-python -c "import asyncio; from src.utils.session_manager import harvest_all; asyncio.run(harvest_all())"
+> 每个 Agent 内置 CriticAgent 自修正 — review-retry loop，输出质量把关。  
+> 无 API Key 时自动降级为模板模式，零成本可用。
 
-# 3. 之后即可纯 HTTP 直连，无需浏览器
-python main.py --platform all --keyword 美食
-```
+### 编排与交付
 
-会话文件保存在 `browser_data/{platform}_http_session.json`，收割一次可用数天。
+- **LangGraph StateGraph DAG** — 多平台并行搜索 + 7 Agent 线性链
+- **MCP Server** — 30+ 工具，Claude Desktop / Cursor / Hermes 原生调用
+- **Go 二进制** — 9.4MB 单文件，Windows 即开即用
+- **WebUI** — FastAPI + WebSocket 实时仪表板
+- **Docker 一键部署**
 
-### 会话自动管理
+---
 
-系统会自动检测会话是否过期，过期则自动从 CDP Chrome 重新收割：
-
-```python
-from src.utils.session_manager import ensure_session, check_health
-
-# 检测会话健康状态
-healthy = await check_health("weibo")
-
-# 确保会话有效（过期自动收割）
-await ensure_session("weibo")
-```
-
-### 代理池
-
-编辑 `config/proxies.json` 填入代理地址：
+## MCP Server — 用自然语言调度
 
 ```json
+// Claude Desktop 配置
 {
-    "proxies": [
-        "http://user:pass@proxy1.example.com:8080",
-        "socks5://127.0.0.1:1080"
-    ]
+  "mcpServers": {
+    "smart-agent": {
+      "command": "python",
+      "args": ["-m", "src.mcp_tools.server"]
+    }
+  }
 }
 ```
 
-支持 HTTP/HTTPS/SOCKS5 代理，自动轮转 + 健康检测 + 失败剔除。
+配置后在 Claude Desktop / Hermes 中直接对话：
 
-### WebUI 仪表板
+| 你说 | Agent 自动调用 |
+|------|------|
+| 「帮我搜知乎 AI Agent 话题」 | `zhihu_search_tool` |
+| 「分析下 B站 这个视频的评论情绪」 | `bilibili_comment_tool` |
+| 「对比抖音和快手同话题热度」 | `douyin_search_tool` + `kuaishou_search_tool` |
+| 「帮我写一篇小红书种草文案」 | `xiaohongshu_search_tool` + CopyWriter |
 
-```bash
-python -m api.main
-# → http://localhost:8000
-```
+---
 
-内建暗色主题，WebSocket 实时日志，JSON/CSV 下载，任务轮询。
+## 技术栈
 
-## CLI 参数
+- Python 3.12+ · LangGraph · FastMCP · Playwright · Scrapling
+- DeepSeek V4 API（LLM 驱动全部分析）
+- Go 9.4MB 二进制（Windows 零依赖部署）
+- Docker + Windows 一键部署脚本
 
-| 参数 | 说明 | 可选值 |
-|------|------|------|
-| `--platform` | 目标平台 | bilibili / xiaohongshu / douyin / zhihu / kuaishou / weibo / tieba / all |
-| `--type` | 操作类型 | search / hot / detail / comment / user |
-| `--keyword` | 搜索关键词 | 任意文本 |
-| `--limit` | 结果数量 | 默认 20 |
-| `--output` | 输出目录 | 默认 output/ |
-| `--dry-run` | 预览执行计划 | — |
-| `--list-platforms` | 列出支持平台 | — |
+---
+
+## 与同类项目对比
+
+| 维度 | MediaCrawler | Smart Agent |
+|------|:--:|:--:|
+| 平台数 | 7+ | 7 |
+| 纯 HTTP | ✅ | ✅ |
+| AI 分析 Agent | ❌ | ✅ 7 Agent |
+| 自修正 Critic | ❌ | ✅ |
+| MCP 协议 | ❌ | ✅ |
+| Go 二进制 | ❌ | ✅ |
+| 开源协议 | MIT | MIT |
+
+---
 
 ## 项目结构
 
 ```
-smart-agent/
-├── main.py                        # CLI 入口
-├── api/                           # WebUI（FastAPI + SPA）
-├── config/
-│   ├── settings.py                # 集中配置
-│   └── proxies.json               # 代理池配置
-├── base/
-│   └── platform_base.py           # PlatformAdapter 抽象基类
-├── src/
-│   ├── agents/                    # 7 平台适配器
-│   │   ├── bilibili_adapter.py    # B站 — 纯 Python Wbi
-│   │   ├── xiaohongshu_adapter.py # 小红书 — x-s 会话复用
-│   │   ├── douyin_adapter.py      # 抖音 — 会话上下文
-│   │   ├── zhihu_adapter.py       # 知乎 — 纯 cookies
-│   │   ├── kuaishou_adapter.py    # 快手 — 纯 cookies
-│   │   ├── weibo_adapter.py       # 微博 — cookies + xsrf
-│   │   └── tieba_adapter.py       # 贴吧 — curl_cffi TLS
-│   └── utils/
-│       ├── ks_http.py             # 快手纯 HTTP 客户端
-│       ├── zh_http.py             # 知乎纯 HTTP 客户端
-│       ├── weibo_http.py          # 微博纯 HTTP 客户端
-│       ├── tieba_http.py          # 贴吧纯 HTTP 客户端
-│       ├── session_manager.py     # 会话健康检测 + 自动收割
-│       ├── proxy_pool.py          # 代理池轮转 + 健康检测
-│       ├── browser_service.py     # CDP 浏览器控制
-│       └── logger.py              # 统一日志
-├── store/                         # 6 种存储后端
-├── browser_data/                  # 会话收割文件
-├── output/                        # 默认输出目录
-└── docs/
-    └── 使用指南.md                 # 详细使用文档
+src/
+├── agents/          # 7 平台 Adapter
+├── orchestrator/    # LangGraph DAG + 7 Agent
+│   └── agents/      # TrendScout / ProductMiner / SentimentReader / ...
+├── mcp_tools/       # MCP Server
+├── utils/           # 浏览器 / 反爬 / 日志 / Cookie / Session 管理
+└── store/           # 6 种存储后端
+
+go/                  # Go 高性能版本（6.7MB 二进制）
+api/                 # WebUI 仪表板
 ```
 
-## 扩展功能
+---
 
-本仓库同时包含以下可直接使用的扩展模块：
+## 路线图
 
-- **MCP Server** — 标准 MCP 协议接口（25 个工具），可接入 Claude Desktop / Cursor 等 AI 工具链
-- **Docker 部署** — `docker compose up` 即开即用
-- **断点续爬 + 去重** — SQLite 持久化，中断后自动续传，支持 `--resume`
-- **AI Agent 管线** — LangGraph + DeepSeek LLM 驱动，9 个分析 Agent（趋势/选品/视频/情绪/文案/配图等）
-- **批量下载器** — 视频 + 封面图批量下载
-- **Go 高性能模式** — Go 二进制（6.7MB）替代 Python CLI，并发性能提升 5-10 倍
+- [x] 7 平台搜索
+- [x] 7 Agent AI 分析
+- [x] LangGraph DAG 编排
+- [x] MCP Server
+- [x] Go 高性能版本
+- [x] Docker + Windows 部署
+- [ ] 获客引擎（购买意图识别 + 获客文案生成）→ Pro 版
+- [ ] 更多平台支持
 
-## 免责声明
+---
 
-本项目仅供个人学习与学术研究使用。详见 [完整免责声明](DISCLAIMER.md)。
+## Pro 版
+
+如需企业级功能（多账号 IP 池、自愈引擎、策略记忆、获客引擎、CookieBridge），请查看 [Smart Agent Pro](https://github.com/Smart75850/smart-agent-pro)（私人仓库，联系作者获取访问权限）。
+
+---
+
+## 作者
+
+**Smart75850** — 独立开发者，All in AI Agent。
+
+- GitHub: [@Smart75850](https://github.com/Smart75850)
+
+---
 
 ## License
 
-NON-COMMERCIAL LEARNING LICENSE 1.0
+MIT License — 详见 [LICENSE](LICENSE)
+
+---
+
+⭐ 如果这个项目对你有帮助，请给一个 Star！
