@@ -13,9 +13,37 @@
 
 ---
 
-## 當前焦點（2026-06-03 更新）
+## 2026-06-12 Claude Code 全面实测验证
+
+### 测试结果：71/71 全部通过 ✅
+- 测试环境：Python 3.14.4, venv 全新创建, Windows 11
+- 全量测试：71/71 = 100%（smoke 5 + adapters 13 + API 14 + pipeline 23 + tools 15）
+- 无回归，零失败
+
+### Bug 修复（4项）
+1. **`curl_cffi` 缺依赖** — `requirements.txt` 未列出，导致 `session_manager.py` import 失败 → 已添加
+2. **API 测试 403** — `UsageMiddleware` 试用额度阻塞 TestClient → tests 改用临时 `USAGE_FILE`
+3. **`--type aggregate` 误判** — 强制要求 `--engine langgraph`，普通引擎报错 → 已解除限制
+4. **抖音/小红书 adapter 缺参数** — `search()` 不接受 `sort_type/publish_time/search_channel`，且 `_adaptive_search()` 未实现 → 已补齐签名+实现
+
+### 真实用户场景实测
+| 场景 | 命令 | 结果 |
+|------|------|:--:|
+| 单平台搜索 | `--platform bilibili --keyword "AI工具"` | ✅ 5条 |
+| 全平台聚合 | `--platform all --type aggregate --pipeline simple` | ✅ 9条（B站+微博+贴吧） |
+| Full Pipeline | `--pipeline full --keyword "AI教程"` | ✅ 7 Agent 全链路 |
+
+### 平台 HTTP 直连状态
+| B站 | 微博 | 贴吧 | 知乎 | 快手 | 抖音 | 小红书 |
+|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| ✅ | ✅ | ✅ | ⚠️需CDP | ⚠️需CDP | ⚠️需CDP | ⚠️需登录 |
+
+---
+
+## 當前焦點（2026-06-12 更新）
 
 ✅ **开源版已发布** — 5平台纯HTTP + 7平台浏览器，56/56测试通过
+✅ **71/71 测试全绿** — Claude Code 实测验证，4个Bug已修复
 ✅ **逆向签名文件已移除** — 抖音+小红书逆向放私有备份 `桌面\Smart-Agent逆向签名-私有\`
 🟡 **内容营运**：计划已有，B站/掘金/知乎待开始执行
 🟡 **销售推广**：策略已定（见知识星图节点30）
@@ -176,8 +204,8 @@
 | `Smart75850/smart-agent` | 🔓 公開 | `main` | **開源版（最新 code）** |
 | `Smart75850/smart-agent-pro` | 🔒 私人 | `main` | Pro 版舊倉庫（已廢棄） |
 
-**開發目錄：** `C:\Users\guohu\Desktop\smart-agent\`
-**Remote：** `old-public` → `Smart75850/smart-agent`
+**開發目錄：** `C:\Users\guohu\workspace\smart-agent\`
+**Remote：** `origin` → `Smart75850/smart-agent-pro`
 **逆向備份：** `C:\Users\guohu\Desktop\Smart-Agent逆向签名-私有\`
 
 ---

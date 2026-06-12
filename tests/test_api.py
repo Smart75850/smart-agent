@@ -1,4 +1,7 @@
 """API integration tests — FastAPI routes + request validation."""
+import json
+import os
+import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
@@ -7,8 +10,28 @@ from fastapi.testclient import TestClient
 class TestAPIRoutes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # 用临时文件隔离额度检查，避免测试间互相影响
+        cls._tmp_usage = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        fresh_config = {
+            "license": "trial",
+            "total_limit": 999,
+            "used": 0,
+            "first_use": None,
+            "last_use": None,
+            "wechat": "smart4906",
+            "licensed_to": "",
+        }
+        json.dump(fresh_config, cls._tmp_usage)
+        cls._tmp_usage.close()
+        os.environ["USAGE_FILE"] = cls._tmp_usage.name
+
         from api.main import app
         cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls):
+        os.unlink(cls._tmp_usage.name)
+        os.environ.pop("USAGE_FILE", None)
 
     def test_list_platforms(self):
         resp = self.client.get("/api/platforms")

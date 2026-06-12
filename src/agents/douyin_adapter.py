@@ -307,7 +307,9 @@ class DouyinAdapter(PlatformAdapter):
     def need_login(self) -> bool:
         return True
 
-    async def search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+    async def search(self, keyword: str, limit: Optional[int] = None,
+                     sort_type: int = 0, publish_time: int = 0,
+                     search_channel: str = "") -> list[dict]:
         try:
             data = json.loads(await douyin_search(keyword, count=limit or 40))
             if data and len(data) > 0:
@@ -315,6 +317,22 @@ class DouyinAdapter(PlatformAdapter):
         except Exception as e:
             logger.warning(f"[Douyin] API search failed: {e}, trying adaptive fallback")
         return await self._adaptive_search(keyword, limit)
+
+    async def _adaptive_search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
+        """HTTP 搜索失败时的浏览器兜底搜索。"""
+        try:
+            if not browser.is_running():
+                logger.warning("[Douyin] 浏览器未启动，adaptive 搜索不可用")
+                return []
+            page = await browser.new_page()
+            search_url = f"https://www.douyin.com/search/{keyword}"
+            await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(3000)
+            result = await page.evaluate(_SEARCH_JS)
+            return result[:limit] if limit else result
+        except Exception as e:
+            logger.warning(f"[Douyin] adaptive 搜索失败: {e}")
+            return []
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:
         data = json.loads(await douyin_hot())

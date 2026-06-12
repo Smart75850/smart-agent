@@ -283,8 +283,8 @@ async def main():
             await browser.close()
         return
 
-    # ── aggregate + langgraph 快速路徑 ───────────────────────
-    if args.type == "aggregate" and args.engine == "langgraph":
+    # ── aggregate 快速路徑 ───────────────────────────────────
+    if args.type == "aggregate":
         if args.stream:
             from src.orchestrator import run_pipeline_stream
             async for event in run_pipeline_stream(
