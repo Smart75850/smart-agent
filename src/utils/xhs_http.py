@@ -222,15 +222,30 @@ def _parse_items(data: dict) -> list[dict]:
         cover_info = nc.get("cover", {}) or {}
         author_info = nc.get("user", {}) or {}
         note_id = item.get("id", "")
+        image_list = nc.get("image_list", []) or []
         results.append({
+            # 基础信息
             "title": nc.get("display_title", ""),
-            "author": author_info.get("nickname", ""),
-            "plays": interact.get("view_count", 0) or 0,
-            "likes": interact.get("liked_count", 0) or 0,
-            "comments": interact.get("comment_count", 0) or 0,
             "note_id": note_id,
+            "note_type": nc.get("type", ""),  # normal=图文, video=视频
             "cover_url": cover_info.get("url_default", "") or cover_info.get("url", ""),
-            "note_type": nc.get("type", ""),
+            "cover_width": cover_info.get("width", 0),
+            "cover_height": cover_info.get("height", 0),
+            "images": [img.get("url_default", img.get("url", "")) for img in image_list],
+            # 作者信息
+            "author": author_info.get("nickname", ""),
+            "author_id": author_info.get("user_id", ""),
+            "author_avatar": author_info.get("avatar", ""),
+            # 互动数据
+            "likes": interact.get("liked_count", 0),
+            "collects": interact.get("collected_count", 0),
+            "comments": interact.get("comment_count", 0),
+            "shares": interact.get("shared_count", 0),
+            "liked": interact.get("liked", False),
+            "collected": interact.get("collected", False),
+            # 角标 & 链接
+            "corner_tag": (nc.get("corner_tag_info", []) or [{}])[0].get("text", "") if nc.get("corner_tag_info") else "",
+            "tags": [t.get("name", "") for t in (nc.get("tag_list", []) or []) if t.get("name")],
             "link": f"https://www.xiaohongshu.com/explore/{note_id}" if note_id else "",
         })
     return results

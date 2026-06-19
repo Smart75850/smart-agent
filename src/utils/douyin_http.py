@@ -195,18 +195,41 @@ async def search(keyword: str, count: int = 20, offset: int = 0) -> list[dict]:
                 continue
             seen.add(aweme_id)
 
-            statistics = info.get("statistics", {}) or {}
+            author = info.get("author", {}) or {}
+            stat = info.get("statistics", {}) or {}
+            video = info.get("video", {}) or {}
+            music = info.get("music", {}) or {}
+            cover_list = (video.get("cover", {}) or {}).get("url_list", [])
             results.append({
+                # 基础信息
                 "title": info.get("desc", ""),
-                "author": info.get("author", {}).get("nickname", ""),
-                "plays": statistics.get("play_count", 0) or statistics.get("share_count", 0) or 0,
-                "likes": statistics.get("digg_count", 0) or 0,
-                "comments": statistics.get("comment_count", 0) or 0,
-                "shares": statistics.get("share_count", 0) or 0,
-                "collects": statistics.get("collect_count", 0) or 0,
                 "aweme_id": aweme_id,
-                "sec_uid": info.get("author", {}).get("sec_uid", ""),
-                "cover_url": (info.get("video", {}).get("cover", {}).get("url_list", [""]) or [""])[0],
+                "create_time": info.get("create_time", 0),
+                "duration_ms": video.get("duration", 0),
+                "resolution": f"{video.get('width', 0)}x{video.get('height', 0)}",
+                "cover_url": cover_list[0] if cover_list else "",
+                "media_type": info.get("media_type", 0),
+                # 作者信息
+                "author": author.get("nickname", ""),
+                "author_uid": author.get("uid", ""),
+                "author_sec_uid": author.get("sec_uid", ""),
+                "author_followers": author.get("follower_count", 0),
+                "author_avatar": (author.get("avatar_thumb", {}) or {}).get("url_list", [""])[0] if isinstance(author.get("avatar_thumb"), dict) else "",
+                # 统计数据
+                "plays": stat.get("play_count", 0),
+                "likes": stat.get("digg_count", 0),
+                "comments": stat.get("comment_count", 0),
+                "shares": stat.get("share_count", 0),
+                "collects": stat.get("collect_count", 0),
+                "downloads": stat.get("download_count", 0),
+                "forwards": stat.get("forward_count", 0),
+                # 音乐信息
+                "music_title": music.get("title", ""),
+                "music_author": music.get("author", ""),
+                "music_id": str(music.get("id", "")),
+                # 分享 & 标签
+                "share_url": (info.get("share_info", {}) or {}).get("share_url", ""),
+                "hashtags": [t.get("hashtag_name", "") for t in (info.get("text_extra", []) or []) if t.get("hashtag_name")],
                 "link": f"https://www.douyin.com/video/{aweme_id}" if aweme_id else "",
             })
 

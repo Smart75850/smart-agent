@@ -66,13 +66,41 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
                             seen_aweme.add(aid)
                             author = info.get("author", {}) or {}
                             stat = info.get("statistics", {}) or {}
+                            video = info.get("video", {}) or {}
+                            music = info.get("music", {}) or {}
+                            cover_list = (video.get("cover", {}) or {}).get("url_list", [])
                             api_items.append({
+                                # 基础信息
                                 "title": info.get("desc", ""),
+                                "aweme_id": aid,
+                                "create_time": info.get("create_time", 0),
+                                "duration_ms": video.get("duration", 0),
+                                "resolution": f"{video.get('width', 0)}x{video.get('height', 0)}",
+                                "cover_url": cover_list[0] if cover_list else "",
+                                "media_type": info.get("media_type", 0),
+                                # 作者信息
                                 "author": author.get("nickname", ""),
+                                "author_uid": author.get("uid", ""),
+                                "author_sec_uid": author.get("sec_uid", ""),
+                                "author_followers": author.get("follower_count", 0),
+                                "author_following": author.get("following_count", 0),
+                                "author_avatar": (author.get("avatar_thumb", {}) or {}).get("url_list", [""])[0] if isinstance(author.get("avatar_thumb"), dict) else "",
+                                # 统计数据
                                 "plays": stat.get("play_count", 0),
                                 "likes": stat.get("digg_count", 0),
-                                "aweme_id": aid,
-                                "sec_uid": author.get("sec_uid", ""),
+                                "comments": stat.get("comment_count", 0),
+                                "shares": stat.get("share_count", 0),
+                                "collects": stat.get("collect_count", 0),
+                                "downloads": stat.get("download_count", 0),
+                                "forwards": stat.get("forward_count", 0),
+                                # 音乐信息
+                                "music_title": music.get("title", ""),
+                                "music_author": music.get("author", ""),
+                                "music_id": str(music.get("id", "")),
+                                # 分享信息
+                                "share_url": (info.get("share_info", {}) or {}).get("share_url", ""),
+                                # 标签
+                                "hashtags": [t.get("hashtag_name", "") for t in (info.get("text_extra", []) or []) if t.get("hashtag_name")],
                             })
                     except Exception:
                         pass
@@ -164,31 +192,65 @@ async def douyin_hot() -> str:
 
 
 async def douyin_detail(video_id: str) -> str:
-    """爬取抖音視頻詳情。"""
-    logger.info(f"抖音詳情: video_id={video_id}")
+    """爬取抖音视频详情 — 拦截 detail API 获取播放量等完整统计（搜索API中play_count为0）。"""
+    logger.info(f"抖音详情: video_id={video_id}")
     try:
         page = await browser.new_page()
         try:
+            detail_data = {}
+
+            async def on_response(resp):
+                nonlocal detail_data
+                if "aweme/v1/web/aweme/detail" in resp.url and not detail_data:
+                    try:
+                        body = await resp.json()
+                        info = (body.get("aweme_detail") or {})
+                        author = info.get("author", {}) or {}
+                        stat = info.get("statistics", {}) or {}
+                        video = info.get("video", {}) or {}
+                        cover_list = (video.get("cover", {}) or {}).get("url_list", [])
+                        detail_data = {
+                            "title": info.get("desc", ""),
+                            "aweme_id": str(info.get("aweme_id", "")),
+                            "create_time": info.get("create_time", 0),
+                            "duration_ms": video.get("duration", 0),
+                            "resolution": f"{video.get('width', 0)}x{video.get('height', 0)}",
+                            "cover_url": cover_list[0] if cover_list else "",
+                            "author": author.get("nickname", ""),
+                            "author_uid": author.get("uid", ""),
+                            "author_followers": author.get("follower_count", 0),
+                            "plays": stat.get("play_count", 0),
+                            "likes": stat.get("digg_count", 0),
+                            "comments": stat.get("comment_count", 0),
+                            "shares": stat.get("share_count", 0),
+                            "collects": stat.get("collect_count", 0),
+                            "forwards": stat.get("forward_count", 0),
+                            "downloads": stat.get("download_count", 0),
+                            "share_url": (info.get("share_info", {}) or {}).get("share_url", ""),
+                            "hashtags": [t.get("hashtag_name", "") for t in (info.get("text_extra", []) or []) if t.get("hashtag_name")],
+                        }
+                    except Exception:
+                        pass
+
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
             await page.goto(f"https://www.douyin.com/video/{video_id}", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(5000)
-            result = await page.evaluate("""() => {
-    const titleEl = document.querySelector('[class*="title"], [class*="Title"], h1');
-    const descEl = document.querySelector('[class*="desc"], [class*="Desc"]');
-    const playEl = document.querySelector('[class*="play"], [class*="Play"], [class*="count"]');
-    const likeEl = document.querySelector('[class*="like"]:not([class*="digg"])');
-    return {
-        title: titleEl?.textContent?.trim() || '',
-        desc: descEl?.textContent?.trim() || '',
-        plays: playEl?.textContent?.trim() || '',
-        likes: likeEl?.textContent?.trim() || '',
-    };
+
+            # DOM 兜底（API未拦截到时）
+            if not detail_data:
+                result = await page.evaluate("""() => {
+    const titleEl = document.querySelector('[class*=\"title\"], [class*=\"Title\"], h1');
+    const descEl = document.querySelector('[class*=\"desc\"], [class*=\"Desc\"]');
+    return { title: titleEl?.textContent?.trim() || '', desc: descEl?.textContent?.trim() || '' };
 }""")
-            logger.info("抖音詳情完成")
-            return json.dumps(result, ensure_ascii=False)
+                detail_data = result
+
+            logger.info("抖音详情完成")
+            return json.dumps(detail_data, ensure_ascii=False)
         finally:
             await page.close()
     except Exception as e:
-        logger.warning(f"抖音詳情异常: {e}")
+        logger.warning(f"抖音详情异常: {e}")
         return json.dumps({}, ensure_ascii=False)
 
 
@@ -212,10 +274,15 @@ async def douyin_comment(video_id: str, count: int = 50) -> str:
                             seen_cids.add(cid)
                             user = c.get("user", {}) or {}
                             comments.append({
+                                "cid": str(c.get("cid", "")),
                                 "user": user.get("nickname", ""),
+                                "user_uid": user.get("uid", ""),
+                                "user_avatar": (user.get("avatar_thumb", {}) or {}).get("url_list", [""])[0] if isinstance(user.get("avatar_thumb"), dict) else "",
                                 "content": c.get("text", ""),
                                 "likes": c.get("digg_count", 0),
                                 "reply_count": c.get("reply_comment_total", 0),
+                                "create_time": c.get("create_time", 0),
+                                "reply_id": c.get("reply_id", ""),
                             })
                     except Exception:
                         pass
@@ -252,9 +319,12 @@ async def douyin_comment(video_id: str, count: int = 50) -> str:
                         if cid and cid not in seen_cids:
                             seen_cids.add(cid)
                             comments.append({
+                                "cid": cid,
                                 "user": c.get("user", ""),
                                 "content": c.get("content", ""),
                                 "likes": c.get("likes", 0),
+                                "reply_count": c.get("reply_count", 0),
+                                "create_time": c.get("create_time", 0),
                             })
                             new_count += 1
                     if new_count == 0:
