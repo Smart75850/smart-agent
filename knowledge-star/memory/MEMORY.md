@@ -1,2 +1,0 @@
-- [JMS Clash 节点更新修复](jms-clash-fix.md) — Clash Verge Rev 订阅失败的根本原因、配置架构、文件路径、自动更新脚本
-- [CDP反爬架构决策](cdp-anti-bot-strategy.md) — 抖音/小红书已弃用HTTP逆向，全面采用CDP浏览器拦截优先策略
