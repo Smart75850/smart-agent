@@ -92,7 +92,7 @@ class Settings:
     def from_env(cls) -> "Settings":
         """從環境變數讀取設定，override 預設值。"""
         return cls(
-            BROWSER_ENGINE=environ.get("BROWSER_ENGINE", "playwright"),
+            BROWSER_ENGINE=environ.get("BROWSER_ENGINE", "auto"),
             CDP_PORT=int(environ.get("CDP_PORT", "9222")),
             PAGE_TIMEOUT=int(environ.get("PAGE_TIMEOUT", "30000")),
             SLEEP_AFTER_LOAD=int(environ.get("SLEEP_AFTER_LOAD", "8")),

@@ -1,40 +1,39 @@
-# Smart Agent CDP Chrome 啟動腳本
-# 用大佬真實 Chrome profile + 遠程調試端口
+# Start Chrome with CDP for Smart Agent
+$CHROME = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+$PROFILE = "C:\Users\guohu\workspace\smart-agent\browser_data\chrome_profile"
+$PORT = 9222
 
-param(
-    [string]$Mode = "main",           # main=真實profile, dedicated=養號專用
-    [int]$Port = 9222                 # CDP 端口（dedicated 用 9223）
+if (-not (Test-Path $CHROME)) {
+    Write-Host "ERROR: Chrome not found at $CHROME"
+    exit 1
+}
+
+New-Item -ItemType Directory -Force -Path $PROFILE | Out-Null
+
+try {
+    $response = Invoke-WebRequest -Uri "http://127.0.0.1:$PORT/json/version" -UseBasicParsing -TimeoutSec 2
+    Write-Host "CDP Chrome already running on port $PORT"
+    exit 0
+} catch {
+    Write-Host "Starting CDP Chrome on port $PORT..."
+}
+
+Start-Process -FilePath $CHROME -ArgumentList @(
+    "--remote-debugging-port=$PORT",
+    "--user-data-dir=$PROFILE",
+    "--no-first-run",
+    "--no-default-browser-check"
 )
 
-$ChromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-
-if ($Mode -eq "main") {
-    $ProfileDir = "$env:LOCALAPPDATA\Google\Chrome\User Data"
-    Write-Host "=== 啟動真實 Chrome Profile (CDP port $Port) ==="
-} else {
-    $ProfileDir = "$PSScriptRoot\..\browser_data\dedicated_chrome"
-    New-Item -ItemType Directory -Force $ProfileDir | Out-Null
-    Write-Host "=== 啟動養號專用 Chrome Profile (CDP port $Port) ==="
-}
-
-# Kill existing Chrome on this port
-$existing = netstat -ano | Select-String ":$Port.*LISTENING"
-if ($existing) {
-    Write-Host "端口 $Port 已被佔用，嘗試關閉..."
-    $pidMatch = [regex]::Match($existing, '\s+(\d+)$')
-    if ($pidMatch.Success) {
-        Stop-Process -Id $pidMatch.Groups[1].Value -Force -ErrorAction SilentlyContinue
-        Start-Sleep 2
+for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Seconds 1
+    try {
+        $null = Invoke-WebRequest -Uri "http://127.0.0.1:$PORT/json/version" -UseBasicParsing -TimeoutSec 2
+        Write-Host "CDP Chrome ready! (port $PORT)"
+        exit 0
+    } catch {
+        Write-Host -NoNewline "."
     }
 }
-
-Start-Process $ChromePath "--remote-debugging-port=$Port", "--user-data-dir=$ProfileDir"
-Start-Sleep 3
-
-# Verify
-$check = netstat -ano | Select-String ":$Port.*LISTENING"
-if ($check) {
-    Write-Host "Chrome 已啟動 (CDP port $Port) - 就緒"
-} else {
-    Write-Host "啟動失敗，請檢查 Chrome 路徑: $ChromePath"
-}
+Write-Host "`nERROR: CDP Chrome failed to start within 30s"
+exit 1
