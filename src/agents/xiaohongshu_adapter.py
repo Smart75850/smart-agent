@@ -8,8 +8,7 @@ from src.utils.browser_service import browser
 from src.utils.logger import logger
 
 
-_SEARCH_JS = r"""\
-() => {
+_SEARCH_JS = r"""() => {
     const out = []; const seen = new Set();
     const cards = document.querySelectorAll('.note-item, [class*="note-item"], [class*="NoteItem"], section a[href*="/explore/"], [class*="feeds-page"] a[href*="/explore/"], a[href*="/search_result/"]');
     const parseHref = (href) => {
