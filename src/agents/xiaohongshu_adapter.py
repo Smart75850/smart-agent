@@ -9,29 +9,45 @@ from src.utils.browser_service import browser
 from src.utils.logger import logger
 
 
-_SEARCH_JS = """\
+_SEARCH_JS = r"""\
 () => {
     const out = []; const seen = new Set();
     const cards = document.querySelectorAll('.note-item, [class*="note-item"], [class*="NoteItem"], section a[href*="/explore/"], [class*="feeds-page"] a[href*="/explore/"], a[href*="/search_result/"]');
+    const parseHref = (href) => {
+        if (!href) return {note_id: '', xsec_token: ''};
+        // 提取 note_id: /explore/xxxx 或 /search_result/xxxx
+        const m = href.match(/\/(explore|search_result)\/([a-zA-Z0-9]+)/);
+        const note_id = m ? m[2] : '';
+        // 提取 xsec_token
+        const xm = href.match(/xsec_token=([^&]+)/);
+        const xsec_token = xm ? xm[1] : '';
+        return {note_id, xsec_token};
+    };
     cards.forEach(el => {
         const linkEl = el.tagName === 'A' ? el : el.querySelector('a[href*="/explore/"], a[href*="/search_result/"]');
         const href = linkEl?.getAttribute('href') || '';
         if (!href || seen.has(href)) return;
         seen.add(href);
+        const {note_id, xsec_token} = parseHref(href);
         const title = el.querySelector('.title, [class*="title"], [class*="note-title"]')?.textContent?.trim()
             || el.querySelector('span')?.textContent?.trim()
             || el.textContent.trim().slice(0, 80);
         const author = el.querySelector('.author, .name, [class*="author"], [class*="name"]')?.textContent?.trim() || '';
         const likes = el.querySelector('.like, [class*="like"], [class*="count"], [class*="engage"]')?.textContent?.trim() || '';
-        if (title.length > 3) out.push({title: title, author: author, likes: likes, link: href});
+        const coverEl = el.querySelector('img');
+        const cover_url = coverEl?.getAttribute('src') || coverEl?.getAttribute('data-src') || '';
+        const detail_url = note_id ? ('https://www.xiaohongshu.com/explore/' + note_id + (xsec_token ? '?xsec_token=' + xsec_token + '&xsec_source=pc_search' : '')) : href;
+        if (title.length > 3) out.push({note_id, xsec_token, title, author, likes, cover_url, url: detail_url});
     });
     if (out.length === 0) {
         document.querySelectorAll('a[href*="/explore/"]').forEach(a => {
             const href = a.getAttribute('href') || '';
             if (!href || seen.has(href)) return;
             seen.add(href);
+            const {note_id, xsec_token} = parseHref(href);
             const t = a.textContent.trim();
-            if (t.length > 5) out.push({title: t.slice(0, 100), author: '', likes: '', link: href});
+            const detail_url = note_id ? ('https://www.xiaohongshu.com/explore/' + note_id + (xsec_token ? '?xsec_token=' + xsec_token + '&xsec_source=pc_search' : '')) : href;
+            if (t.length > 5) out.push({note_id, xsec_token, title: t.slice(0, 100), author: '', likes: '', cover_url: '', url: detail_url});
         });
     }
     return out;
@@ -195,7 +211,7 @@ async def xiaohongshu_comment(note_id: str, count: int = 50, xsec_token: str = "
 
             async def on_response(resp):
                 """拦截评论 API 响应，提取结构化字段。"""
-                if ("comment" in resp.url or "sub_comment" in resp.url) and resp.status == 200:
+                if "/api/sns/web/v2/comment" in resp.url and resp.status == 200:
                     try:
                         body = await resp.json()
                         comment_list = (body.get("data", {}).get("comments", []) or [])
@@ -289,55 +305,196 @@ async def xiaohongshu_comment(note_id: str, count: int = 50, xsec_token: str = "
 
 
 async def xiaohongshu_hot() -> str:
-    """爬取小紅薯推薦 feed（近似熱榜），需登入先有內容。回傳 JSON 字串。"""
-    logger.info("小紅薯熱榜: 開始爬取")
+    """爬取小红书推荐 feed（近似热榜）— CDP 浏览器拦截 API + DOM 兜底。需登入。回传 JSON 字串。"""
+    logger.info("小红书热榜: 开始爬取")
     page = await browser.new_page()
     try:
-        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded")
+        hot_items: list[dict] = []
+        seen_ids: set[str] = set()
+
+        async def on_response(resp):
+            """拦截首页推荐 feed API。"""
+            if ("/api/sns/web/v1/homefeed" in resp.url or "/api/sns/web/v1/feed" in resp.url) and resp.status == 200:
+                try:
+                    body = await resp.json()
+                    items = body.get("data", {}).get("items", []) or []
+                    for item in items:
+                        note_card = item.get("note_card") or item
+                        note_id = str(item.get("id", "") or note_card.get("note_id", ""))
+                        if not note_id or note_id in seen_ids:
+                            continue
+                        seen_ids.add(note_id)
+                        xsec_token = (
+                            note_card.get("xsec_token", "")
+                            or item.get("xsec_token", "")
+                        )
+                        if not xsec_token:
+                            share_link = (note_card.get("share_info", {}) or {}).get("link", "")
+                            if "xsec_token=" in share_link:
+                                m = re.search(r'xsec_token=([^&]+)', share_link)
+                                xsec_token = m.group(1) if m else ""
+                        user = note_card.get("user", {}) or {}
+                        interact = note_card.get("interact_info", {}) or {}
+                        cover = note_card.get("cover", {}) or {}
+                        detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                        if xsec_token:
+                            detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_feed"
+                        hot_items.append({
+                            "note_id": note_id,
+                            "xsec_token": xsec_token,
+                            "title": note_card.get("display_title", ""),
+                            "author": user.get("nickname", ""),
+                            "author_id": user.get("user_id", ""),
+                            "likes": interact.get("liked_count", ""),
+                            "cover_url": cover.get("url_default", "") or cover.get("url", ""),
+                            "url": detail_url,
+                        })
+                except Exception:
+                    pass
+
+        page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+
+        # 滚动触发更多加载
+        for _ in range(3):
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2000)
+
+        await page.wait_for_timeout(2000)
+
+        # DOM 兜底
+        if not hot_items:
+            dom_result = await page.evaluate(r"""() => {
     const items = document.querySelectorAll('.note-item, [class*="note-item"], [class*="feed"] [class*="item"]');
     const seen = new Set();
+    const parseHref = (href) => {
+        const m = href?.match(/\/(explore)\/([a-zA-Z0-9]+)/);
+        const note_id = m ? m[2] : '';
+        const xm = href?.match(/xsec_token=([^&]+)/);
+        return {note_id, xsec_token: xm ? xm[1] : ''};
+    };
     return Array.from(items).filter(el => {
         const t = el.textContent.trim();
         if (!t || t.length < 5 || seen.has(t)) return false;
         seen.add(t);
         return true;
-    }).slice(0, 30).map(el => ({
-        title: el.querySelector('.title, [class*="title"]')?.textContent?.trim() || '',
-        likes: el.querySelector('.like, [class*="like"], [class*="count"]')?.textContent?.trim() || '',
-        link: el.querySelector('a')?.getAttribute('href') || '',
-    }));
+    }).slice(0, 30).map(el => {
+        const href = el.querySelector('a')?.getAttribute('href') || '';
+        const {note_id, xsec_token} = parseHref(href);
+        const coverEl = el.querySelector('img');
+        const detail_url = note_id ? ('https://www.xiaohongshu.com/explore/' + note_id + (xsec_token ? '?xsec_token=' + xsec_token + '&xsec_source=pc_feed' : '')) : href;
+        return {
+            note_id, xsec_token,
+            title: el.querySelector('.title, [class*="title"]')?.textContent?.trim() || '',
+            likes: el.querySelector('.like, [class*="like"], [class*="count"]')?.textContent?.trim() || '',
+            cover_url: coverEl?.getAttribute('src') || coverEl?.getAttribute('data-src') || '',
+            url: detail_url,
+        };
+    });
 }""")
-        logger.info(f"小紅薯熱榜完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
+            if dom_result:
+                hot_items = dom_result
+                logger.info("小红书热榜: API 拦截为空，使用 DOM 兜底")
+
+        logger.info(f"小红书热榜完成: {len(hot_items)} 条")
+        return json.dumps(hot_items, ensure_ascii=False)
     finally:
         await page.close()
 
 
 async def xiaohongshu_user(user_id: str) -> str:
-    """爬取小紅薯用戶主頁筆記列表，需登入先有內容。回傳 JSON 字串。"""
-    logger.info(f"小紅薯用戶: user_id={user_id}")
+    """爬取小红书用户主页笔记列表 — CDP 浏览器。需登入。回传 JSON 字串。"""
+    logger.info(f"小红书用户: user_id={user_id}")
     page = await browser.new_page()
     try:
-        await page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}", wait_until="domcontentloaded")
+        user_items: list[dict] = []
+        seen_ids: set[str] = set()
+
+        async def on_response(resp):
+            """拦截用户主页笔记列表 API。"""
+            if ("/api/sns/web/v1/user_posted" in resp.url or "user/notes" in resp.url) and resp.status == 200:
+                try:
+                    body = await resp.json()
+                    notes = body.get("data", {}).get("notes", []) or []
+                    for note in notes:
+                        note_id = str(note.get("note_id", ""))
+                        if not note_id or note_id in seen_ids:
+                            continue
+                        seen_ids.add(note_id)
+                        xsec_token = note.get("xsec_token", "")
+                        if not xsec_token:
+                            share_link = (note.get("share_info", {}) or {}).get("link", "")
+                            if "xsec_token=" in share_link:
+                                m = re.search(r'xsec_token=([^&]+)', share_link)
+                                xsec_token = m.group(1) if m else ""
+                        interact = note.get("interact_info", {}) or {}
+                        cover = note.get("cover", {}) or {}
+                        detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                        if xsec_token:
+                            detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_user"
+                        user_items.append({
+                            "note_id": note_id,
+                            "xsec_token": xsec_token,
+                            "title": note.get("display_title", ""),
+                            "likes": interact.get("liked_count", ""),
+                            "collects": interact.get("collected_count", ""),
+                            "comments": interact.get("comment_count", ""),
+                            "cover_url": cover.get("url_default", "") or cover.get("url", ""),
+                            "url": detail_url,
+                        })
+                except Exception:
+                    pass
+
+        page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+        await page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}", wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+
+        # 滚动加载更多
+        for _ in range(3):
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2000)
+
+        await page.wait_for_timeout(2000)
+
+        # DOM 兜底
+        if not user_items:
+            dom_result = await page.evaluate(r"""() => {
     const items = document.querySelectorAll('.note-item, [class*="note-item"]');
     const seen = new Set();
+    const parseHref = (href) => {
+        const m = href?.match(/\/(explore)\/([a-zA-Z0-9]+)/);
+        const note_id = m ? m[2] : '';
+        const xm = href?.match(/xsec_token=([^&]+)/);
+        return {note_id, xsec_token: xm ? xm[1] : ''};
+    };
     return Array.from(items).filter(el => {
         const t = el.textContent.trim();
         if (!t || t.length < 3 || seen.has(t)) return false;
         seen.add(t);
         return true;
-    }).slice(0, 30).map(el => ({
-        title: el.querySelector('.title, [class*="title"]')?.textContent?.trim() || '',
-        likes: el.querySelector('.like, [class*="like"], [class*="count"]')?.textContent?.trim() || '',
-        link: el.querySelector('a')?.getAttribute('href') || '',
-    }));
+    }).slice(0, 30).map(el => {
+        const href = el.querySelector('a')?.getAttribute('href') || '';
+        const {note_id, xsec_token} = parseHref(href);
+        const coverEl = el.querySelector('img');
+        const detail_url = note_id ? ('https://www.xiaohongshu.com/explore/' + note_id + (xsec_token ? '?xsec_token=' + xsec_token + '&xsec_source=pc_user' : '')) : href;
+        return {
+            note_id, xsec_token,
+            title: el.querySelector('.title, [class*="title"]')?.textContent?.trim() || '',
+            likes: el.querySelector('.like, [class*="like"], [class*="count"]')?.textContent?.trim() || '',
+            cover_url: coverEl?.getAttribute('src') || coverEl?.getAttribute('data-src') || '',
+            url: detail_url,
+        };
+    });
 }""")
-        logger.info(f"小紅薯用戶完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
+            if dom_result:
+                user_items = dom_result
+                logger.info("小红书用户: API 拦截为空，使用 DOM 兜底")
+
+        logger.info(f"小红书用户完成: {len(user_items)} 条")
+        return json.dumps(user_items, ensure_ascii=False)
     finally:
         await page.close()
 
