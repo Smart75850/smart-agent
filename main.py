@@ -111,6 +111,10 @@ def parse_args(argv=None):
         help="列出支援平台",
     )
     parser.add_argument(
+        "--xsec-token", default="",
+        help="小红书安全令牌（每个帖子唯一，从搜索结果中获取）",
+    )
+    parser.add_argument(
         "--cookie-bridge", action="store_true",
         help="啟動 CookieBridge 本地服務，接收 Chrome Extension 同步的 cookies",
     )
@@ -130,7 +134,10 @@ def _build_kwargs(args, method):
     if method == "search":
         return {"keyword": args.keyword} if args.keyword else {}
     if method in ("detail", "comment"):
-        return {"item_id": args.keyword}
+        kw = {"item_id": args.keyword}
+        if args.xsec_token:
+            kw["xsec_token"] = args.xsec_token
+        return kw
     if method == "user":
         return {"user_id": args.keyword}
     # hot / rank 無需 keyword
