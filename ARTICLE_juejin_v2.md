@@ -1,158 +1,115 @@
-# 开源一个月，我的7平台爬虫被用户测出了15个Bug，修复过程全记录
+# 开源一个月，我的7平台爬虫被用户测出了15个Bug
 
-> 一个真实开源项目的成长故事：从「我自己跑得通啊」到「对不起，是我的锅」。
-
----
-
-Smart Agent 上线 GitHub 快一个月了——一个纯 Python 的多平台内容采集框架，覆盖 B站/抖音/小红书/知乎/快手/微博/贴吧 7 个平台，内置 7 个 AI Agent，接上 Ollama 或任意 OpenAI 接口就能自动做爆款分析、选品挖掘、评论情绪、文案生成。
+Smart Agent 上线 GitHub 快一个月了。一个纯 Python 的多平台内容采集框架，支持 B站、抖音、小红书、知乎、快手、微博、贴吧，内置了 7 个 AI Agent，接上 Ollama 或者任意 OpenAI 接口就能自动做爆款分析、选品挖掘、评论情绪、文案生成。
 
 GitHub: https://github.com/Smart75850/smart-agent
 
-听着很美好对吧？
+听着挺美好的。然后用户来了，然后 Bug 来了。我才意识到自己写的代码到底有多脆。
 
-然后用户来了。然后 Bug 来了。然后我意识到：**我自己测的是演示，用户用的才是测试。**
+这篇文章不讲什么「从零构建爬虫框架」的宏大叙事，就是实打实记录一下过去两天被用户报出来的几个 Bug，以及修的过程中踩的坑。如果你也在做 Python 项目或者维护开源工具，应该会遇到类似的问题。
 
-这篇文章没有「我如何从零构建一个爬虫框架」的宏观叙事，只有 48 小时内被用户报出来的 5 个真实 Bug 以及修复过程。如果你也在做 Python 项目、或者在维护开源工具，这些坑你应该都会遇到。
+## Bug 1：环境变量被默默覆盖了
 
----
+用户说他设了 `BROWSER_ENGINE=cdp`，CDP Chrome 也在 9222 端口跑着，但程序还是弹了一个全新的 Chrome 窗口出来，根本没连接他已经登录的那个。
 
-## Bug 1：环境变量被无声覆盖，CDP 模式根本没生效
-
-**现象**：用户设了 `BROWSER_ENGINE=cdp`，CDP Chrome 也在 9222 端口跑着，但程序还是弹出了一个全新的 Chrome 窗口，而不是连接他已经登录的那个。
-
-**排查**：用户怀疑自己设错了环境变量，反复确认语法没问题。我检查代码后发现——
+排查了一圈发现，`main.py` 里有这么一行：
 
 ```python
-# main.py — 旧代码
 os.environ["BROWSER_ENGINE"] = args.engine
-# args.engine 默认值是 "playwright"
 ```
 
-`--engine` 参数的默认值是 `playwright`。即使用户已经 `set BROWSER_ENGINE=cdp` 了，`main.py` 照样用 `playwright` 覆盖掉。用户的 `cdp` 设置被无声无息地抹杀了。
+`--engine` 参数的默认值是 `playwright`。也就是说，不管用户有没有设环境变量，这行代码都会用默认值 `playwright` 覆盖掉。用户的 `cdp` 设置被无声无息地抹掉了。
 
-**修复**：
+修复就一行：
 
 ```python
 if "BROWSER_ENGINE" not in os.environ:
     os.environ["BROWSER_ENGINE"] = args.engine
 ```
 
-**教训**：CLI 参数默认值和环境变量的优先级要想清楚。我的规则是——**用户显式设了环境变量，就不要用参数默认值去覆盖。**
+这事说起来不复杂，但用户因为这个折腾了快一个小时。一个参数默认值搞出来的问题，完全是我的责任。
 
----
+## Bug 2：`'bool' object is not callable`
 
-## Bug 2：`'bool' object is not callable` — Property 被当成了 Method
+搜索返回空结果（用户还没登录小红书），程序走兜底路径的时候崩了，报错 `'bool' object is not callable`。
 
-**现象**：搜索返回空结果后，程序走兜底路径时崩了，报错 `'bool' object is not callable`。
+原因：`browser_service.py` 里 `is_running` 是个 `@property`，返回值是布尔。但兜底搜索函数里写成了 `browser.is_running()` —— 多了对括号。Python 尝试把 `True` 当函数调，于是炸了。
 
-**排查**：`browser_service.py` 里 `is_running` 是个 `@property`：
+这个 Bug 我自己测的时候根本触发不了，因为我跑测试的时候不会走到兜底路径——永远是主路径成功，永远用不到那个 fallback 函数。用户一跑就踩到了。
 
-```python
-@property
-def is_running(self) -> bool:
-    return self._browser is not None
-```
+把括号去掉就修好了。
 
-但在 `_adaptive_search` 兜底函数里，写成了 `browser.is_running()`——加了对括号。
+## Bug 3：搜到数据了，保存的时候崩了
 
-Python 把 `is_running` 返回的 `True`（bool 值）当成函数来调用，于是 `True()` → `'bool' object is not callable`。
+这个是最让我脸上挂不住的。
 
-**修复**：`browser.is_running()` → `browser.is_running`，去掉括号。
-
-**教训**：`@property` 和普通方法的调用语法不一样。Python 不会在定义时提示你「这个属性将来可能被当方法调用」，只在运行时炸。Code Review 时特别注意属性访问有没有多余的括号。
-
----
-
-## Bug 3：搜是搜到了，保存时 UnboundLocalError
-
-**现象**：用户搜索小红书拿到了 40 条结果，但在保存输出时崩了：
+用户搜小红书拿到了 40 条结果，然后在保存输出的时候程序崩了：
 
 ```
 UnboundLocalError: cannot access local variable 'settings'
 ```
 
-**排查**：`main()` 函数里之前加 API Key 检测时，在 `if` 分支里写了：
+我之前在 `main()` 函数里加 API Key 检测功能的时候，在一个 `if` 分支里写了：
 
 ```python
 if args.type == "aggregate":
-    from config.settings import settings  # ← 埋雷
+    from config.settings import settings
 ```
 
-**Python 作用域规则**：函数内任何位置出现 `import xxx` 或 `xxx = ...`，整个函数都会把 `xxx` 当作局部变量。用户没有用 `--type aggregate`，`if` 分支不执行，`settings` 从未被局部赋值——但 Python 仍然认为它是局部变量。后面 `settings.STORE_BACKEND` 就报了 `UnboundLocalError`。
+Python 的作用域规则是这样的：函数内任何位置出现 `import xxx` 或者 `xxx = ...`，整个函数都会把 `xxx` 当局部变量。用户没有用 `--type aggregate`，那个 `if` 分支没执行到，`settings` 局部变量从未被赋值，但 Python 仍然认为它是局部变量。后面代码里用到 `settings.STORE_BACKEND` 的时候直接就 UnboundLocalError 了。
 
-**修复**：删掉 `if` 里的重复 import（模块顶部已经 import 过了）。
+而模块顶部明明已经 `from config.settings import settings` 过了，这个 `if` 里的重复 import 完全是多余的。删掉就好。
 
-**教训**：不要在函数内部的 `if` 分支里 import 模块级已导入的东西。这属于「怎么写都不会想到会炸，但确实会炸」的 Python 坑。
+这个坑说实话挺反直觉的，我自己写的时候完全没意识到会有问题——因为「我自己」跑的时候一定是走 aggregate 路径的。
 
----
+## Bug 4：正文只返回了 13 个字
 
-## Bug 4：详情内容只返回了 13 个字
+用户搜到帖子后用 `--type detail` 拉取正文，`desc` 字段只返回了 13 个字：「发现RED直播发布通知我我」。内容完全不对。
 
-**现象**：用户搜到帖子后用 `--type detail` 拉取正文，`desc` 字段只返回了 13 个字：「发现RED直播发布通知我我」。正文完全不匹配。
+原因是我最初的详情提取是用 CSS 选择器刮 DOM 的，`querySelector('.desc')` 之类的。但小红书把真正的帖子正文藏在 `window.__INITIAL_STATE__` 这个 SSR 内嵌的 JS 变量里，里面有标题、正文（752 字）、作者、头像、互动数据、图片列表、标签、发布时间、IP 属地。DOM 里只有一个残缺的预览。
 
-**排查**：最初的详情提取逻辑是用 CSS 选择器从 DOM 刮数据，`querySelector('.desc')` 之类的。但小红书把真正的帖子正文藏在了 SSR 内嵌的 JS 变量里——`window.__INITIAL_STATE__`。这个变量包含了帖子的完整数据：标题、正文（752 字）、作者、头像、互动数据、图片列表、标签、发布时间、IP 属地……而 DOM 里只有一个残缺的预览。
+改成优先读 `__INITIAL_STATE__` 就好了。现在详情能拿到完整的 15 个字段。
 
-**修复**：提取逻辑改为优先读 `__INITIAL_STATE__.note.noteDetailMap[noteId].note`，DOM 作为兜底。
+这个 Bug 让我意识到，写爬虫的时候不能只看 DOM。现代前端框架的数据经常不在 HTML 里，得先打开 DevTools Console 看看 `window.__INITIAL_STATE__` 这类全局变量。
 
-```javascript
-const state = window.__INITIAL_STATE__;
-const note = state.note.noteDetailMap[noteId].note;
-// 现在标题、正文、图片、标签全有了
-```
+## Bug 5：搜索和热榜返回的数据结构对不上
 
-**教训**：现代 SPA/SSR 页面的数据源不在 DOM 里，在 JS 变量里。写爬虫的时候，先打开 DevTools Console，敲 `window.__INITIAL_STATE__`（或者 `__NEXT_DATA__`、`__NUXT__`、`__SVELTEKIT__`——框架不同名字不同），看看数据到底在哪，再决定用 CSS 选择器还是 JS 变量。
+搜索用的是 API 拦截（`page.on("response")`），能拿到完整的 15 个字段。热榜只有 DOM 兜底，CSS 选择器只能刮到 4 个字段。两个路径返回的东西完全不同，下游代码处理的时候就乱了——用户从搜索结果能正常看详情，从热榜结果就不行，因为缺了 `xsec_token`。
 
----
+写兜底路径的时候我只求「不崩溃」，没考虑到数据格式要对齐主路径。但用户不知道什么路径是主什么路径是兜底，对他来说都是同一个功能。
 
-## Bug 5：API 拦截和 DOM 兜底的数据格式不一致
+修的方式是给热榜也加上 API 拦截，DOM 兜底也补全字段。现在所有入口返回的数据结构完全一致了。
 
-**现象**：搜索和热榜返回的字段不一样。搜索有 `note_id`、`xsec_token`、`url`、`image_count`，热榜只有 `title`、`author`、`likes`、`link`。用户用搜索结果能正常看详情，用热榜结果就不行——因为热榜结果缺少 `xsec_token`。
+## 写代码的以为自己测过了，用户一跑才知道没测
 
-**排查**：搜索用的是 API 拦截（`page.on("response")`），能拿到完整的 API 响应数据。热榜只有 DOM 兜底，CSS 选择器只能刮到 4 个字段。两个路径返回的数据结构完全不同，下游代码处理时就会炸。
+我自己测的时候：CDP Chrome 已登录、网络正常、API 拦截每次都成功、LLM Key 配好了。全是 happy path。
 
-**修复**：给热榜也加了 API 拦截（拦截 `/api/sns/web/v1/homefeed`），DOM 兜底也升级成跟 API 一致的字段名和结构。现在所有入口（搜索、热榜、用户主页）返回的数据结构完全一致。
+用户的环境：CDP Chrome 开了但没登录、Windows cmd 手打环境变量、网络偶尔延迟导致 API 拦截失败、没配 API Key 所以走兜底路径。全是 edge case。
 
-**教训**：兜底路径的数据格式必须和主路径对齐。主路径返回什么字段，兜底路径就应该返回什么字段（至少 key 一致，值可以为空）。
+说白了，我做的叫演示，用户做的才叫测试。
 
----
+现在我在项目里加了一条硬性要求：每次写完代码，至少测三条失败路径——环境变量没设或者设错了会怎样、API 拦截失败走 DOM 兜底会怎样、没登录的时候会怎样。
 
-## 非技术总结
+这套标准以后也适用我所有的项目。
 
-### 我的最大收获：用户做的才是测试
-
-我自己测试的时候：CDP Chrome 已登录、网络正常、API 拦截成功——全是 Happy Path。用户的环境：CDP Chrome 开了但没登录、Windows cmd 手打环境变量、网络延迟导致拦截失败——全是 Edge Case。
-
-现在我的项目里多了一条**「Failure Path 测试铁律」**——每次写完代码，至少测 3 条失败路径：
-
-| Failure Path | 必测 |
-|---|---|
-| 环境变量未设 / 设错 | ✅ |
-| API 拦截失败 → DOM 兜底 | ✅ |
-| 登录态缺失 | ✅ |
-| 用户 cmd 语法 vs PowerShell 语法 | ✅ |
-| Python 版本 3.9 vs 3.11+ | ✅ |
-
----
-
-## 项目现状
-
-经过这轮修复，开源版已比较稳定。如果你想试试：
+## 试试看
 
 ```bash
 git clone https://github.com/Smart75850/smart-agent.git
 cd smart-agent
 pip install -r requirements.txt
 
-# 懒人包：双击 scripts\quick_xhs.bat，自动启动 CDP Chrome + 提示登录 + 搜索
+# Windows 懒人包：双击 scripts\quick_xhs.bat
 # 或者手打：
 set BROWSER_ENGINE=cdp
 python main.py --platform xiaohongshu --keyword "穿搭"
+
+# 搜完自动拉详情正文
+python main.py --platform xiaohongshu --keyword "穿搭" --limit 5 --fetch-detail
 ```
 
-接上本地 Ollama 就能跑 7 个 AI Agent 全链路分析（`ollama pull qwen3:14b`），一分钱不花。
+装个 Ollama（`ollama pull qwen3:14b`），改一下 `.env` 就能跑 7 个 AI Agent 做全链路分析，不花一分钱。
 
----
+GitHub: https://github.com/Smart75850/smart-agent
 
-*GitHub: https://github.com/Smart75850/smart-agent*
-
-*Star ⭐ 是对开源作者最好的鼓励。有问题直接提 Issue，看到就会回。*
+有问题直接提 Issue，看到就会回。Star 是对开源作者最好的鼓励。

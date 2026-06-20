@@ -1,95 +1,63 @@
-# 开源一个月，社区用户帮我找出 15 个 Bug——Smart Agent 真实成长记录
+# 开源一个月，Smart Agent 从"我自己能跑"到"社区帮我校准"
 
-> 一个 MIT 协议的多平台内容采集框架，从"我自己跑得通"到"社区帮我校准"的 30 天。
+Smart Agent 是一个纯 Python、MIT 协议的多平台内容采集与分析框架。
 
----
-
-## 项目简介
-
-Smart Agent 是一个纯 Python、MIT 开源协议的多平台内容采集与分析框架。
-
-- **7 个平台**：B站、抖音、小红书、知乎、快手、微博、贴吧
-- **5 种操作**：关键词搜索、热榜、帖子详情、评论采集、用户作品
-- **7 个 AI Agent**：爆款识别、选品分析、视频拆解、评论情绪、文案生成、内容改写、配图策略（支持本地 Ollama 或任何 OpenAI 兼容接口，零成本可用）
-- **6 种存储**：JSON、CSV、JSONL、Excel、SQLite、MySQL
-- **零 Node.js 依赖**：纯 Python 技术栈
+覆盖 B站、抖音、小红书、知乎、快手、微博、贴吧 7 个平台，支持搜索、热榜、详情、评论、用户作品五种操作，内置 7 个 AI Agent 做内容分析，接上 Ollama 就能零成本跑全链路。
 
 GitHub: https://github.com/Smart75850/smart-agent
 
----
+## 和同类项目的区别
 
-## 为什么又写了一个采集框架
+市面上不缺爬虫项目。我写这个的主要原因是我自己要用——做内容分析的时候经常需要跨平台采集数据，换平台就得换工具，体验很差。
 
-市面上不缺爬虫工具，但缺一个**对 Python 技术栈友好、多平台统一接口、能复用浏览器登录态**的方案。
+和 MediaCrawler 相比，Smart Agent 不需要 Node.js，纯 Python 技术栈。支持 CDP 模式直接复用已登录的 Chrome，不用手动管 Cookie。内置的 AI 分析 Agent 可以接任何 OpenAI 兼容接口，包括本地 Ollama，不需要花钱调用云端 API。
 
-| 对比 | MediaCrawler | Smart Agent |
-|---|---|---|
-| 技术栈 | Python + Node.js | 纯 Python |
-| 平台数 | 7+ | 7 |
-| CDP 复用登录 Chrome | ❌ | ✅ |
-| AI 分析 Agent | ❌ | ✅ 7 个 Agent |
-| 本地 LLM 支持 | ❌ | ✅ Ollama 零成本 |
-| MCP 协议 | ❌ | ✅ |
-| 开源协议 | Apache-2.0 | MIT |
+## 开源第一个月，被用户教做人了
 
----
+项目上线的时候我自己觉得挺稳的，每个功能都跑过，测试都绿。然后第一个用户来了。
 
-## 从"线上可用"到"线下稳定"：5 个真实的 Bug 修复记录
+两天之内他报了好几个 Bug，每一个我排查完之后都只能承认：确实是我代码的问题。
 
-### Bug 1：环境变量被 CLI 参数默认值覆盖
+说几个典型的。
 
-用户设了 `BROWSER_ENGINE=cdp`，但 `main.py` 里 `args.engine` 默认值是 `playwright`，直接覆盖了用户的环境变量。导致程序启动了新浏览器而不是连接 CDP Chrome。
+**环境变量被 CLI 参数默认值覆盖。** 用户设了 `BROWSER_ENGINE=cdp`，但 `main.py` 里 `args.engine` 默认值是 `playwright`，直接覆盖了用户的环境变量。这导致程序启动了一个全新的 Chrome 而不是连接用户已经登录的那个。修复很简单：环境变量没设的时候才用 CLI 参数值。
 
-> 修复：只有环境变量未设时才用 CLI 参数值。
+**兜底路径的代码把 property 当 method 调。** `browser.is_running` 是 `@property`，返回值是布尔。兜底搜索里写成了 `browser.is_running()`，Python 尝试把 `True` 当函数调。这个 Bug 我自己测的时候永远不会触发，因为我跑测试的时候主路径永远是成功的，走不到兜底。
 
-### Bug 2：Property vs Method 混淆
+**函数内 if 分支里 import 导致 UnboundLocalError。** 我在 `if args.type == "aggregate"` 分支里写了一个局部 `from config.settings import settings`。Python 的规则是函数内任何位置有 import 或赋值，整个函数都会把那个名字当局部变量。用户没走这个分支，`settings` 从未被局部赋值，后面用到的时候就炸了。而我"自己"跑的时候一定会走 aggregate 路径，所以完全没发现。
 
-`browser.is_running` 是 `@property`，但兜底代码写成了 `browser.is_running()`——把 `True` 当函数调用。
+**正文提取只刮到 13 个字。** CSS 选择器刮不到小红书帖子的正文——数据藏在 `window.__INITIAL_STATE__` 这个 SSR 内嵌变量里。现代前端框架的数据经常不在 DOM 里，得先看 JS 全局变量。
 
-> 修复：去掉括号。`@property` 返回的是值，不是 callable。
+**搜索和热榜返回的数据结构不一致。** 搜索用 API 拦截拿 15 个字段，热榜用 DOM 兜底只拿 4 个。兜底的时候我只求不崩，没管字段对齐。但用户不知道哪个是主路径哪个是兜底，在他眼里都是同一个功能。
 
-### Bug 3：if 分支内 import 导致 UnboundLocalError
+## 开源维护者的一些碎碎念
 
-在 `if args.type == "aggregate"` 分支里写了 `from config.settings import settings`，导致 Python 将 `settings` 视为整个函数的局部变量。用户没走这个分支时，后面 `settings.STORE_BACKEND` 就炸了。
+修完这些 Bug 之后我在项目文档里加了一条"Failure Path 测试标准"——每次写完代码至少测三个失败场景。你的环境完美不代表用户的环境也完美，这件事听起来很废话，但真的写到代码里就很容易忘。
 
-> 修复：删掉重复 import，直接使用模块顶部的导入。
+还有就是认真回 Issue。那个用户虽然没付钱，但他帮我做了花钱都买不到的测试——在完全陌生的环境里，用我完全没想到的方式，把我的代码从头到尾跑了一遍。每一个 Bug 报告都是一份免费的 QA 报告。
 
-### Bug 4：详情正文只返回 13 个字
+最后是一个很实操的建议：给你的项目写一个懒人包。一个 `.bat` 文件，用户双击就能跑，不用手打任何命令。很多用户不是不会用，是懒得看文档。你把门槛降到最低，用的人就多了。
 
-CSS 选择器刮不到小红书的正文——数据藏在 SSR 内嵌的 `window.__INITIAL_STATE__` 变量里。
+## 试试看
 
-> 修复：优先从 `__INITIAL_STATE__` 提取，DOM 作为兜底。
+```bash
+git clone https://github.com/Smart75850/smart-agent.git
+cd smart-agent
+pip install -r requirements.txt
+playwright install chromium
 
-### Bug 5：主路径和兜底路径数据结构不一致
+# 搜索
+set BROWSER_ENGINE=cdp
+python main.py --platform xiaohongshu --keyword "穿搭"
 
-API 拦截返回 15 个字段，DOM 兜底只返回 4 个。下游代码处理时无法统一。
+# 搜完自动拉详情正文
+python main.py --platform xiaohongshu --keyword "穿搭" --limit 5 --fetch-detail
+```
 
-> 修复：所有入口统一数据结构，兜底路径补全字段。
-
----
-
-## 对开源维护者的 6 条建议
-
-1. **写懒人包**——一个 `.bat` 文件，用户双击就能跑，不要让他手打环境变量
-2. **用户是免费的 QA 团队**——认真回每一个 Issue，那是你花钱都买不到的测试覆盖
-3. **测 Failure Path**——你的环境完美 ≠ 用户的环境完美
-4. **环境变量优先于默认参数**——用户显式设置的，不要用代码默认值覆盖
-5. **兜底路径数据格式要对齐主路径**——不能主路径 15 字段、兜底 4 字段
-6. **现代 SPA 的数据在 JS 变量里**——写采集逻辑前，先看 `window.__INITIAL_STATE__`
+装个 Ollama 就能跑 7 个 AI Agent，不花一分钱。
 
 ---
 
-## 社区参与
+项目 MIT 协议开源，欢迎提 Issue、PR、Star。
 
-项目完全开源（MIT License），欢迎任何形式的贡献：
-
-- 🐛 **提交 Bug**：GitHub Issues
-- 📝 **完善文档**：README、Wiki、使用指南
-- 🔧 **贡献代码**：Fork → PR → Review
-- ⭐ **Star**：对项目最大的认可
-
----
-
-*GitHub: https://github.com/Smart75850/smart-agent*
-
-*如果你也在做内容采集或数据分析相关的工具，欢迎交流。*
+GitHub: https://github.com/Smart75850/smart-agent
