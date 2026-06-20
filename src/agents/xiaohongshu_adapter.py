@@ -51,10 +51,45 @@ _SEARCH_JS = r"""() => {
     return out;
 }"""
 
-_DETAIL_JS = """\
-() => {
-    const titleEl = document.querySelector('.title, #detail-title, .note-title, [class*="note-title"], [class*="detail-title"]');
-    const descEl = document.querySelector('.desc, .content, .note-content, [class*="desc"], [class*="note-content"], [class*="content"]');
+_DETAIL_JS = r"""() => {
+    // 优先从 __INITIAL_STATE__ 提取完整数据（SSR 内嵌）
+    try {
+        const state = window.__INITIAL_STATE__;
+        if (state && state.note && state.note.noteDetailMap) {
+            const map = state.note.noteDetailMap;
+            const noteId = Object.keys(map)[0];
+            const note = map[noteId] && map[noteId].note;
+            if (note) {
+                const user = note.user || {};
+                const interact = note.interactInfo || {};
+                const images = (note.imageList || []).map(img => img.urlDefault || img.url || '');
+                const tags = (note.tagList || []).map(t => t.name || '');
+                return {
+                    title: note.title || '',
+                    desc: note.desc || '',
+                    full_text: note.desc || '',
+                    author: user.nickname || '',
+                    author_id: user.userId || '',
+                    author_avatar: user.avatar || '',
+                    likes: interact.likedCount || '',
+                    collects: interact.collectedCount || '',
+                    comments: interact.commentCount || '',
+                    shares: interact.shareCount || '',
+                    type: note.type || '',
+                    image_count: images.length,
+                    images: images,
+                    tag_list: tags,
+                    publish_time: note.time || '',
+                    ip_location: note.ipLocation || '',
+                    note_id: note.noteId || noteId,
+                };
+            }
+        }
+    } catch(e) {}
+
+    // DOM 兜底
+    const titleEl = document.querySelector('.title, #detail-title, .note-title, [class*="note-title"], [class*="detail-title"], #detail-desc');
+    const descEl = document.querySelector('#detail-desc, .note-scroller, [class*="note-scroller"], .note-text, [class*="note-text"]');
     const authorEl = document.querySelector('.author, .name, .username, .note-author, [class*="author"], [class*="note-author"]');
     const likeEl = document.querySelector('.like, .engage-bar .like, [class*="like"], [class*="engage"]');
     const collectEl = document.querySelector('.collect, .engage-bar .collect, [class*="collect"]');
@@ -62,6 +97,7 @@ _DETAIL_JS = """\
     return {
         title: titleEl?.textContent?.trim() ?? null,
         desc: descEl?.textContent?.trim() ?? null,
+        full_text: descEl?.textContent?.trim() ?? null,
         author: authorEl?.textContent?.trim() ?? null,
         likes: likeEl?.textContent?.trim() ?? null,
         collects: collectEl?.textContent?.trim() ?? null,
@@ -176,7 +212,7 @@ async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
 
 
 async def xiaohongshu_note_detail(note_id: str, xsec_token: str = "") -> str:
-    """获取小红书笔记详情 — CDP 浏览器。需登入。回传 JSON 字串。
+    """获取小红书笔记详情 — CDP 浏览器拦截详情 API + DOM 兜底。需登入。回传 JSON 字串。
 
     Args:
         note_id: 笔记ID（如 6938f1a5000000001e03d4e3）
@@ -184,13 +220,74 @@ async def xiaohongshu_note_detail(note_id: str, xsec_token: str = "") -> str:
     """
     logger.info(f"小红书详情: note_id={note_id} xsec_token={xsec_token[:20] if xsec_token else '无'}...")
     try:
-        url = f"https://www.xiaohongshu.com/explore/{note_id}"
-        if xsec_token:
-            url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
-        result = await browser.evaluate(url, _DETAIL_JS)
-        title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
-        logger.info(f"小红书详情完成: {title}")
-        return json.dumps(result, ensure_ascii=False)
+        page = await browser.new_page()
+        try:
+            detail_data: dict = {}
+
+            async def on_response(resp):
+                """拦截笔记详情 API，提取完整正文/图片/标签等。"""
+                if ("/api/sns/web/v1/feed" in resp.url or "note_id" in resp.url) and resp.status == 200:
+                    try:
+                        body = await resp.json()
+                        items = body.get("data", {}).get("items", []) or []
+                        if not items:
+                            # 有些接口返回单个 note
+                            note_data = body.get("data", {}).get("note", {}) or body.get("data", {})
+                            if note_data and note_data.get("note_id"):
+                                items = [{"note_card": note_data}]
+                        for item in items:
+                            nc = item.get("note_card", item)
+                            if str(nc.get("note_id", "")) != note_id:
+                                continue
+                            user = nc.get("user", {}) or {}
+                            interact = nc.get("interact_info", {}) or {}
+                            cover = nc.get("cover", {}) or {}
+                            image_list = nc.get("image_list", []) or []
+                            detail_data.update({
+                                "title": nc.get("display_title", "") or nc.get("title", ""),
+                                "desc": nc.get("desc", ""),
+                                "full_text": nc.get("desc", ""),
+                                "author": user.get("nickname", ""),
+                                "author_id": user.get("user_id", ""),
+                                "author_avatar": user.get("avatar", ""),
+                                "likes": interact.get("liked_count", ""),
+                                "collects": interact.get("collected_count", ""),
+                                "comments": interact.get("comment_count", ""),
+                                "shares": interact.get("share_count", ""),
+                                "type": nc.get("type", ""),
+                                "cover_url": cover.get("url_default", "") or cover.get("url", ""),
+                                "image_count": len(image_list),
+                                "images": [img.get("url_default", img.get("url", "")) for img in image_list],
+                                "tag_list": [t.get("name", "") for t in (nc.get("tag_list", []) or []) if t.get("name")],
+                                "publish_time": nc.get("time", ""),
+                                "ip_location": nc.get("ip_location", ""),
+                            })
+                    except Exception:
+                        pass
+
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+            url = f"https://www.xiaohongshu.com/explore/{note_id}"
+            if xsec_token:
+                url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
+
+            # 等 API 响应返回
+            await page.wait_for_timeout(2000)
+
+            # DOM 兜底: API拦截失败时用CSS选择器
+            if not detail_data:
+                dom = await page.evaluate(_DETAIL_JS)
+                if dom and isinstance(dom, dict):
+                    detail_data = dom
+                    logger.info("小红书详情: API 拦截为空，使用 DOM 兜底")
+
+            title = detail_data.get("title", "N/A")
+            logger.info(f"小红书详情完成: {title}")
+            return json.dumps(detail_data, ensure_ascii=False)
+        finally:
+            await page.close()
     except Exception as e:
         logger.warning(f"小红书详情异常: {e}")
         return json.dumps({}, ensure_ascii=False)
