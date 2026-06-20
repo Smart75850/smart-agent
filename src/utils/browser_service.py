@@ -71,7 +71,7 @@ class BrowserService:
                     cookie_domain: str = ".douyin.com"):
         if self.is_running:
             return
-        engine = environ.get("BROWSER_ENGINE") or ENGINE
+        engine = (environ.get("BROWSER_ENGINE") or ENGINE).strip('"').strip("'")
         if engine == "auto":
             engine = "cdp" if _check_cdp(CDP_PORT) else "playwright"
             logger.info(f"浏览器引擎自动选择: {engine} (CDP={'可用' if engine == 'cdp' else '不可用'})")

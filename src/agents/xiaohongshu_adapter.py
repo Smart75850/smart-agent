@@ -536,7 +536,7 @@ class XiaohongshuAdapter(PlatformAdapter):
     async def _adaptive_search(self, keyword: str, limit: Optional[int] = None) -> list[dict]:
         """HTTP 搜索失败时的浏览器兜底搜索。"""
         try:
-            if not browser.is_running():
+            if not browser.is_running:
                 logger.warning("[Xiaohongshu] 浏览器未启动，adaptive 搜索不可用")
                 return []
             page = await browser.new_page()
