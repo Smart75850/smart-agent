@@ -288,7 +288,6 @@ async def main():
     # ── aggregate 快速路徑 ───────────────────────────────────
     if args.type == "aggregate":
         # 检查 API Key 配置
-        from config.settings import settings
         has_llm = bool(settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY)
         if not has_llm and args.pipeline in ("full", "sentiment"):
             print("=" * 60)
