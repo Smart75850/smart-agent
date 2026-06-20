@@ -89,6 +89,49 @@ python main.py --platform xiaohongshu --keyword "穿搭" --limit 20
 
 ---
 
+## AI 分析配置（可选）
+
+开源版内置 7 个 AI Agent（趋势分析、产品挖掘、视频拆解、评论情绪、文案生成、内容改写、配图策略）。配置 LLM 后即可启用。
+
+### 方案一：本地 Ollama（推荐，免费）
+
+```bash
+# 1. 安装 Ollama
+# 下载: https://ollama.com
+
+# 2. 拉取模型（根据显存选择）
+ollama pull qwen3:14b      # 16GB 内存可用，中文最佳
+# 或更轻量:
+ollama pull qwen3:8b       # 8GB 内存
+# 或更强:
+ollama pull qwen3:32b      # 24GB+ 内存
+
+# 3. 编辑 .env 文件
+LLM_API_URL=http://localhost:11434/v1
+LLM_MODEL=qwen3:14b
+```
+
+### 方案二：云端 API
+
+```bash
+# .env 文件添加（任一即可）
+DEEPSEEK_API_KEY=sk-你的key      # DeepSeek，¥10 起充
+# 或任何 OpenAI 兼容接口：
+LLM_API_KEY=your-key
+LLM_API_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+```
+
+### 运行 AI 分析
+
+```bash
+python main.py --platform bilibili --keyword "AI工具" --type aggregate --pipeline full
+```
+
+> 没有配置 LLM 时搜索采集功能不受影响，仅 AI 分析自动降级为模板模式。
+
+---
+
 ## 完整参数
 
 ```bash
