@@ -115,6 +115,10 @@ def parse_args(argv=None):
         help="小红书安全令牌（每个帖子唯一，从搜索结果中获取）",
     )
     parser.add_argument(
+        "--fetch-detail", action="store_true",
+        help="搜索后自动逐条拉取详情正文（仅 xiaohongshu/douyin 有效）",
+    )
+    parser.add_argument(
         "--cookie-bridge", action="store_true",
         help="啟動 CookieBridge 本地服務，接收 Chrome Extension 同步的 cookies",
     )
@@ -442,6 +446,39 @@ async def main():
                 all_results[key] = {"error": err_msg}
                 logger.error(f"[{platform}] {action}: ERROR — {err_msg}")
                 ck.mark_failed(platform, action, args.keyword, error_msg=err_msg)
+
+        # ── fetch-detail：搜索后自动逐条拉取详情 ──────────────────
+        if args.fetch_detail and args.type == "search":
+            for platform, action, func, kwargs in tasks:
+                key = f"{platform}_detail_batch"
+                items = all_results.get(f"{platform}_search", [])
+                if not isinstance(items, list) or not items:
+                    continue
+                adapter = _ADAPTERS.get(platform)
+                if not adapter:
+                    continue
+                logger.info(f"[{platform}] 批量拉取详情: {len(items)} 条...")
+                details = []
+                for i, item in enumerate(items):
+                    nid = item.get("note_id") or item.get("id") or item.get("aweme_id") or ""
+                    xt = item.get("xsec_token", "")
+                    if not nid:
+                        continue
+                    try:
+                        d = await adapter.detail(nid, xsec_token=xt)
+                        if isinstance(d, str):
+                            d = json.loads(d)
+                        d["_search_index"] = i
+                        details.append(d)
+                        logger.info(f"  [{i+1}/{len(items)}] {str(d.get('title',''))[:30]}")
+                    except Exception as e:
+                        logger.warning(f"  [{i+1}/{len(items)}] 详情失败: {e}")
+                        details.append({"error": str(e), "note_id": nid, "_search_index": i})
+
+                all_results[key] = details
+                store = get_store(settings.STORE_BACKEND)
+                filepath = save_with_dedup(store, details, args.output, key)
+                logger.info(f"[{platform}] 批量详情完成: {len(details)} 条 → {filepath}")
 
         # ── download ──────────────────────────────────────────
         if args.download and all_results:
