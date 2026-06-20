@@ -20,18 +20,32 @@
 git clone https://github.com/Smart75850/smart-agent.git
 cd smart-agent
 pip install -r requirements.txt
+playwright install chromium
 
-# 单平台搜索
+# B站 — 即开即用，无需登录
 python main.py --platform bilibili --keyword "AI工具"
 
-# 全平台并发搜索 + AI 全链路分析
-python main.py --platform all --keyword "一人公司" --type aggregate --engine langgraph --pipeline full
-
-# MCP Server 模式（推荐）
-python -m src.mcp_tools.server
+# 小红书/抖音 — 需要先启动 CDP Chrome 并登录（见下方）
 ```
 
-> 📖 完整指南：[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
+### 小红书 & 抖音 使用步骤
+
+小红书和抖音需要真实 Chrome 浏览器（反爬 JS 动态签名），三步即可：
+
+```powershell
+# 1. 启动 CDP Chrome（双击运行）
+.\scripts\start_cdp_chrome.ps1
+
+# 2. 在弹出的 Chrome 中手动扫码登录小红书 / 抖音
+#    Chrome 不要关闭，最小化即可
+
+# 3. 运行搜索
+$env:BROWSER_ENGINE = "cdp"
+python main.py --platform xiaohongshu --keyword "穿搭"
+python main.py --platform douyin --keyword "AI工具"
+```
+
+> 📖 完整上手指南：[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
 
 ---
 
