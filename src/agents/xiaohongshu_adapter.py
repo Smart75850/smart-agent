@@ -1,7 +1,6 @@
 import asyncio
 import json
 import re
-from pathlib import Path
 from typing import Optional
 
 from base.platform_base import PlatformAdapter
@@ -185,13 +184,17 @@ async def xiaohongshu_note_detail(note_id: str, xsec_token: str = "") -> str:
         xsec_token: 安全令牌（从搜索结果中获取，每个帖子唯一）
     """
     logger.info(f"小红书详情: note_id={note_id} xsec_token={xsec_token[:20] if xsec_token else '无'}...")
-    url = f"https://www.xiaohongshu.com/explore/{note_id}"
-    if xsec_token:
-        url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
-    result = await browser.evaluate(url, _DETAIL_JS)
-    title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
-    logger.info(f"小红书详情完成: {title}")
-    return json.dumps(result, ensure_ascii=False)
+    try:
+        url = f"https://www.xiaohongshu.com/explore/{note_id}"
+        if xsec_token:
+            url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
+        result = await browser.evaluate(url, _DETAIL_JS)
+        title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
+        logger.info(f"小红书详情完成: {title}")
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"小红书详情异常: {e}")
+        return json.dumps({}, ensure_ascii=False)
 
 
 async def xiaohongshu_comment(note_id: str, count: int = 50, xsec_token: str = "") -> str:
@@ -307,66 +310,67 @@ async def xiaohongshu_comment(note_id: str, count: int = 50, xsec_token: str = "
 async def xiaohongshu_hot() -> str:
     """爬取小红书推荐 feed（近似热榜）— CDP 浏览器拦截 API + DOM 兜底。需登入。回传 JSON 字串。"""
     logger.info("小红书热榜: 开始爬取")
-    page = await browser.new_page()
     try:
-        hot_items: list[dict] = []
-        seen_ids: set[str] = set()
+        page = await browser.new_page()
+        try:
+            hot_items: list[dict] = []
+            seen_ids: set[str] = set()
 
-        async def on_response(resp):
-            """拦截首页推荐 feed API。"""
-            if ("/api/sns/web/v1/homefeed" in resp.url or "/api/sns/web/v1/feed" in resp.url) and resp.status == 200:
-                try:
-                    body = await resp.json()
-                    items = body.get("data", {}).get("items", []) or []
-                    for item in items:
-                        note_card = item.get("note_card") or item
-                        note_id = str(item.get("id", "") or note_card.get("note_id", ""))
-                        if not note_id or note_id in seen_ids:
-                            continue
-                        seen_ids.add(note_id)
-                        xsec_token = (
-                            note_card.get("xsec_token", "")
-                            or item.get("xsec_token", "")
-                        )
-                        if not xsec_token:
-                            share_link = (note_card.get("share_info", {}) or {}).get("link", "")
-                            if "xsec_token=" in share_link:
-                                m = re.search(r'xsec_token=([^&]+)', share_link)
-                                xsec_token = m.group(1) if m else ""
-                        user = note_card.get("user", {}) or {}
-                        interact = note_card.get("interact_info", {}) or {}
-                        cover = note_card.get("cover", {}) or {}
-                        detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
-                        if xsec_token:
-                            detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_feed"
-                        hot_items.append({
-                            "note_id": note_id,
-                            "xsec_token": xsec_token,
-                            "title": note_card.get("display_title", ""),
-                            "author": user.get("nickname", ""),
-                            "author_id": user.get("user_id", ""),
-                            "likes": interact.get("liked_count", ""),
-                            "cover_url": cover.get("url_default", "") or cover.get("url", ""),
-                            "url": detail_url,
-                        })
-                except Exception:
-                    pass
+            async def on_response(resp):
+                """拦截首页推荐 feed API。"""
+                if ("/api/sns/web/v1/homefeed" in resp.url or "/api/sns/web/v1/feed" in resp.url) and resp.status == 200:
+                    try:
+                        body = await resp.json()
+                        items = body.get("data", {}).get("items", []) or []
+                        for item in items:
+                            note_card = item.get("note_card") or item
+                            note_id = str(item.get("id", "") or note_card.get("note_id", ""))
+                            if not note_id or note_id in seen_ids:
+                                continue
+                            seen_ids.add(note_id)
+                            xsec_token = (
+                                note_card.get("xsec_token", "")
+                                or item.get("xsec_token", "")
+                            )
+                            if not xsec_token:
+                                share_link = (note_card.get("share_info", {}) or {}).get("link", "")
+                                if "xsec_token=" in share_link:
+                                    m = re.search(r'xsec_token=([^&]+)', share_link)
+                                    xsec_token = m.group(1) if m else ""
+                            user = note_card.get("user", {}) or {}
+                            interact = note_card.get("interact_info", {}) or {}
+                            cover = note_card.get("cover", {}) or {}
+                            detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                            if xsec_token:
+                                detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_feed"
+                            hot_items.append({
+                                "note_id": note_id,
+                                "xsec_token": xsec_token,
+                                "title": note_card.get("display_title", ""),
+                                "author": user.get("nickname", ""),
+                                "author_id": user.get("user_id", ""),
+                                "likes": interact.get("liked_count", ""),
+                                "cover_url": cover.get("url_default", "") or cover.get("url", ""),
+                                "url": detail_url,
+                            })
+                    except Exception:
+                        pass
 
-        page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
 
-        await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(5000)
+            await page.goto("https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
 
-        # 滚动触发更多加载
-        for _ in range(3):
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            # 滚动触发更多加载
+            for _ in range(3):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000)
+
             await page.wait_for_timeout(2000)
 
-        await page.wait_for_timeout(2000)
-
-        # DOM 兜底
-        if not hot_items:
-            dom_result = await page.evaluate(r"""() => {
+            # DOM 兜底
+            if not hot_items:
+                dom_result = await page.evaluate(r"""() => {
     const items = document.querySelectorAll('.note-item, [class*="note-item"], [class*="feed"] [class*="item"]');
     const seen = new Set();
     const parseHref = (href) => {
@@ -394,74 +398,78 @@ async def xiaohongshu_hot() -> str:
         };
     });
 }""")
-            if dom_result:
-                hot_items = dom_result
-                logger.info("小红书热榜: API 拦截为空，使用 DOM 兜底")
+                if dom_result:
+                    hot_items = dom_result
+                    logger.info("小红书热榜: API 拦截为空，使用 DOM 兜底")
 
-        logger.info(f"小红书热榜完成: {len(hot_items)} 条")
-        return json.dumps(hot_items, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"小红书热榜完成: {len(hot_items)} 条")
+            return json.dumps(hot_items, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"小红书热榜异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def xiaohongshu_user(user_id: str) -> str:
     """爬取小红书用户主页笔记列表 — CDP 浏览器。需登入。回传 JSON 字串。"""
     logger.info(f"小红书用户: user_id={user_id}")
-    page = await browser.new_page()
     try:
-        user_items: list[dict] = []
-        seen_ids: set[str] = set()
+        page = await browser.new_page()
+        try:
+            user_items: list[dict] = []
+            seen_ids: set[str] = set()
 
-        async def on_response(resp):
-            """拦截用户主页笔记列表 API。"""
-            if ("/api/sns/web/v1/user_posted" in resp.url or "user/notes" in resp.url) and resp.status == 200:
-                try:
-                    body = await resp.json()
-                    notes = body.get("data", {}).get("notes", []) or []
-                    for note in notes:
-                        note_id = str(note.get("note_id", ""))
-                        if not note_id or note_id in seen_ids:
-                            continue
-                        seen_ids.add(note_id)
-                        xsec_token = note.get("xsec_token", "")
-                        if not xsec_token:
-                            share_link = (note.get("share_info", {}) or {}).get("link", "")
-                            if "xsec_token=" in share_link:
-                                m = re.search(r'xsec_token=([^&]+)', share_link)
-                                xsec_token = m.group(1) if m else ""
-                        interact = note.get("interact_info", {}) or {}
-                        cover = note.get("cover", {}) or {}
-                        detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
-                        if xsec_token:
-                            detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_user"
-                        user_items.append({
-                            "note_id": note_id,
-                            "xsec_token": xsec_token,
-                            "title": note.get("display_title", ""),
-                            "likes": interact.get("liked_count", ""),
-                            "collects": interact.get("collected_count", ""),
-                            "comments": interact.get("comment_count", ""),
-                            "cover_url": cover.get("url_default", "") or cover.get("url", ""),
-                            "url": detail_url,
-                        })
-                except Exception:
-                    pass
+            async def on_response(resp):
+                """拦截用户主页笔记列表 API。"""
+                if ("/api/sns/web/v1/user_posted" in resp.url or "user/notes" in resp.url) and resp.status == 200:
+                    try:
+                        body = await resp.json()
+                        notes = body.get("data", {}).get("notes", []) or []
+                        for note in notes:
+                            note_id = str(note.get("note_id", ""))
+                            if not note_id or note_id in seen_ids:
+                                continue
+                            seen_ids.add(note_id)
+                            xsec_token = note.get("xsec_token", "")
+                            if not xsec_token:
+                                share_link = (note.get("share_info", {}) or {}).get("link", "")
+                                if "xsec_token=" in share_link:
+                                    m = re.search(r'xsec_token=([^&]+)', share_link)
+                                    xsec_token = m.group(1) if m else ""
+                            interact = note.get("interact_info", {}) or {}
+                            cover = note.get("cover", {}) or {}
+                            detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                            if xsec_token:
+                                detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_user"
+                            user_items.append({
+                                "note_id": note_id,
+                                "xsec_token": xsec_token,
+                                "title": note.get("display_title", ""),
+                                "likes": interact.get("liked_count", ""),
+                                "collects": interact.get("collected_count", ""),
+                                "comments": interact.get("comment_count", ""),
+                                "cover_url": cover.get("url_default", "") or cover.get("url", ""),
+                                "url": detail_url,
+                            })
+                    except Exception:
+                        pass
 
-        page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
 
-        await page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}", wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(5000)
+            await page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}", wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(5000)
 
-        # 滚动加载更多
-        for _ in range(3):
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            # 滚动加载更多
+            for _ in range(3):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000)
+
             await page.wait_for_timeout(2000)
 
-        await page.wait_for_timeout(2000)
-
-        # DOM 兜底
-        if not user_items:
-            dom_result = await page.evaluate(r"""() => {
+            # DOM 兜底
+            if not user_items:
+                dom_result = await page.evaluate(r"""() => {
     const items = document.querySelectorAll('.note-item, [class*="note-item"]');
     const seen = new Set();
     const parseHref = (href) => {
@@ -489,14 +497,17 @@ async def xiaohongshu_user(user_id: str) -> str:
         };
     });
 }""")
-            if dom_result:
-                user_items = dom_result
-                logger.info("小红书用户: API 拦截为空，使用 DOM 兜底")
+                if dom_result:
+                    user_items = dom_result
+                    logger.info("小红书用户: API 拦截为空，使用 DOM 兜底")
 
-        logger.info(f"小红书用户完成: {len(user_items)} 条")
-        return json.dumps(user_items, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"小红书用户完成: {len(user_items)} 条")
+            return json.dumps(user_items, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"小红书用户异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 class XiaohongshuAdapter(PlatformAdapter):

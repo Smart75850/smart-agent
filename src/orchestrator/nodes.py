@@ -8,6 +8,7 @@ import httpx
 
 from src.orchestrator.state import PipelineState
 from src.aggregator import _normalize
+from src.utils.browser_service import browser
 from src.utils.logger import logger
 from config.settings import settings
 
@@ -369,10 +370,8 @@ async def _harvest_cdp(platform: str, valid_items: list, all_comments: dict):
     """CDP 浏览器评论收割 — 检查浏览器可用性后尝试。"""
     if platform == "douyin":
         try:
-            from src.utils.browser_service import BrowserService
-            bs = BrowserService()
-            if not bs.is_running:
-                logger.debug("comment_harvest: 浏览器未启动，跳过抖音评论")
+            if not browser.is_running or not browser.is_connected():
+                logger.debug("comment_harvest: 浏览器未启动或已断开，跳过抖音评论")
                 return
             adapter = _get_adapter("douyin")
             for item_id, item in valid_items:

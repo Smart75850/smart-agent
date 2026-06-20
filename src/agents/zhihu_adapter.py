@@ -203,11 +203,12 @@ async def zhihu_hot() -> str:
 async def zhihu_comment(question_id: str) -> str:
     """爬取知乎問題評論，需登入先有完整內容。回傳 JSON 字串。"""
     logger.info(f"知乎評論: question_id={question_id}")
-    page = await browser.new_page()
     try:
-        await page.goto(f"https://www.zhihu.com/question/{question_id}", wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+        page = await browser.new_page()
+        try:
+            await page.goto(f"https://www.zhihu.com/question/{question_id}", wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            result = await page.evaluate("""() => {
     const items = document.querySelectorAll('.CommentItem');
     return Array.from(items).map(item => ({
         user: item.querySelector('.CommentItem-UserLink')?.textContent?.trim() || '',
@@ -221,20 +222,24 @@ async def zhihu_comment(question_id: str) -> str:
         })),
     }));
 }""")
-        logger.info(f"知乎評論完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"知乎評論完成: {len(result)} 條")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"知乎評論异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def zhihu_detail(question_id: str) -> str:
     """爬取知乎問題詳情 + 精選回答，需登入先有完整內容。回傳 JSON 字串。"""
     logger.info(f"知乎詳情: question_id={question_id}")
-    page = await browser.new_page()
     try:
-        await page.goto(f"https://www.zhihu.com/question/{question_id}", wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+        page = await browser.new_page()
+        try:
+            await page.goto(f"https://www.zhihu.com/question/{question_id}", wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            result = await page.evaluate("""() => {
     const titleEl = document.querySelector('.QuestionItem-title, .QuestionHeader-title, [class*="QuestionTitle"]');
     const descEl = document.querySelector('.QuestionItem-desc, .QuestionHeader-detail, [class*="QuestionDetail"]');
     const answers = document.querySelectorAll('.AnswerCard, [class*="AnswerItem"]');
@@ -253,21 +258,25 @@ async def zhihu_detail(question_id: str) -> str:
         }),
     };
 }""")
-        title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
-        logger.info(f"知乎詳情完成: {title}")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
+            logger.info(f"知乎詳情完成: {title}")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"知乎詳情异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def zhihu_user(user_id: str) -> str:
     """爬取知乎用戶主頁內容，需登入先有完整內容。回傳 JSON 字串。"""
     logger.info(f"知乎用戶: user_id={user_id}")
-    page = await browser.new_page()
     try:
-        await page.goto(f"https://www.zhihu.com/people/{user_id}", wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+        page = await browser.new_page()
+        try:
+            await page.goto(f"https://www.zhihu.com/people/{user_id}", wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            result = await page.evaluate("""() => {
     const items = document.querySelectorAll('.ProfileItem, .ContentItem, [class*="Profile"] [class*="item"]');
     const seen = new Set();
     return Array.from(items).filter(el => {
@@ -281,10 +290,13 @@ async def zhihu_user(user_id: str) -> str:
         link: el.querySelector('a')?.getAttribute('href') || '',
     }));
 }""")
-        logger.info(f"知乎用戶完成: {len(result)} 條")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"知乎用戶完成: {len(result)} 條")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"知乎用戶异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 class ZhihuAdapter(PlatformAdapter):
@@ -322,58 +334,62 @@ async def zhihu_search(keyword: str, count: int = 40) -> str:
     """搜索知乎內容。Path 1: 纯 HTTP Session → Path 2: CDP Browser"""
     logger.info(f"知乎搜索: keyword={keyword} count={count}")
 
-    # Path 1: 纯 HTTP Session（零浏览器，毫秒级）
     try:
-        from src.utils.session_manager import ensure_session
-        if await ensure_session("zhihu"):
-            from src.utils.zh_http import search_all
-            items = await search_all(keyword, limit=count)
-            if items:
-                logger.info(f"[zhihu-session] 纯HTTP直连成功: {len(items)} 条")
-                return json.dumps(items, ensure_ascii=False)
-    except Exception as exc:
-        logger.warning(f"知乎 Session HTTP 失败: {exc}，尝试 CDP 浏览器路径")
+        # Path 1: 纯 HTTP Session（零浏览器，毫秒级）
+        try:
+            from src.utils.session_manager import ensure_session
+            if await ensure_session("zhihu"):
+                from src.utils.zh_http import search_all
+                items = await search_all(keyword, limit=count)
+                if items:
+                    logger.info(f"[zhihu-session] 纯HTTP直连成功: {len(items)} 条")
+                    return json.dumps(items, ensure_ascii=False)
+        except Exception as exc:
+            logger.warning(f"知乎 Session HTTP 失败: {exc}，尝试 CDP 浏览器路径")
 
-    # Path 2: CDP Browser
-    page = await browser.new_page()
-    try:
-        await page.goto(
-            f"https://www.zhihu.com/search?type=content&q={keyword}",
-            wait_until="domcontentloaded",
-        )
-        await page.wait_for_timeout(5000)
-        cur_url = page.url
-        if "signin" in cur_url or "login" in cur_url:
-            logger.warning(f"知乎搜索: 檢測到登入牆 (URL 跳轉至 signin/login)，請先手動登入知乎")
-            return json.dumps([], ensure_ascii=False)
+        # Path 2: CDP Browser
+        page = await browser.new_page()
+        try:
+            await page.goto(
+                f"https://www.zhihu.com/search?type=content&q={keyword}",
+                wait_until="domcontentloaded",
+            )
+            await page.wait_for_timeout(5000)
+            cur_url = page.url
+            if "signin" in cur_url or "login" in cur_url:
+                logger.warning(f"知乎搜索: 檢測到登入牆 (URL 跳轉至 signin/login)，請先手動登入知乎")
+                return json.dumps([], ensure_ascii=False)
 
-        all_items = []
-        seen = set()
-        for offset in range(0, count, 20):
-            if offset > 0:
-                await page.goto(
-                    f"https://www.zhihu.com/search?type=content&q={keyword}&offset={offset}",
-                    wait_until="domcontentloaded",
-                )
-                await page.wait_for_timeout(3000)
-            result = await page.evaluate(_SEARCH_JS)
-            if not result:
-                break
-            new_count = 0
-            for item in result:
-                key = item.get("link", "") or item.get("title", "")
-                if key and key not in seen:
-                    seen.add(key)
-                    all_items.append(item)
-                    new_count += 1
-            if new_count == 0:
-                break
+            all_items = []
+            seen = set()
+            for offset in range(0, count, 20):
+                if offset > 0:
+                    await page.goto(
+                        f"https://www.zhihu.com/search?type=content&q={keyword}&offset={offset}",
+                        wait_until="domcontentloaded",
+                    )
+                    await page.wait_for_timeout(3000)
+                result = await page.evaluate(_SEARCH_JS)
+                if not result:
+                    break
+                new_count = 0
+                for item in result:
+                    key = item.get("link", "") or item.get("title", "")
+                    if key and key not in seen:
+                        seen.add(key)
+                        all_items.append(item)
+                        new_count += 1
+                if new_count == 0:
+                    break
 
-        if not all_items:
-            body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
-            if "登录" in body_text and "注册" in body_text:
-                logger.warning("知乎搜索: 檢測到登入牆 (頁面包含登入/註冊提示)，請先手動登入知乎")
-        logger.info(f"知乎搜索完成: {len(all_items)} 條結果")
-        return json.dumps(all_items[:count], ensure_ascii=False)
-    finally:
-        await page.close()
+            if not all_items:
+                body_text = await page.evaluate("() => document.body?.textContent?.slice(0, 500) || ''")
+                if "登录" in body_text and "注册" in body_text:
+                    logger.warning("知乎搜索: 檢測到登入牆 (頁面包含登入/註冊提示)，請先手動登入知乎")
+            logger.info(f"知乎搜索完成: {len(all_items)} 條結果")
+            return json.dumps(all_items[:count], ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"知乎搜索异常: {e}")
+        return json.dumps([], ensure_ascii=False)

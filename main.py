@@ -67,7 +67,7 @@ def parse_args(argv=None):
         help="操作類型（預設 search，按平台決定可用選項）",
     )
     parser.add_argument(
-        "--engine", default="playwright", choices=["playwright", "cdp", "camoufox", "langgraph"],
+        "--engine", default="playwright", choices=["playwright", "cdp", "camoufox"],
         help="瀏覽器引擎（預設 playwright）",
     )
     parser.add_argument(
@@ -227,11 +227,13 @@ async def _run_scheduled(schedule: str, func, *args, **kwargs):
 async def _aggregate_wrapper(args):
     """aggregate 定時包裝。"""
     from src.orchestrator import run_pipeline
+    platforms = None if args.platform == "all" else [args.platform]
     result = await run_pipeline(
         keyword=args.keyword or "",
         limit=args.limit or 30,
         llm_filter=args.llm_filter,
         pipeline_mode=args.pipeline,
+        platforms=platforms,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
@@ -285,6 +287,7 @@ async def main():
 
     # ── aggregate 快速路徑 ───────────────────────────────────
     if args.type == "aggregate":
+        platforms = None if args.platform == "all" else [args.platform]
         if args.stream:
             from src.orchestrator import run_pipeline_stream
             async for event in run_pipeline_stream(
@@ -292,6 +295,7 @@ async def main():
                 limit=args.limit or 30,
                 llm_filter=args.llm_filter,
                 pipeline_mode=args.pipeline,
+                platforms=platforms,
             ):
                 print(json.dumps(event, ensure_ascii=False))
         else:
@@ -301,6 +305,7 @@ async def main():
                 limit=args.limit or 30,
                 llm_filter=args.llm_filter,
                 pipeline_mode=args.pipeline,
+                platforms=platforms,
             )
             print(json.dumps(result, ensure_ascii=False, indent=2))
         return
@@ -341,7 +346,8 @@ async def main():
         return
 
     # ── engine ───────────────────────────────────────────────
-    os.environ["BROWSER_ENGINE"] = args.engine
+    if args.engine != "langgraph":
+        os.environ["BROWSER_ENGINE"] = args.engine
 
     # ── output dir ───────────────────────────────────────────
     out_dir = Path(args.output)

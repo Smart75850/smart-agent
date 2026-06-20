@@ -1,4 +1,3 @@
-import asyncio
 import json
 import re
 from typing import Optional
@@ -46,11 +45,15 @@ _SEARCH_JS = """\
 async def bilibili_rank(category: str = "all") -> str:
     """爬取 B站 排行榜指定分類，回傳 JSON 字串。"""
     logger.info(f"B站排行榜: category={category}")
-    url = f"https://www.bilibili.com/v/popular/rank/{category}"
-    result = await browser.evaluate(url, _RANK_JS, wait_selector=".rank-list")
-    result = _normalize_links(result)
-    logger.info(f"B站排行榜完成: {len(result)} 條結果")
-    return json.dumps(result, ensure_ascii=False)
+    try:
+        url = f"https://www.bilibili.com/v/popular/rank/{category}"
+        result = await browser.evaluate(url, _RANK_JS, wait_selector=".rank-list")
+        result = _normalize_links(result)
+        logger.info(f"B站排行榜完成: {len(result)} 條結果")
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"B站排行榜异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def bilibili_search(keyword: str, count: int = 40) -> str:
@@ -197,9 +200,10 @@ async def bilibili_comment(bvid: str) -> str:
 async def bilibili_detail(bvid: str) -> str:
     """爬取 B站 視頻詳情，回傳 JSON 字串。"""
     logger.info(f"B站詳情: bvid={bvid}")
-    result = await browser.evaluate(
-        f"https://www.bilibili.com/video/{bvid}",
-        """() => {
+    try:
+        result = await browser.evaluate(
+            f"https://www.bilibili.com/video/{bvid}",
+            """() => {
   const midEl = document.querySelector('a[href*="space.bilibili.com"]');
   const midHref = midEl?.getAttribute('href') || '';
   const midMatch = midHref.match(/space\\.bilibili\\.com\\/(\\d+)/);
@@ -214,43 +218,50 @@ async def bilibili_detail(bvid: str) -> str:
     mid: midMatch ? midMatch[1] : '',
   };
 }""",
-    )
-    title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
-    logger.info(f"B站詳情完成: {title} mid={result.get('mid', '?')}")
-    return json.dumps(result, ensure_ascii=False)
+        )
+        title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
+        logger.info(f"B站詳情完成: {title} mid={result.get('mid', '?')}")
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"B站詳情异常: {e}")
+        return json.dumps({}, ensure_ascii=False)
 
 
 async def _bilibili_user_cdp(uid: str) -> list[dict]:
     """CDP 方式获取用户视频，一次加载 + reload 重试。"""
-    page = await browser.new_page()
     try:
-        for attempt in range(2):
-            if attempt == 0:
-                await page.goto(f"https://space.bilibili.com/{uid}/video", wait_until="domcontentloaded", timeout=30000)
-            else:
-                logger.warning(f"B站用戶 {uid}: CDP 第1次0条，reload 重试")
-                await page.reload(wait_until="domcontentloaded", timeout=30000)
+        page = await browser.new_page()
+        try:
+            for attempt in range(2):
+                if attempt == 0:
+                    await page.goto(f"https://space.bilibili.com/{uid}/video", wait_until="domcontentloaded", timeout=30000)
+                else:
+                    logger.warning(f"B站用戶 {uid}: CDP 第1次0条，reload 重试")
+                    await page.reload(wait_until="domcontentloaded", timeout=30000)
 
-            # 等 .bili-video-card 出现（最多 8s，比固定等待更精准）
-            try:
-                await page.wait_for_selector(".bili-video-card", timeout=8000)
-            except Exception:
-                pass
-            await page.wait_for_timeout(2000)
+                # 等 .bili-video-card 出现（最多 8s，比固定等待更精准）
+                try:
+                    await page.wait_for_selector(".bili-video-card", timeout=8000)
+                except Exception:
+                    pass
+                await page.wait_for_timeout(2000)
 
-            # 滚动触发懒加载
-            for _ in range(3):
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(1000)
-            await page.wait_for_timeout(1500)
+                # 滚动触发懒加载
+                for _ in range(3):
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(1000)
+                await page.wait_for_timeout(1500)
 
-            result = await page.evaluate(_USER_JS)
-            if result and len(result) > 0:
-                return result
+                result = await page.evaluate(_USER_JS)
+                if result and len(result) > 0:
+                    return result
 
+            return []
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"B站用戶 CDP 异常: {e}")
         return []
-    finally:
-        await page.close()
 
 
 # 提取用户视频的 JS
@@ -346,4 +357,5 @@ class BilibiliAdapter(PlatformAdapter):
 
     async def user(self, user_id: str, limit: Optional[int] = None) -> list[dict]:
         data = json.loads(await bilibili_user(user_id))
-        return data[:limit] if limit else data
+        works = data.get("works", []) if isinstance(data, dict) else data
+        return works[:limit] if limit else works

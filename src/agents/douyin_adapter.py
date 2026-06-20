@@ -110,6 +110,12 @@ async def douyin_search(keyword: str, count: int = 40) -> str:
             await page.goto(f"https://www.douyin.com/search/{keyword}", wait_until="domcontentloaded", timeout=20000)
             await page.wait_for_timeout(5000)
 
+            # 登录墙检测
+            page_text = await page.evaluate("() => document.body?.innerText || ''")
+            if "请先登录" in page_text or "登录" in page_text:
+                logger.warning("抖音搜索: 检测到登录墙，请先在浏览器中登录抖音账号")
+                return json.dumps([], ensure_ascii=False)
+
             max_scrolls = max((count // 10) + 3, 6)
             for _ in range(max_scrolls):
                 if len(api_items) >= count:
@@ -333,6 +339,38 @@ async def douyin_comment(video_id: str, count: int = 50) -> str:
                     break
 
                 await page.wait_for_timeout(1000)
+
+            # DOM 兜底（API 拦截为空时，直接从页面提取评论）
+            if not comments:
+                dom_result = await page.evaluate("""() => {
+    const items = document.querySelectorAll('[class*="comment-item"], [class*="CommentItem"], .comment-item, [class*="comment"], [class*="Comment"]');
+    const seen = new Set();
+    const out = [];
+    items.forEach(item => {
+        const t = item.textContent.trim();
+        if (!t || t.length < 3 || seen.has(t)) return;
+        seen.add(t);
+        const contentEl = item.querySelector('[class*="content"], [class*="text"], .content, .text, p');
+        const userEl = item.querySelector('[class*="user"], [class*="name"], [class*="author"], [class*="nickname"]');
+        out.push({
+            user: userEl?.textContent?.trim() || '',
+            content: contentEl?.textContent?.trim() || t.slice(0, 200),
+            likes: 0,
+        });
+    });
+    if (out.length < 5) {
+        const allText = document.body?.innerText || '';
+        const lines = allText.split('\\n').filter(l => l.trim().length > 10).slice(0, 40);
+        for (const l of lines) {
+            const t = l.trim().slice(0, 200);
+            if (t && !seen.has(t)) { seen.add(t); out.push({user: '', content: t, likes: 0}); }
+        }
+    }
+    return out;
+}""")
+                if dom_result:
+                    comments = dom_result
+                    logger.info("抖音評論: API 拦截为空，使用 DOM 兜底")
 
             result = comments[:count]
             logger.info(f"抖音評論完成: {len(result)} 條")

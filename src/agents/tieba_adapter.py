@@ -158,19 +158,23 @@ _BAIDU_TIEBA_JS = """\
 
 async def tieba_hot() -> str:
     logger.info("贴吧热榜: 开始爬取")
-    page = await browser.new_page()
     try:
-        await page.goto("https://tieba.baidu.com/hottopic/browse/topicList", wait_until="domcontentloaded")
-        await page.wait_for_timeout(4000)
-        result = await page.evaluate(_HOT_JS)
-        if not result:
-            await page.goto("https://tieba.baidu.com/", wait_until="domcontentloaded")
-            await page.wait_for_timeout(3000)
+        page = await browser.new_page()
+        try:
+            await page.goto("https://tieba.baidu.com/hottopic/browse/topicList", wait_until="domcontentloaded")
+            await page.wait_for_timeout(4000)
             result = await page.evaluate(_HOT_JS)
-        logger.info(f"贴吧热榜完成: {len(result)} 条结果")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            if not result:
+                await page.goto("https://tieba.baidu.com/", wait_until="domcontentloaded")
+                await page.wait_for_timeout(3000)
+                result = await page.evaluate(_HOT_JS)
+            logger.info(f"贴吧热榜完成: {len(result)} 条结果")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"贴吧热榜异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def tieba_search(keyword: str, count: int = 40) -> str:
@@ -190,68 +194,77 @@ async def tieba_search(keyword: str, count: int = 40) -> str:
         logger.warning(f"贴吧 Session HTTP 失败: {exc}，尝试 CDP 浏览器路径")
 
     # Path 2: CDP Browser
-    page = await browser.new_page()
     try:
-        all_items = []
-        seen = set()
-        max_pages = max(count // 20 + 3, 5)
-        for pn in range(0, max_pages):
-            url = f"https://tieba.baidu.com/f/search/res?qw={keyword}" if pn == 0 else f"https://tieba.baidu.com/f/search/res?qw={keyword}&pn={pn * 20}"
-            await page.goto(url, wait_until="domcontentloaded")
-            await page.wait_for_timeout(3000)
-            cur_title = await page.title()
-            if "安全验证" in cur_title:
-                logger.warning("贴吧搜索: 触发百度安全验证，请先在浏览器中手动访问贴吧完成验证")
-                break
-            result = await page.evaluate(_SEARCH_JS)
-            if not result:
-                break
-            new_count = 0
-            for item in result:
-                key = item.get("link", "") or item.get("title", "")
-                if key and key not in seen:
-                    seen.add(key)
-                    all_items.append(item)
-                    new_count += 1
-            if new_count == 0:
-                break
-            if len(all_items) >= count:
-                break
-        logger.info(f"贴吧搜索完成: {len(all_items)} 条结果")
-        return json.dumps(all_items[:count], ensure_ascii=False)
-    finally:
-        await page.close()
+        page = await browser.new_page()
+        try:
+            all_items = []
+            seen = set()
+            max_pages = max(count // 20 + 3, 5)
+            for pn in range(0, max_pages):
+                url = f"https://tieba.baidu.com/f/search/res?qw={keyword}" if pn == 0 else f"https://tieba.baidu.com/f/search/res?qw={keyword}&pn={pn * 20}"
+                await page.goto(url, wait_until="domcontentloaded")
+                await page.wait_for_timeout(3000)
+                cur_title = await page.title()
+                if "安全验证" in cur_title:
+                    logger.warning("贴吧搜索: 触发百度安全验证，请先在浏览器中手动访问贴吧完成验证")
+                    break
+                result = await page.evaluate(_SEARCH_JS)
+                if not result:
+                    break
+                new_count = 0
+                for item in result:
+                    key = item.get("link", "") or item.get("title", "")
+                    if key and key not in seen:
+                        seen.add(key)
+                        all_items.append(item)
+                        new_count += 1
+                if new_count == 0:
+                    break
+                if len(all_items) >= count:
+                    break
+            logger.info(f"贴吧搜索完成: {len(all_items)} 条结果")
+            return json.dumps(all_items[:count], ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"贴吧搜索 CDP 异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def tieba_detail(tid: str) -> str:
     logger.info(f"贴吧详情: tid={tid}")
-    page = await browser.new_page()
     try:
-        if not tid.startswith("https://"):
-            tid = f"https://tieba.baidu.com/p/{tid}"
-        await page.goto(tid, wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+        page = await browser.new_page()
+        try:
+            if not tid.startswith("https://"):
+                tid = f"https://tieba.baidu.com/p/{tid}"
+            await page.goto(tid, wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            result = await page.evaluate("""() => {
     const title = document.querySelector('.core_title_txt, [class*="title"]')?.textContent?.trim() || '';
     const content = document.querySelector('.d_post_content, [class*="content"]')?.textContent?.trim()?.slice(0, 500) || '';
     const author = document.querySelector('.d_author, [class*="author"]')?.textContent?.trim() || '';
     return {title, content, author};
 }""")
-        logger.info(f"贴吧详情完成: {result.get('title', 'N/A')[:30] if isinstance(result, dict) else 'N/A'}")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"贴吧详情完成: {result.get('title', 'N/A')[:30] if isinstance(result, dict) else 'N/A'}")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"贴吧详情异常: {e}")
+        return json.dumps({}, ensure_ascii=False)
 
 
 async def tieba_comment(tid: str) -> str:
     logger.info(f"贴吧评论: tid={tid}")
-    page = await browser.new_page()
     try:
-        if not tid.startswith("https://"):
-            tid = f"https://tieba.baidu.com/p/{tid}"
-        await page.goto(tid, wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+        page = await browser.new_page()
+        try:
+            if not tid.startswith("https://"):
+                tid = f"https://tieba.baidu.com/p/{tid}"
+            await page.goto(tid, wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            result = await page.evaluate("""() => {
     const items = document.querySelectorAll('.lzl_cnt, .j_lzl_container [class*="item"], .lzl_single_post');
     if (items.length === 0) {
         const replies = document.querySelectorAll('.d_post_content, [class*="content"]');
@@ -270,19 +283,23 @@ async def tieba_comment(tid: str) -> str:
         likes: item.querySelector('[class*="like"], [class*="agree"]')?.textContent?.trim() || '',
     }));
 }""")
-        logger.info(f"贴吧评论完成: {len(result)} 条")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"贴吧评论完成: {len(result)} 条")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"贴吧评论异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def tieba_user(user_id: str) -> str:
     logger.info(f"贴吧用户: user_id={user_id}")
-    page = await browser.new_page()
     try:
-        await page.goto(f"https://tieba.baidu.com/home/main?un={user_id}", wait_until="domcontentloaded")
-        await page.wait_for_timeout(5000)
-        result = await page.evaluate("""() => {
+        page = await browser.new_page()
+        try:
+            await page.goto(f"https://tieba.baidu.com/home/main?un={user_id}", wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            result = await page.evaluate("""() => {
     const items = document.querySelectorAll('.thread_item, [class*="thread"] [class*="item"], [class*="list"] li');
     return Array.from(items).slice(0, 20).map(el => ({
         title: el.querySelector('a[href*="/p/"], a[class*="title"], a')?.textContent?.trim() || '',
@@ -290,10 +307,13 @@ async def tieba_user(user_id: str) -> str:
         link: el.querySelector('a[href*="/p/"]')?.getAttribute('href') || '',
     }));
 }""")
-        logger.info(f"贴吧用户完成: {len(result)} 条")
-        return json.dumps(result, ensure_ascii=False)
-    finally:
-        await page.close()
+            logger.info(f"贴吧用户完成: {len(result)} 条")
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            await page.close()
+    except Exception as e:
+        logger.warning(f"贴吧用户异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 class TiebaAdapter(PlatformAdapter):

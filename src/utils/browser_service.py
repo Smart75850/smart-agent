@@ -65,6 +65,7 @@ class BrowserService:
         self._engine = None
         self._inject_cookies: dict = {}
         self._cookie_domain: str = ".douyin.com"
+        self._watchdog_task: asyncio.Task | None = None
 
     async def start(self, cookies_dict: dict = None, proxy: str = None,
                     cookie_domain: str = ".douyin.com"):
@@ -220,7 +221,10 @@ class BrowserService:
 
         await self._load_platform_cookies()
         _register_cleanup()
-        asyncio.create_task(self._watchdog())
+        # 取消旧 watchdog，避免 restart 时任务泄漏
+        if self._watchdog_task and not self._watchdog_task.done():
+            self._watchdog_task.cancel()
+        self._watchdog_task = asyncio.create_task(self._watchdog())
 
     async def _load_platform_cookies(self):
         """从 browser_data/{platform}_cookies.json 加载 cookies 并注入上下文。"""
@@ -243,10 +247,6 @@ class BrowserService:
                     logger.info(f"CookieBridge: {platform} 注入 {len(cookies)} 个 cookie")
             except Exception:
                 pass
-
-    @property
-    def is_running(self) -> bool:
-        return self._browser is not None
 
     def is_connected(self) -> bool:
         """检查浏览器是否真正连接（非 None 且未断开）。"""
@@ -310,6 +310,8 @@ class BrowserService:
         await self._cleanup()
 
     async def _cleanup(self):
+        # persistent_context 时 _browser 同 _context 系同一个对象，只能 close 一次
+        is_persistent = self._browser is self._context and self._browser is not None
         try:
             if self._context:
                 await self._context.close()
@@ -317,8 +319,7 @@ class BrowserService:
         except Exception:
             pass
         try:
-            # persistent_context 時 _browser 即係 _context，避免 close 兩次
-            if self._browser and self._browser is not self._context:
+            if self._browser and not is_persistent:
                 await self._browser.close()
         finally:
             if self._playwright:
