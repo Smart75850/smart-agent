@@ -65,7 +65,7 @@ class BrowserService:
         self._engine = None
         self._inject_cookies: dict = {}
         self._cookie_domain: str = ".douyin.com"
-        self._watchdog_task: asyncio.Task | None = None
+        self._watchdog_task = None  # asyncio.Task | None
 
     async def start(self, cookies_dict: dict = None, proxy: str = None,
                     cookie_domain: str = ".douyin.com"):
