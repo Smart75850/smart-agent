@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -76,12 +77,32 @@ async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
                             if not note_id or note_id in seen_ids:
                                 continue
                             seen_ids.add(note_id)
+
+                            # 提取 xsec_token（每个帖子唯一的安全令牌，访问详情必需）
+                            xsec_token = (
+                                note_card.get("xsec_token", "")
+                                or item.get("xsec_token", "")
+                            )
+                            # 从分享链接 URL 中兜底提取
+                            if not xsec_token:
+                                share_link = (note_card.get("share_info", {}) or {}).get("link", "")
+                                if "xsec_token=" in share_link:
+                                    _m = re.search(r'xsec_token=([^&]+)', share_link)
+                                    xsec_token = _m.group(1) if _m else ""
+
                             user = note_card.get("user", {}) or {}
                             interact = note_card.get("interact_info", {}) or {}
                             cover = note_card.get("cover", {}) or {}
                             image_list = note_card.get("image_list", []) or []
+
+                            # 构造带 xsec_token 的详情 URL
+                            detail_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+                            if xsec_token:
+                                detail_url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
+
                             api_items.append({
                                 "note_id": note_id,
+                                "xsec_token": xsec_token,
                                 "title": note_card.get("display_title", ""),
                                 "desc": (note_card.get("desc", "") or "").strip(),
                                 "type": note_card.get("type", "normal"),
@@ -93,7 +114,7 @@ async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
                                 "comments": interact.get("comment_count", ""),
                                 "shares": interact.get("share_count", ""),
                                 "cover_url": cover.get("url_default", "") or cover.get("url", ""),
-                                "url": f"https://www.xiaohongshu.com/explore/{note_id}",
+                                "url": detail_url,
                                 "image_count": len(image_list),
                                 "tag_list": [t.get("name", "") for t in (note_card.get("tag_list", []) or []) if t.get("name")],
                             })
@@ -140,19 +161,32 @@ async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
         return json.dumps([], ensure_ascii=False)
 
 
-async def xiaohongshu_note_detail(note_id: str) -> str:
-    """獲取小紅薯筆記詳情，需登入先有完整內容。回傳 JSON 字串。"""
-    logger.info(f"小紅薯詳情: note_id={note_id}")
+async def xiaohongshu_note_detail(note_id: str, xsec_token: str = "") -> str:
+    """获取小红书笔记详情 — CDP 浏览器。需登入。回传 JSON 字串。
+
+    Args:
+        note_id: 笔记ID（如 6938f1a5000000001e03d4e3）
+        xsec_token: 安全令牌（从搜索结果中获取，每个帖子唯一）
+    """
+    logger.info(f"小红书详情: note_id={note_id} xsec_token={xsec_token[:20] if xsec_token else '无'}...")
     url = f"https://www.xiaohongshu.com/explore/{note_id}"
+    if xsec_token:
+        url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
     result = await browser.evaluate(url, _DETAIL_JS)
     title = result.get("title", "N/A") if isinstance(result, dict) else "N/A"
-    logger.info(f"小紅薯詳情完成: {title}")
+    logger.info(f"小红书详情完成: {title}")
     return json.dumps(result, ensure_ascii=False)
 
 
-async def xiaohongshu_comment(note_id: str, count: int = 50) -> str:
-    """爬取小红书笔记评论 — CDP 浏览器拦截评论 API + DOM 兜底。需登入。回传 JSON 字串。"""
-    logger.info(f"小红书评论: note_id={note_id} count={count}")
+async def xiaohongshu_comment(note_id: str, count: int = 50, xsec_token: str = "") -> str:
+    """爬取小红书笔记评论 — CDP 浏览器拦截评论 API + DOM 兜底。需登入。回传 JSON 字串。
+
+    Args:
+        note_id: 笔记ID
+        count: 评论数量
+        xsec_token: 安全令牌（从搜索结果中获取）
+    """
+    logger.info(f"小红书评论: note_id={note_id} count={count} xsec_token={xsec_token[:20] if xsec_token else '无'}...")
     try:
         page = await browser.new_page()
         try:
@@ -197,6 +231,8 @@ async def xiaohongshu_comment(note_id: str, count: int = 50) -> str:
             page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
 
             url = f"https://www.xiaohongshu.com/explore/{note_id}"
+            if xsec_token:
+                url += f"?xsec_token={xsec_token}&xsec_source=pc_search"
             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(5000)
 
@@ -350,10 +386,10 @@ class XiaohongshuAdapter(PlatformAdapter):
         return data[:limit] if limit else data
 
     async def detail(self, item_id: str, xsec_token: str = "", **kwargs) -> dict:
-        return json.loads(await xiaohongshu_note_detail(item_id))
+        return json.loads(await xiaohongshu_note_detail(item_id, xsec_token=xsec_token))
 
-    async def comment(self, item_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await xiaohongshu_comment(item_id, count=limit or 50))
+    async def comment(self, item_id: str, limit: Optional[int] = None, xsec_token: str = "", **kwargs) -> list[dict]:
+        data = json.loads(await xiaohongshu_comment(item_id, count=limit or 50, xsec_token=xsec_token))
         return data[:limit] if limit else data
 
     async def user(self, user_id: str, limit: Optional[int] = None) -> list[dict]:
