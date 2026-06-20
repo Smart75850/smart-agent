@@ -368,7 +368,8 @@ async def main():
         return
 
     # ── engine ───────────────────────────────────────────────
-    if args.engine != "langgraph":
+    # 用户已设环境变量时优先使用，否则用命令行参数（默认 playwright）
+    if "BROWSER_ENGINE" not in os.environ:
         os.environ["BROWSER_ENGINE"] = args.engine
 
     # ── output dir ───────────────────────────────────────────
