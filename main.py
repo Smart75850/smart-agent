@@ -287,6 +287,24 @@ async def main():
 
     # ── aggregate 快速路徑 ───────────────────────────────────
     if args.type == "aggregate":
+        # 检查 API Key 配置
+        from config.settings import settings
+        has_llm = bool(settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY)
+        if not has_llm and args.pipeline in ("full", "sentiment"):
+            print("=" * 60)
+            print("  ⚠️  未配置 LLM API Key，AI 分析将降级为模板模式")
+            print()
+            print("  配置方法：编辑项目目录下的 .env 文件，添加：")
+            print("    DEEPSEEK_API_KEY=sk-你的key       # DeepSeek（推荐，¥10起充）")
+            print("    # 或任何 OpenAI 兼容接口：")
+            print("    LLM_API_KEY=your-api-key")
+            print("    LLM_API_URL=https://api.deepseek.com/v1")
+            print("    LLM_MODEL=deepseek-chat")
+            print()
+            print("  无 API Key 时搜索/采集功能不受影响，仅 AI 分析降级")
+            print("=" * 60)
+            print()
+
         platforms = None if args.platform == "all" else [args.platform]
         if args.stream:
             from src.orchestrator import run_pipeline_stream
