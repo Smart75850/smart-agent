@@ -1,3 +1,4 @@
+from __future__ import annotations
 """高层 API — 一鸡两味（同步/流式）。"""
 import hashlib
 from typing import AsyncIterator

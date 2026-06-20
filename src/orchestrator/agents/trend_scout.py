@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Trend Scout Agent — 爆款趨勢分析。
 
 Flow:
@@ -209,7 +210,7 @@ class TrendScout(BaseAgent):
     ) -> TrendReport:
         """DeepSeek LLM 分析爆款趨勢（v2 增強 prompt）。"""
         if not self._api_key:
-            logger.info("DeepSeek API key 未設定，使用純熱度排序")
+            logger.info("LLM 未配置，使用純熱度排序")
             return self._fallback(platform, keyword, items)
 
         items_text = "\n".join(

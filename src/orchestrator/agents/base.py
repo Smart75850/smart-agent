@@ -17,6 +17,9 @@ T = TypeVar("T", bound=BaseModel)
 class BaseAgent:
     def __init__(self):
         self._api_key = settings.DEEPSEEK_API_KEY or settings.LLM_API_KEY
+        # Ollama 等本地模型唔需要 API key，塞 dummy 值绕过各 agent 的 key 检查
+        if not self._api_key and settings.LLM_API_URL:
+            self._api_key = "ollama"
         self._api_url = settings.DEEPSEEK_API_URL or settings.LLM_API_URL or "https://api.deepseek.com/v1"
         self._model = settings.DEEPSEEK_MODEL or settings.LLM_MODEL or "deepseek-chat"
         # QWEN-VL 多模态配置

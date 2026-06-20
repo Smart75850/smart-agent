@@ -1,3 +1,4 @@
+from __future__ import annotations
 """定时巡检引擎 — 监控关键词，增量发现新内容时回调通知。"""
 import asyncio
 import json
