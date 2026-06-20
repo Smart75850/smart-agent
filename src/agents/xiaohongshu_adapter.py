@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -8,8 +7,6 @@ from base.platform_base import PlatformAdapter
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
-_COOKIE_FILE = Path(__file__).parent.parent.parent / "output" / "xiaohongshu_cookies.json"
-_PERSIST_DIR = Path(os.environ.get("TEMP", r"C:\tmp")) / "pw_xhs_live"
 
 _SEARCH_JS = """\
 () => {
@@ -59,64 +56,88 @@ _DETAIL_JS = """\
 
 
 async def xiaohongshu_search(keyword: str, count: int = 40) -> str:
-    """搜索小紅薯筆記，scroll 翻頁，需登入。回傳 JSON 字串。"""
-    logger.info(f"小紅薯搜索: keyword={keyword} count={count}")
-
-    from playwright.async_api import async_playwright
-
-    async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
-            user_data_dir=str(_PERSIST_DIR),
-            headless=False,
-            viewport={"width": 1920, "height": 1080},
-            locale="zh-CN",
-            timezone_id="Asia/Shanghai",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            args=["--no-sandbox"],
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
-
+    """搜索小红书笔记 — CDP 浏览器拦截搜索 API + DOM 兜底。需登入。回传 JSON 字串。"""
+    logger.info(f"小红书搜索: keyword={keyword} count={count}")
+    try:
+        page = await browser.new_page()
         try:
+            api_items: list[dict] = []
+            seen_ids: set[str] = set()
+
+            async def on_response(resp):
+                """拦截搜索 API 响应，提取完整字段（比 DOM 多图片数/笔记类型等）。"""
+                if "search/notes" in resp.url and resp.status == 200:
+                    try:
+                        body = await resp.json()
+                        items = body.get("data", {}).get("items", []) or []
+                        for item in items:
+                            note_card = item.get("note_card") or item
+                            note_id = str(item.get("id", "") or note_card.get("note_id", ""))
+                            if not note_id or note_id in seen_ids:
+                                continue
+                            seen_ids.add(note_id)
+                            user = note_card.get("user", {}) or {}
+                            interact = note_card.get("interact_info", {}) or {}
+                            cover = note_card.get("cover", {}) or {}
+                            image_list = note_card.get("image_list", []) or []
+                            api_items.append({
+                                "note_id": note_id,
+                                "title": note_card.get("display_title", ""),
+                                "desc": (note_card.get("desc", "") or "").strip(),
+                                "type": note_card.get("type", "normal"),
+                                "author": user.get("nickname", ""),
+                                "author_id": user.get("user_id", ""),
+                                "author_avatar": user.get("avatar", ""),
+                                "likes": interact.get("liked_count", ""),
+                                "collects": interact.get("collected_count", ""),
+                                "comments": interact.get("comment_count", ""),
+                                "shares": interact.get("share_count", ""),
+                                "cover_url": cover.get("url_default", "") or cover.get("url", ""),
+                                "url": f"https://www.xiaohongshu.com/explore/{note_id}",
+                                "image_count": len(image_list),
+                                "tag_list": [t.get("name", "") for t in (note_card.get("tag_list", []) or []) if t.get("name")],
+                            })
+                    except Exception:
+                        pass
+
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
             search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&source=web_search_result_notes"
             await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(5000)
 
-            # 檢查登入牆
-            body = await page.evaluate("() => document.body.textContent.substring(0, 500)")
-            if "登录后查看" in body:
-                logger.warning("小紅薯未登入，請先執行 login_search_xhs.py 掃碼登入")
-                await context.close()
+            # 检查登录墙
+            body_text = await page.evaluate("() => document.body.textContent.substring(0, 500)")
+            if "登录后查看" in body_text:
+                logger.warning("小红书未登录，请先在 CDP Chrome 中扫码登录小红书")
                 return json.dumps([], ensure_ascii=False)
 
-            all_results = []
-            seen = set()
-            max_scrolls = max((count // 30) + 3, 5)
-
+            # 滚动触发搜索 API 分页加载
+            max_scrolls = max((count // 20) + 3, 5)
             for _ in range(max_scrolls):
-                items = await page.evaluate(_SEARCH_JS)
-                new_count = 0
-                for item in items:
-                    key = item.get("link", "") or item.get("title", "")
-                    if key and key not in seen:
-                        seen.add(key)
-                        all_results.append(item)
-                        new_count += 1
-
-                if new_count == 0 and len(all_results) > 0:
+                if len(api_items) >= count:
                     break
-
-                if len(all_results) >= count:
-                    break
-
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(2500)
 
-            result = all_results[:count]
-            logger.info(f"小紅薯搜索完成: {len(result)} 條")
-            return json.dumps(result, ensure_ascii=False)
+            # 等待最后一波 API 响应
+            await page.wait_for_timeout(2000)
 
+            # DOM 兜底（API 未拦截到时用 CSS 选择器抓取）
+            if not api_items:
+                dom_result = await page.evaluate(_SEARCH_JS)
+                if dom_result:
+                    api_items = dom_result
+                    logger.info("小红书搜索: API 拦截为空，使用 DOM 兜底")
+
+            result = api_items[:count]
+            logger.info(f"小红书搜索完成: {len(result)} 条")
+            return json.dumps(result, ensure_ascii=False)
         finally:
-            await context.close()
+            await page.close()
+    except Exception as e:
+        logger.warning(f"小红书搜索异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def xiaohongshu_note_detail(note_id: str) -> str:
@@ -129,32 +150,69 @@ async def xiaohongshu_note_detail(note_id: str) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
-async def xiaohongshu_comment(note_id: str) -> str:
-    """爬取小紅薯筆記評論，使用 persistent context 以保持登入態。"""
-    logger.info(f"小紅薯評論: note_id={note_id}")
-
-    from playwright.async_api import async_playwright
-
-    async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
-            user_data_dir=str(_PERSIST_DIR),
-            headless=False,
-            viewport={"width": 1920, "height": 1080},
-            locale="zh-CN",
-            timezone_id="Asia/Shanghai",
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            args=["--no-sandbox"],
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
-
+async def xiaohongshu_comment(note_id: str, count: int = 50) -> str:
+    """爬取小红书笔记评论 — CDP 浏览器拦截评论 API + DOM 兜底。需登入。回传 JSON 字串。"""
+    logger.info(f"小红书评论: note_id={note_id} count={count}")
+    try:
+        page = await browser.new_page()
         try:
-            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}", wait_until="domcontentloaded", timeout=30000)
+            comments: list[dict] = []
+            seen_cids: set[str] = set()
+
+            async def on_response(resp):
+                """拦截评论 API 响应，提取结构化字段。"""
+                if ("comment" in resp.url or "sub_comment" in resp.url) and resp.status == 200:
+                    try:
+                        body = await resp.json()
+                        comment_list = (body.get("data", {}).get("comments", []) or [])
+                        for c in comment_list:
+                            cid = str(c.get("id", ""))
+                            if not cid or cid in seen_cids:
+                                continue
+                            seen_cids.add(cid)
+                            user = c.get("user_info", {}) or {}
+                            # 子评论
+                            sub_comments = []
+                            for sc in (c.get("sub_comments", []) or []):
+                                sc_user = sc.get("user_info", {}) or {}
+                                sub_comments.append({
+                                    "content": sc.get("content", ""),
+                                    "user": sc_user.get("nickname", ""),
+                                    "likes": sc.get("like_count", 0),
+                                })
+                            comments.append({
+                                "cid": cid,
+                                "content": c.get("content", ""),
+                                "user": user.get("nickname", ""),
+                                "user_id": user.get("user_id", ""),
+                                "user_avatar": user.get("avatar", ""),
+                                "likes": c.get("like_count", 0),
+                                "reply_count": c.get("sub_comment_count", 0),
+                                "create_time": c.get("create_time", 0),
+                                "sub_comments": sub_comments,
+                            })
+                    except Exception:
+                        pass
+
+            page.on("response", lambda resp: asyncio.ensure_future(on_response(resp)))
+
+            url = f"https://www.xiaohongshu.com/explore/{note_id}"
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(5000)
+
             # 滚动触发评论加载
-            for _ in range(5):
+            for _ in range(max((count // 20) + 3, 5)):
+                if len(comments) >= count:
+                    break
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(1500)
-            result = await page.evaluate("""() => {
+
+            # 等待最后一波 API 响应
+            await page.wait_for_timeout(2000)
+
+            # DOM 兜底
+            if not comments:
+                dom_result = await page.evaluate("""() => {
     const items = document.querySelectorAll('[class*="comment-item"], [class*="CommentItem"], .comment-item, [class*="comment"], [class*="Comment"]');
     const seen = new Set();
     const out = [];
@@ -170,7 +228,6 @@ async def xiaohongshu_comment(note_id: str) -> str:
             })),
         });
     });
-    // 如果没找到足够评论，提取页面文本块兜底
     if (out.length < 8) {
         const allText = document.body?.innerText || '';
         const lines = allText.split('\\n').filter(l => l.trim().length > 10).slice(0, 60);
@@ -181,10 +238,18 @@ async def xiaohongshu_comment(note_id: str) -> str:
     }
     return out;
 }""")
-            logger.info(f"小紅薯評論完成: {len(result)} 條")
+                if dom_result:
+                    comments = dom_result
+                    logger.info("小红书评论: API 拦截为空，使用 DOM 兜底")
+
+            result = comments[:count]
+            logger.info(f"小红书评论完成: {len(result)} 条")
             return json.dumps(result, ensure_ascii=False)
         finally:
-            await context.close()
+            await page.close()
+    except Exception as e:
+        logger.warning(f"小红书评论异常: {e}")
+        return json.dumps([], ensure_ascii=False)
 
 
 async def xiaohongshu_hot() -> str:
@@ -288,7 +353,7 @@ class XiaohongshuAdapter(PlatformAdapter):
         return json.loads(await xiaohongshu_note_detail(item_id))
 
     async def comment(self, item_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await xiaohongshu_comment(item_id))
+        data = json.loads(await xiaohongshu_comment(item_id, count=limit or 50))
         return data[:limit] if limit else data
 
     async def user(self, user_id: str, limit: Optional[int] = None) -> list[dict]:
