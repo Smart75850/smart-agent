@@ -1,3 +1,4 @@
+from __future__ import annotations
 """B站纯 HTTP 客户端 — Wbi 签名 + curl_cffi TLS 指纹伪装，零浏览器。"""
 import json
 from pathlib import Path

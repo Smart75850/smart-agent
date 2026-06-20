@@ -1,3 +1,4 @@
+from __future__ import annotations
 """HTTP 客户端工厂 — 自动注入代理，失败时降级直连。"""
 import httpx
 from src.utils.logger import logger

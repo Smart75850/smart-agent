@@ -1,3 +1,4 @@
+from __future__ import annotations
 """VideoCloneAgent — 视频克隆引擎。
 
 下载视频 → 智能抽帧 → QWEN-VL 视觉分析 → DeepSeek 生成复刻方案。

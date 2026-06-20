@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 反反爬自動升級引擎 — 檢測封鎖 → 自動逐級加強反反爬措施
 

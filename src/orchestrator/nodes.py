@@ -1,3 +1,4 @@
+from __future__ import annotations
 """LangGraph 节点函数 — 纯 async，无副作用。"""
 import asyncio
 import hashlib
