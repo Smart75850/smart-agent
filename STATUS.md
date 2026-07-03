@@ -2,6 +2,22 @@
 
 > **呢個係三個工具（VS Code Claude / Terminal Claude Code / Codex）共享嘅單一事實來源。**
 > **開工第一句就話「睇 STATUS.md」，唔好靠記憶。**
+>
+> **Last Updated:** 2026-07-03（加 Verified Metrics 表 + audit.sh + CLAUDE.md）
+
+## 📊 Verified Metrics（按「诚实标注」铁律）
+
+| Metric | Value | Verified | Source | Date |
+|---|---|---|---|---|
+| 全量测试 | 71/71 = 100% | ✅ | `pytest tests/` log | 2026-06-12 |
+| Smoke test | 5/5 PASS (0.02 秒) | ✅ | `pytest tests/test_smoke.py` | 2026-07-03 |
+| 平台数 | 7 | ✅ | `constant/platform.py` | 2026-06-12 |
+| Crawl 类型 | 6 | ✅ | `constant/platform.py` | 2026-06-12 |
+| HTTP 直连 (✅) | 3 平台 | ✅ | STATUS.md 实测表 | 2026-06-12 |
+| HTTP 直连 (⚠️ 需 CDP) | 4 平台 | ✅ | STATUS.md 实测表 | 2026-06-12 |
+| 真实场景实测 | 3/3 项 OK | ✅ | STATUS.md 真实用户场景表 | 2026-06-12 |
+| Bug 修复 | 4 项 | ✅ | STATUS.md Bug 修复段 | 2026-06-12 |
+| 最新版本 | v1.1.0 | ✅ | CHANGELOG.md | 2026-06-10 |
 
 ## 🔴 紅線（所有 AI Agent 必須遵守，違反即係大鑊）
 

@@ -2,6 +2,8 @@
 
 > ⚠️ AI Agent 每新会话第一件事：读此文件
 > 每完成子任务立即回写
+>
+> **Last Updated:** 2026-07-03（加 verified 标注 + audit.sh + CLAUDE.md，符合「最小可信改动」3 原则）
 
 ## ✅ 已完成
 
