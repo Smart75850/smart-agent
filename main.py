@@ -447,11 +447,12 @@ async def main():
                 logger.error(f"[{platform}] {action}: ERROR — {err_msg}")
                 ck.mark_failed(platform, action, args.keyword, error_msg=err_msg)
 
-        # ── fetch-detail：搜索后自动逐条拉取详情 ──────────────────
-        if args.fetch_detail and args.type == "search":
+        # ── fetch-detail：搜索/用户后自动逐条拉取详情 ──────────────────
+        if args.fetch_detail and args.type in ("search", "user"):
             for platform, action, func, kwargs in tasks:
+                source_key = f"{platform}_{args.type}"
                 key = f"{platform}_detail_batch"
-                items = all_results.get(f"{platform}_search", [])
+                items = all_results.get(source_key, [])
                 if not isinstance(items, list) or not items:
                     continue
                 adapter = _ADAPTERS.get(platform)
