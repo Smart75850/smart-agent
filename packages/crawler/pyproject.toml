@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-crawler"
+version = "0.1.0"
+description = "多平台内容采集——7平台纯Python, CDP/Playwright双引擎"
+requires-python = ">=3.11"
+dependencies = ["playwright>=1.40", "curl_cffi>=0.6", "httpx>=0.25"]
+
+[project.optional-dependencies]
+all = ["langgraph", "fastapi", "uvicorn"]
+
+[tool.setuptools.packages.find]
+where = ["."]
