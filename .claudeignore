@@ -1,0 +1,23 @@
+# 省 Token：Claude 无需扫描这些目录
+venv/
+.venv/
+node_modules/
+output/
+downloads/
+browser_data/
+__pycache__/
+*.pyc
+*.pyo
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.tar.gz
+*.png
+*.jpg
+*.mp4
+*.avi
+*.mov
+.DS_Store
+Thumbs.db
