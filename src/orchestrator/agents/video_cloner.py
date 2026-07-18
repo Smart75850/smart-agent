@@ -407,7 +407,35 @@ class VideoCloneAgent(BaseAgent):
         if not url:
             return {"clone_report": None}
         report = await self.run(url, platform=plat)
-        return {"clone_report": asdict(report)}
+        result = {"clone_report": asdict(report)}
+
+        # Optional: 出图 hints 写入 text memory（settings.VIDEO_CLONER_MEMORY_ENABLED）
+        # 注意：image_hint 系文字描述，唔系实际图片路径，所以用 text memory 而唔系 image memory。
+        # 未来真正出图后，可以用 add_image_to_memory 写入 image memory + image embedding。
+        if getattr(settings, "VIDEO_CLONER_MEMORY_ENABLED", False):
+            try:
+                from src.memory.recall import save_task_result
+                valid_hints = [s for s in report.shots if s.image_hint and s.image_hint.strip()]
+                for shot in valid_hints:
+                    # 每条 shot 写入一条独立 entry（方便 recall 单一 shot）
+                    summary = f"[Shot {shot.shot_number}] {shot.action_description} | image_hint: {shot.image_hint}"
+                    save_task_result(
+                        keyword=f"video_clone:{report.platform}:{report.video_title[:30]}",
+                        summary=summary,
+                        metadata={
+                            "video_url": report.video_url,
+                            "video_title": report.video_title,
+                            "shot_number": shot.shot_number,
+                            "platform": report.platform,
+                            "camera_angle": shot.camera_angle,
+                            "duration_seconds": shot.duration_seconds,
+                        },
+                    )
+                logger.info(f"VideoClone: saved {len(valid_hints)} shot hints to text memory")
+            except Exception as exc:
+                logger.warning(f"VideoClone memory save failed (non-fatal): {exc}")
+
+        return result
 
     # ── Step 1: 下载视频 ────────────────────────────────────
 

@@ -57,25 +57,47 @@ def recall_similar_tasks(
     keyword: str,
     top_k: int = 5,
     store: Optional[MemoryStore] = None,
+    rerank: bool = False,
+    rerank_top_k: int = 20,
 ) -> list[dict]:
-    """Recall 同 keyword 相似嘅历史任务。
+    """Recall 同 keyword 相似嘅历史任务（支持两阶段 rerank）。
 
     Args:
         keyword: 当前任务关键词
-        top_k: 返回 top-k 相似历史
+        top_k: 最终返回 top-k
         store: 自定义 store（默认 singleton）
+        rerank: 是否启用 cross-encoder rerank（两阶段）
+        rerank_top_k: 粗排 top-k（rerank 前嘅候选数）
 
     Returns:
-        [{"id", "text", "metadata", "distance"}, ...]
-        distance 越小越相似（cosine distance，0 = 完全相同）
+        [{"id", "text", "metadata", "distance", "rerank_score?"}, ...]
     """
+    from config.settings import settings
+
     store = store or MemoryStore()
 
     if store.count() == 0:
         return []
 
-    results = store.query(keyword, n_results=top_k)
-    return results
+    # 决定是否启用 rerank
+    enable_rerank = rerank or getattr(settings, "RECALL_RERANK_ENABLED", False)
+    initial_k = rerank_top_k if enable_rerank else top_k
+
+    # Stage 1: Vector recall（粗排）
+    results = store.query(keyword, n_results=initial_k)
+
+    if not enable_rerank or len(results) <= 1:
+        return results[:top_k]
+
+    # Stage 2: Cross-encoder rerank（精排）
+    try:
+        from src.memory.rerank import rerank as do_rerank
+        reranked = do_rerank(keyword, results, top_k=top_k)
+        return reranked
+    except Exception as e:
+        from src.utils.logger import logger
+        logger.warning(f"Rerank failed, fallback to vector recall: {e}")
+        return results[:top_k]
 
 
 def reset_memory(store: Optional[MemoryStore] = None) -> None:

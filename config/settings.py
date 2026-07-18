@@ -71,6 +71,12 @@ class Settings:
     # OUTPUT IN CHINESE 强制中文 — 源：高强文书第 4 章 Camel/BabyAGI（invariant #14）
     CHINESE_OUTPUT_INVARIANT: bool = True      # 自动 inject "OUTPUT IN CHINESE" 到 prompt
 
+    # Rerank 两阶段检索 — 源：高强文书第 6 章 QAnything（invariant #16）
+    RECALL_RERANK_ENABLED: bool = False        # 默认关（避免 loading 280MB cross-encoder）
+
+    # video_cloner 集成 memory — 源：高强文书第 16 章 CogVLM2（以文搜图）
+    VIDEO_CLONER_MEMORY_ENABLED: bool = False  # 默认关，video_cloner 出图自动写入 image memory
+
     # LLM (Doubao) — 相容舊 config
     LLM_API_KEY: str = ""
     LLM_API_URL: str = ""
@@ -122,6 +128,8 @@ class Settings:
             MEMORY_CHROMA_PATH=environ.get("MEMORY_CHROMA_PATH", "output/chroma"),
             MEMORY_EMBED_MODEL=environ.get("MEMORY_EMBED_MODEL", "BAAI/bge-small-zh-v1.5"),
             CHINESE_OUTPUT_INVARIANT=environ.get("CHINESE_OUTPUT_INVARIANT", "true").lower() == "true",
+            RECALL_RERANK_ENABLED=environ.get("RECALL_RERANK_ENABLED", "false").lower() == "true",
+            VIDEO_CLONER_MEMORY_ENABLED=environ.get("VIDEO_CLONER_MEMORY_ENABLED", "false").lower() == "true",
             # SignSrv
             SIGN_SRV_ENABLED=environ.get("SIGN_SRV_ENABLED", "true").lower() == "true",
             SIGN_SRV_PORT=int(environ.get("SIGN_SRV_PORT", "18501")),
