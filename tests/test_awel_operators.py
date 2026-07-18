@@ -66,16 +66,26 @@ def test_workflow_chain_single_op():
     """Test 3: Workflow DSL 单个 operator work。"""
     from src.orchestrator.skills.operators import Workflow, LLMOperator
 
-    workflow = Workflow("test_single").chain(LLMOperator(max_tokens=2048))
+    workflow = Workflow("test_single").chain(LLMOperator(max_tokens=4096))
 
     async def run():
-        result = await workflow.execute({"prompt": "说个数字"})
-        assert "response" in result
+        # Retry logic（flaky Qwen3.6 thinking + token quota）
+        last_err = None
+        for attempt in range(3):
+            try:
+                result = await workflow.execute({"prompt": "说个数字"})
+                if result.get("response"):
+                    return result
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(2 ** attempt)
+        if last_err:
+            raise last_err
         return result
 
     import asyncio
     result = asyncio.run(run())
-    assert len(result["response"]) > 0
+    assert len(result["response"]) > 0, f"Response 空（3 次 retry 后）"
 
 
 def test_workflow_chain_multi_ops():

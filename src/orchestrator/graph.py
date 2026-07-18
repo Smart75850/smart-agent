@@ -269,13 +269,21 @@ def compile_graph():
 
     Checkpointer 选择（按 settings.LANGGRAPH_CHECKPOINT_DB）：
       - ":memory:" 或空 → InMemorySaver（默认，重启即丢失）
-      - 其他路径 → AsyncSqliteSaver（持久化到 SQLite，进程重启可恢复）
+      - 其他路径 → 尝试 AsyncSqliteSaver（持久化到 SQLite）
 
     Settings 默认：`output/langgraph_checkpoint.db`（自动启用 SQLite）。
     设置 `LANGGRAPH_CHECKPOINT_DB=:memory:` 切回内存模式。
 
-    注：用 AsyncSqliteSaver 而非 SqliteSaver，因为 pipeline.py 用 ainvoke（async），
-        而 sync SqliteSaver 唔支持 async methods。
+    ⚠️ 已知 limitation（STARTHERE-phase-4 诚实标注）：
+    - 异步 checkpointer setup 复杂（AsyncSqliteSaver 需要 async context + nest_asyncio，
+      但 nest_asyncio + aiosqlite 有 thread reentry bug）
+    - 当前默认 fallback InMemorySaver（state 进程重启即丢失）
+    - Sync SqliteSaver 唔支持 async ainvoke（langgraph 限制）
+    - Trade-off：streaming (astream_events) vs persistent checkpointer
+
+    Future fix 路径：
+    1. 改 compile_graph() 为 async function（最彻底）
+    2. 或者拆 streaming/invoke path，分别用 sync SqliteSaver + InMemorySaver
     """
     import atexit
     from pathlib import Path
@@ -288,25 +296,15 @@ def compile_graph():
         checkpointer = InMemorySaver()
         logger.info("LangGraph 编译完成 (InMemorySaver)")
     else:
-        # SQLite 持久化模式
+        # SQLite 持久化模式（接受 limitation：实际 fallback InMemorySaver）
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        try:
-            # 优先用 AsyncSqliteSaver（支持 async ainvoke）
-            from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-            # AsyncSqliteSaver.from_conn_string() 返 context manager
-            cm = AsyncSqliteSaver.from_conn_string(db_path)
-            checkpointer = cm.__enter__()
-            atexit.register(lambda: cm.__exit__(None, None, None))
-            logger.info(f"LangGraph 编译完成 (AsyncSqliteSaver: {db_path})")
-        except ImportError:
-            logger.warning(
-                "langgraph.checkpoint.sqlite.aio 不可用，回退到 InMemorySaver。"
-                "需要装：pip install langgraph-checkpoint-sqlite"
-            )
-            checkpointer = InMemorySaver()
-        except Exception as e:
-            logger.warning(f"AsyncSqliteSaver setup 失败: {e}，回退到 InMemorySaver")
-            checkpointer = InMemorySaver()
+        checkpointer = InMemorySaver()
+        logger.warning(
+            f"LANGGRAPH_CHECKPOINT_DB={db_path} 已 set，但当前用 InMemorySaver fallback。"
+            f"原因：AsyncSqliteSaver async setup 复杂（nest_asyncio + aiosqlite thread reentry bug）。"
+            f"Fix 路径：改 compile_graph 为 async function。"
+            f"当前 OK：state 唔会持久化，但 pipeline 仍 work。"
+        )
 
     compiled = builder.compile(checkpointer=checkpointer)
     return compiled
