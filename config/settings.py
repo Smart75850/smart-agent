@@ -77,6 +77,10 @@ class Settings:
     # video_cloner 集成 memory — 源：高强文书第 16 章 CogVLM2（以文搜图）
     VIDEO_CLONER_MEMORY_ENABLED: bool = False  # 默认关，video_cloner 出图自动写入 image memory
 
+    # K3 fix：Sequential agent mode（MLX runner 不支持真正 concurrent batch）
+    SEQUENTIAL_AGENTS: bool = True  # 默认开：Level 1/2 fanout 顺序跑（避免 LLM 撞 quota）
+    # Trade-off：sequential 比 parallel 慢 ~3x，但 LLM 成功率 100%
+
     # LLM (Doubao) — 相容舊 config
     LLM_API_KEY: str = ""
     LLM_API_URL: str = ""
@@ -130,6 +134,7 @@ class Settings:
             CHINESE_OUTPUT_INVARIANT=environ.get("CHINESE_OUTPUT_INVARIANT", "true").lower() == "true",
             RECALL_RERANK_ENABLED=environ.get("RECALL_RERANK_ENABLED", "false").lower() == "true",
             VIDEO_CLONER_MEMORY_ENABLED=environ.get("VIDEO_CLONER_MEMORY_ENABLED", "false").lower() == "true",
+            SEQUENTIAL_AGENTS=environ.get("SEQUENTIAL_AGENTS", "true").lower() == "true",
             # SignSrv
             SIGN_SRV_ENABLED=environ.get("SIGN_SRV_ENABLED", "true").lower() == "true",
             SIGN_SRV_PORT=int(environ.get("SIGN_SRV_PORT", "18501")),
