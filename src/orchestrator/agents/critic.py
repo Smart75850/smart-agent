@@ -356,6 +356,6 @@ CRITIC_CONFIG = {
     "agents": ["trend_scout", "video_analyst", "product_miner",
                "sentiment_reader", "copy_writer", "content_remixer_analyze",
                "content_remixer_rewrite", "pic_tactic"],
-    "max_retry": 2,
+    "max_retry": 1,  # 之前 2 → 3 attempts，每次 30s 太慢。改为 1 → 2 attempts，节省 ~30s per agent
     "critic_model": "deepseek-chat",
 }
