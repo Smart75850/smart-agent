@@ -179,30 +179,19 @@ class TrendScout(BaseAgent):
 
     # ── Few-Shot 示例庫 ──────────────────────────────────────
     _FEWSHOT_GOOD = [
+        # L2 fix：few-shot 从 5+2 缩到 2+1（节省 ~400 tokens 装 actual JSON output）
         {"title": "我用AI做了一個能自動回覆客服的機器人，成本只花了50塊", "plays": "85万", "likes": "4.2万",
          "viral_score": 92, "category": "科技/AI",
-         "trend_reason": "AI工具實操+極低成本+個人即商用，三層鉤子疊加；互動比4.9%遠超均值，藍海信號明確"},
+         "trend_reason": "AI工具實操+極低成本+個人即商用，互動比4.9%遠超均值，藍海信號明確"},
         {"title": "小個子女生這樣穿顯高10cm！5套通勤穿搭公式", "plays": "120万", "likes": "6.8万",
          "viral_score": 85, "category": "穿搭",
-         "trend_reason": "精準人群（小個子）+ 數字衝擊（10cm）+ 公式化教程（可收藏），互動比5.7%"},
-        {"title": "小學五年級數學這樣教，孩子終於聽懂了｜分數加減法", "plays": "45万", "likes": "2.1万",
-         "viral_score": 78, "category": "教育",
-         "trend_reason": "垂直剛需（家長痛點）+ 教學實用性強 + 標題含關鍵詞利於搜索，教育賽道持續有需求"},
-        {"title": "黑神話悟空隱藏BOSS位置全攻略，第7個99%人不知道", "plays": "320万", "likes": "15万",
-         "viral_score": 88, "category": "遊戲",
-         "trend_reason": "蹭熱門遊戲IP+數字列舉+稀缺性（99%人不知道），攻略類內容天然有收藏價值"},
-        {"title": "3種食材5分鐘搞定週末早餐，比外面賣的好吃10倍", "plays": "68万", "likes": "3.5万",
-         "viral_score": 76, "category": "美食",
-         "trend_reason": "數字簡化（3食材5分鐘）+ 對比錨定（比外面好吃）+ 場景精準（週末），實用型爆款"},
+         "trend_reason": "精準人群+數字衝擊+公式化教程，互動比5.7%"},
     ]
 
     _FEWSHOT_BAD = [
         {"title": "今天的天氣真好呀陽光明媚", "plays": "1.2万", "likes": "200",
          "viral_score": 8, "category": "其他",
-         "trend_reason": "❌ 錯誤示範：純個人生活記錄、無任何爆款元素、互動比僅1.7%，不應高估此類內容"},
-        {"title": "推薦一個很好用的東西給大家", "plays": "5000", "likes": "150",
-         "viral_score": 12, "category": "其他",
-         "trend_reason": "❌ 錯誤示範：標題模糊無具體信息、無品類關鍵詞、無數字無情緒、無搜索價值"},
+         "trend_reason": "❌ 純個人生活記錄、無爆款元素、互動比僅1.7%"},
     ]
 
     async def _llm_generate(
@@ -239,30 +228,18 @@ ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以
 </scope>
 
 <quality_standards>
-专业级输出必须满足：
-1. 每条 trend_reason 引用至少1个具体数据点（播放量/互动比/增长率），禁用「内容不错」「有潜力」等空泛评价
-2. viral_score 必须体现鉴别度：同一批中最高分与最低分差距 ≥20 分。如果所有内容确实类似，在 summary 说明原因
-3. category 精确到15类枚举值，「其他」仅限无主题的日常随拍，每批最多1个
-4. summary 必须包含：主导赛道判断 + 机会信号 + 风险提示
+1. trend_reason 引用至少1个数据点（播放量/互动比/增长率）
+2. viral_score 体现鉴别度（最高最低分差 ≥20），类似时 summary 说明
+3. category 精确枚举（15类之一）
+4. summary 包含：主导赛道 + 机会信号 + 风险提示
 </quality_standards>
 
 <viral_rules>
-爆款判定（4项中满足 ≥2项）：
-1. 互动比异常：赞/播 >3% 或 评论/播 >0.5%
-2. 热门赛道：属于当前增长中的内容品类
-3. 情绪触发：标题含好奇/共鸣/焦虑/愤怒/惊喜信号
-4. 形式创新：内容形式有别于同赛道常规做法
-
-评分锚点：
-90-100: 蓝海 — 互动比>5% + 新赛道 + 可复制
-70-89: 需求明确 — 互动比>3% + 热门赛道 + 可复制元素
-50-69: 红海 — 赛道拥挤，需差异化
-<50: 小众/低互动
+爆款（4项≥2）：互动比>3% / 热门赛道 / 标题含情绪词 / 形式创新
+评分：>90 蓝海 / 70-89 需求 / 50-69 红海 / <50 小众
 </viral_rules>
 
-<category_enum>
-科技/AI | 美妆 | 美食 | 穿搭 | 家居 | 健身 | 教育 | 财经 | 游戏 | 娱乐 | 旅游 | 母婴 | 宠物 | 健康/医疗 | 其他
-</category_enum>
+<category_enum>15 类：科技/AI | 美妆 | 美食 | 穿搭 | 家居 | 健身 | 教育 | 财经 | 游戏 | 娱乐 | 旅游 | 母婴 | 宠物 | 健康/医疗 | 其他</category_enum>
 
 <examples>
 {good_examples_text}
@@ -270,26 +247,12 @@ ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以
 </examples>
 
 <prediction>
-每条内容必须标注两个预测维度（对标 ViralEvo/Treendly）：
-
-growth_velocity（增长速度）:
-- exploding: 互动比>5% + 新赛道/新形式（预测48h内爆发）
-- rising: 互动比3-5% + 有多条同类内容出现（上升趋势）
-- stable: 互动比1-3%（稳定）
-- declining: 互动比<1% 或明显下滑
-
-trend_lifecycle（生命周期）:
-- early: 赛道竞争者少(<5条同类)，有机会抢先入场
-- peak: 爆发期，大量竞品涌现，需差异化解锁
-- mature: 赛道饱和，头部已定，新入场困难
-- declining: 互动下滑，不建议投入
+每条内容标注：
+- growth_velocity: exploding / rising / stable / declining
+- trend_lifecycle: early / peak / mature / declining
 </prediction>
 
-<edge_cases>
-数据缺失(播放/赞为0): viral_score≤50, growth_velocity=declining, 标注数据不足
-广告/营销话术: 标注商业内容, viral_score 扣20分
-跨类别: 选主类别, trend_reason 提及次要类别
-</edge_cases>
+<edge_cases>数据缺失 viral_score≤50 + declining；广告内容 扣20分；跨类别选主类别</edge_cases>
 
 <task>
 平台: {platform} | 关键词: {keyword}

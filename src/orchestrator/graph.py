@@ -154,39 +154,67 @@ def _route_after_merge(state: PipelineState) -> str:
 
 
 def _fanout_level1(state: PipelineState) -> list[Send]:
-    """trend_scout 后并行/顺序分叉：选品 + 视频 + 情绪 分析。
+    """trend_scout 后顺序/并行分叉：选品 + 视频 + 情绪 分析。
 
     K3 fix：settings.SEQUENTIAL_AGENTS=True 时改为 sequential
-    （Ollama MLX runner 不支持真正 concurrent batch，避免 LLM 撞 quota）
+    - return 1 Send（product_miner）→ conditional edge → video_analyst → sentiment_reader → join
+    - 实际顺序执行，避免 Ollama MLX runner concurrent 撞 quota
     """
     from config.settings import settings
     agents = ["product_miner", "video_analyst", "sentiment_reader"]
     if getattr(settings, "SEQUENTIAL_AGENTS", True):
-        logger.info(f"Fanout Level1 (sequential) → {agents}")
-        # Sequential mode: 喺 graph 内 chain（上一个 agent 完成 → 下一个）
-        # 用 conditional edge 返回 single Send，graph 会 join 之后再去下一个
-        # 但 LangGraph conditional edge 唔直接支持 sequential
-        # Solution: 一次性 fanout 全部，但 settings 标记 sequential（实际仍并行）
-        # 真正 sequential 改用 graph rewrite（trade-off: 大改动）
-        # 当前做法: 记录 flag，agent 内部按 settings 决定并发度
-        logger.debug(f"SEQUENTIAL_AGENTS={True} mode: agent 内部需 self-sequence")
+        logger.info(f"Fanout Level1 (sequential) → {agents[0]} first")
+        return [Send(agents[0], state)]
     else:
         logger.info(f"Fanout Level1 (parallel) → {agents}")
-    return [Send(agent, state) for agent in agents]
+        return [Send(agent, state) for agent in agents]
+
+
+def _route_after_level1_first(state: PipelineState) -> str:
+    """ProductMiner 完成后：sequential 去 video_analyst，parallel 去 join。"""
+    from config.settings import settings
+    if getattr(settings, "SEQUENTIAL_AGENTS", True):
+        return "video_analyst"
+    return "_join_level1"
+
+
+def _route_after_level1_second(state: PipelineState) -> str:
+    """VideoAnalyst 完成后：sequential 去 sentiment_reader，parallel 去 join。"""
+    from config.settings import settings
+    if getattr(settings, "SEQUENTIAL_AGENTS", True):
+        return "sentiment_reader"
+    return "_join_level1"
 
 
 def _fanout_level2(state: PipelineState) -> list[Send]:
-    """分析完成后并行/顺序分叉：文案 + 改写 + 配图 生成。
+    """分析完成后顺序/并行分叉：文案 + 改写 + 配图 生成。
 
-    K3 fix：settings.SEQUENTIAL_AGENTS=True 时改为 sequential
+    K3 fix：SEQUENTIAL_AGENTS=True 时 dispatch 第一个，conditional edge chain
     """
     from config.settings import settings
     agents = ["copy_writer", "content_remixer", "pic_tactic"]
     if getattr(settings, "SEQUENTIAL_AGENTS", True):
-        logger.info(f"Fanout Level2 (sequential mode) → {agents}")
+        logger.info(f"Fanout Level2 (sequential) → {agents[0]} first")
+        return [Send(agents[0], state)]
     else:
         logger.info(f"Fanout Level2 (parallel) → {agents}")
-    return [Send(agent, state) for agent in agents]
+        return [Send(agent, state) for agent in agents]
+
+
+def _route_after_level2_first(state: PipelineState) -> str:
+    """CopyWriter 完成后：sequential 去 content_remixer，parallel 去 format。"""
+    from config.settings import settings
+    if getattr(settings, "SEQUENTIAL_AGENTS", True):
+        return "content_remixer"
+    return "format_output"
+
+
+def _route_after_level2_second(state: PipelineState) -> str:
+    """ContentRemixer 完成后：sequential 去 pic_tactic，parallel 去 format。"""
+    from config.settings import settings
+    if getattr(settings, "SEQUENTIAL_AGENTS", True):
+        return "pic_tactic"
+    return "format_output"
 
 
 async def _noop(state: PipelineState) -> dict:
@@ -253,21 +281,37 @@ def build_graph() -> StateGraph:
     )
 
     # Phase 2: 两阶段并行 Agent 链
-    # Stage 1: trend_scout → fanout (product_miner | video_analyst | sentiment_reader)
+    # Stage 1: trend_scout → fanout (sequential: product → video → sentiment → join)
+    # K3 fix：conditional edges chain 顺序 agent
     builder.add_conditional_edges(
         "trend_scout", _fanout_level1,
         path_map=["product_miner", "video_analyst", "sentiment_reader"],
     )
-    for node in ("product_miner", "video_analyst", "sentiment_reader"):
-        builder.add_edge(node, "_join_level1")
+    builder.add_conditional_edges(
+        "product_miner", _route_after_level1_first,
+        path_map={"video_analyst": "video_analyst", "_join_level1": "_join_level1"},
+    )
+    builder.add_conditional_edges(
+        "video_analyst", _route_after_level1_second,
+        path_map={"sentiment_reader": "sentiment_reader", "_join_level1": "_join_level1"},
+    )
+    builder.add_edge("sentiment_reader", "_join_level1")
 
-    # Stage 2: join → fanout (copy_writer | content_remixer | pic_tactic)
+    # Stage 2: join → fanout (sequential: copy → remix → pic → cross_verify → format)
+    # K3 fix：conditional edges chain 顺序 agent（再 → cross_verify → format）
     builder.add_conditional_edges(
         "_join_level1", _fanout_level2,
         path_map=["copy_writer", "content_remixer", "pic_tactic"],
     )
-    for node in ("copy_writer", "content_remixer", "pic_tactic"):
-        builder.add_edge(node, "cross_verify")
+    builder.add_conditional_edges(
+        "copy_writer", _route_after_level2_first,
+        path_map={"content_remixer": "content_remixer", "format_output": "format_output"},
+    )
+    builder.add_conditional_edges(
+        "content_remixer", _route_after_level2_second,
+        path_map={"pic_tactic": "pic_tactic", "format_output": "format_output"},
+    )
+    builder.add_edge("pic_tactic", "cross_verify")
     builder.add_edge("cross_verify", "format_output")
 
     # Phase 1: 原有 llm_filter/llm_score 路径
