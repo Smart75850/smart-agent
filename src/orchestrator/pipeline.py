@@ -6,6 +6,7 @@ from typing import AsyncIterator
 from src.orchestrator.state import PipelineState
 from src.orchestrator.graph import compiled_graph
 from src.utils.logger import logger
+from config.settings import settings
 
 _DEFAULT_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
 
@@ -83,6 +84,31 @@ async def run_pipeline(
         config=_make_config(keyword, platforms or _DEFAULT_PLATFORMS),
     )
     logger.info(f"pipeline [{pipeline_mode}] 完成: {len(result.get('final_output', []))} 条")
+
+    # Optional: save task result to memory (RAG) — 默认关（settings.MEMORY_SAVE_ENABLED=False）
+    if getattr(settings, "MEMORY_SAVE_ENABLED", False):
+        try:
+            from src.memory.recall import save_task_result
+            final = result.get("final_output", [])
+            summary = (
+                f"Found {len(final)} items from {len(state.get('platforms', []))} platforms, "
+                f"mode={pipeline_mode}, analysis={analysis_mode}."
+            )
+            save_task_result(
+                keyword=keyword,
+                summary=summary,
+                metadata={
+                    "final_count": len(final),
+                    "platform_count": len(state.get("platforms", [])),
+                    "pipeline_mode": pipeline_mode,
+                    "analysis_mode": analysis_mode,
+                },
+            )
+            logger.info(f"Memory: saved task '{keyword}' to Chroma")
+        except Exception as exc:
+            # Memory save 失败唔影响 pipeline 输出（graceful degradation）
+            logger.warning(f"Memory save failed (non-fatal): {exc}")
+
     return result
 
 

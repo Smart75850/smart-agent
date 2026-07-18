@@ -63,6 +63,11 @@ class Settings:
     # LangGraph
     LANGGRAPH_CHECKPOINT_DB: str = "output/langgraph_checkpoint.db"
 
+    # Memory (RAG / 跨任务 recall) — 源：高强文书第 6/13/16 章
+    MEMORY_SAVE_ENABLED: bool = False          # 默认关，避免 silent overhead
+    MEMORY_CHROMA_PATH: str = "output/chroma"  # Chroma 持久化路径
+    MEMORY_EMBED_MODEL: str = "BAAI/bge-small-zh-v1.5"  # sentence-transformers model
+
     # LLM (Doubao) — 相容舊 config
     LLM_API_KEY: str = ""
     LLM_API_URL: str = ""
@@ -110,6 +115,9 @@ class Settings:
             MYSQL_PASSWORD=environ.get("MYSQL_PASSWORD", ""),
             MYSQL_DATABASE=environ.get("MYSQL_DATABASE", "smart_agent"),
             LANGGRAPH_CHECKPOINT_DB=environ.get("LANGGRAPH_CHECKPOINT_DB", "output/langgraph_checkpoint.db"),
+            MEMORY_SAVE_ENABLED=environ.get("MEMORY_SAVE_ENABLED", "false").lower() == "true",
+            MEMORY_CHROMA_PATH=environ.get("MEMORY_CHROMA_PATH", "output/chroma"),
+            MEMORY_EMBED_MODEL=environ.get("MEMORY_EMBED_MODEL", "BAAI/bge-small-zh-v1.5"),
             # SignSrv
             SIGN_SRV_ENABLED=environ.get("SIGN_SRV_ENABLED", "true").lower() == "true",
             SIGN_SRV_PORT=int(environ.get("SIGN_SRV_PORT", "18501")),
