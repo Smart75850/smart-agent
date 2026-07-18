@@ -99,7 +99,20 @@ async def step2_start_browser_and_login():
     print("  📱 如果 browser 要求扫码登录（例如 bilibili / 抖音），请扫描登录。")
     print("     （注意：按 smart-agent CLAUDE.md，HTTP 爬虫已废，全部用 CDP。）")
     print()
-    input("  按 Enter 继续（确认扫码完成）...")
+
+    # Detect stdin（background run 冇 stdin → EOFError）
+    import sys
+    if sys.stdin.isatty():
+        input("  按 Enter 继续（确认扫码完成）...")
+    else:
+        # Non-tty 环境（background / CI / claude code session）
+        # 等 30s 让用户扫码（如果有 GUI）
+        print("  ℹ️  stdin 非 tty（background run）")
+        print("     如果 browser 窗口已弹出 GUI，请喺外面扫码。")
+        print("     等待 30s...")
+        import asyncio as _aio
+        await _aio.sleep(30)
+
     return True
 
 
