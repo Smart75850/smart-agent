@@ -53,7 +53,7 @@ class BaseAgent:
         if json_mode:
             body["response_format"] = {"type": "json_object"}
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
                 f"{self._api_url}/chat/completions",
                 headers={
@@ -114,7 +114,14 @@ class BaseAgent:
                 raise RuntimeError(f"QWEN-VL API 错误: {data}")
             return data["choices"][0]["message"]["content"]
 
-    async def _call_llm_structured(self, prompt, output_model, temperature=0.3, max_tokens=4000):
+    async def _call_llm_structured(self, prompt, output_model, temperature=0.3, max_tokens=6000):
+        """调用 LLM 输出结构化 JSON。
+
+        max_tokens 默认 6000（之前 4000 太少）：
+        - Qwen3.6 thinking mode 喺 detailed prompt 上用 ~2000-3000 tokens
+        - TrendScout prompt（few-shot + 15 items + 多 rules）需要更多 quota
+        - 4000 撞 quota → response empty → JSON parse fail
+        """
         schema = output_model.model_json_schema()
         schema_str = json.dumps(schema, ensure_ascii=False)
         full_prompt = f"{prompt}\n\n---\n输出必须严格符合以下 JSON Schema，只返回纯 JSON 对象：\n```json\n{schema_str}\n```"
@@ -122,7 +129,7 @@ class BaseAgent:
         parsed = self._parse_json(content)
         return output_model.model_validate(parsed)
 
-    async def _call_llm_with_critic(self, prompt, output_model, agent_type, temperature=0.3, max_tokens=4000):
+    async def _call_llm_with_critic(self, prompt, output_model, agent_type, temperature=0.3, max_tokens=6000):
         from src.orchestrator.agents.critic import CriticAgent, CRITIC_CONFIG
         from src.orchestrator.agents.trace_collector import build_dynamic_fewshot, record_trace
         dyn_fs = build_dynamic_fewshot(agent_type, min_score=80)
