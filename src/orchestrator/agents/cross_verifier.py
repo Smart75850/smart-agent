@@ -143,9 +143,10 @@ class CrossVerifier(BaseAgent):
             pct_matches = set(re.findall(r'(\d+(?:\.\d+)?%)', output_str))
             numbers_by_agent[agent_name] = pct_matches
 
-        # 对比 sentiment_reader（正面%）vs trend_scout（viral_score）
-        sent = agent_outputs.get("sentiment_reader", {})
-        trend = agent_outputs.get("trend_scout", {})
+        # 对比 sentiment（正面%）vs trend（viral_score）
+        # 注意：verify() 入面已经 strip "_report" 后缀，所以 keys 系 "sentiment" / "trend"
+        sent = agent_outputs.get("sentiment", {})
+        trend = agent_outputs.get("trend", {})
 
         # 检查：如果 sentiment 负面 > 50% 但 trend 讲「viral」，矛盾
         if sent and trend:
