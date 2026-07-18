@@ -56,8 +56,10 @@ _CATEGORY_VALUES = frozenset([
 class TrendScoutItemOutput(BaseModel):
     index: int = Field(description="内容在输入列表中的索引")
     viral_score: int = Field(ge=0, le=100, description="爆款潜力分：90+蓝海/70-89有需求/50-69红海/<50小众")
-    trend_reason: str = Field(min_length=10, description="爆款原因分析，引用具体数据+爆款机制")
-    category: Literal["科技/AI", "美妝", "美食", "穿搭", "家居", "健身", "教育", "財經", "遊戲", "娛樂", "旅遊", "母嬰", "寵物", "健康/醫療", "其他"] = Field(description="分类枚举")
+    # M1 fix：trend_reason 改 default "" 避免 pydantic 拒绝整个 output
+    # （LLM 偶尔返 items 截断，缺 trend_reason 字段）
+    trend_reason: str = Field(default="", description="爆款原因分析，引用具体数据+爆款机制（可空，graceful）")
+    category: str = Field(default="其他", description="分类枚举（15 类之一，默认其他）")
     growth_velocity: Literal["exploding", "rising", "stable", "declining"] = Field(default="stable", description="增长速度：exploding(互动比>5%+新赛道)/rising(3-5%)/stable(1-3%)/declining(<1%)")
     trend_lifecycle: Literal["early", "peak", "mature", "declining"] = Field(default="peak", description="生命周期：early(新赛道少竞品)/peak(爆发期竞品涌现)/mature(稳定饱和)/declining(互动下滑)")
 
@@ -202,9 +204,10 @@ class TrendScout(BaseAgent):
             logger.info("LLM 未配置，使用純熱度排序")
             return self._fallback(platform, keyword, items)
 
+        # M2 fix：减少 max items from 15 → 5（避免 LLM 截断导致 validation fail）
         items_text = "\n".join(
             f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')} | 作者:{it.get('author','')}"
-            for i, it in enumerate(items[:15])
+            for i, it in enumerate(items[:5])
         )
 
         good_examples_text = "\n".join(
@@ -262,21 +265,27 @@ ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以
         try:
             output = await self._call_llm_with_critic(prompt, TrendScoutOutput, "trend_scout", temperature=0.3)
 
+            # M2 fix：partial items handling（LLM 截断 → 接受 valid 部分，skip invalid）
             trend_items = []
             for ti in output.items:
-                idx = ti.index
-                src = items[idx] if 0 <= idx < len(items) else {}
-                trend_items.append(TrendItem(
-                    title=src.get("title", ""),
-                    platform=platform,
-                    viral_score=ti.viral_score,
-                    trend_reason=ti.trend_reason,
-                    category=ti.category,
-                    growth_velocity=getattr(ti, 'growth_velocity', 'stable'),
-                    trend_lifecycle=getattr(ti, 'trend_lifecycle', 'peak'),
-                    engagement={"plays": src.get("plays", "0"), "likes": src.get("likes", "0")},
-                    raw=src,
-                ))
+                try:
+                    idx = ti.index
+                    src = items[idx] if 0 <= idx < len(items) else {}
+                    trend_items.append(TrendItem(
+                        title=src.get("title", ""),
+                        platform=platform,
+                        viral_score=ti.viral_score,
+                        trend_reason=ti.trend_reason or "（LLM 未生成详细理由）",
+                        category=ti.category if ti.category in _CATEGORY_VALUES else "其他",
+                        growth_velocity=getattr(ti, 'growth_velocity', 'stable'),
+                        trend_lifecycle=getattr(ti, 'trend_lifecycle', 'peak'),
+                        engagement={"plays": src.get("plays", "0"), "likes": src.get("likes", "0")},
+                        raw=src,
+                    ))
+                except Exception as item_exc:
+                    # Skip individual bad item
+                    logger.warning(f"TrendScout skip bad item idx={ti.index}: {item_exc}")
+                    continue
 
             trend_items.sort(key=lambda x: x.viral_score, reverse=True)
             return TrendReport(
