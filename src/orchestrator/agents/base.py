@@ -32,7 +32,18 @@ class BaseAgent:
 
         max_tokens 默认 4096 因为 Qwen3.6 thinking mode 较长（800-2000 tokens），
         低于 2048 会被 thinking 抢光 quota 导致 response 为空。
+
+        按 invariant #14（OUTPUT IN CHINESE 强制中文）：
+        - 自动 inject `OUTPUT IN CHINESE` 到 prompt 头部（如果未存在）
+        - settings.CHINESE_OUTPUT_INVARIANT = False 可关闭
         """
+        from config.settings import settings
+
+        # OUTPUT IN CHINESE invariant（章 4 Camel/BabyAGI 启发）
+        if getattr(settings, "CHINESE_OUTPUT_INVARIANT", True):
+            if "OUTPUT IN CHINESE" not in prompt and "OUTPUT IN ENGLISH" not in prompt:
+                prompt = f"OUTPUT IN CHINESE（简体中文）\n\n{prompt}"
+
         body = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],

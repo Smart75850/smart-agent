@@ -6,6 +6,7 @@
 - embeddings: 本地 sentence-transformers（中文友好，Apple Silicon MPS）
 - store: Chroma 持久化向量库
 - recall: 跨任务 recall API
+- image_embeddings / image_search: CLIP cross-modal（以文搜图）
 
 设计原则（按 smart-agent CLAUDE.md）：
 - Lazy loading：首次调用才加载 model（避免 import 延迟 11s）
@@ -25,8 +26,19 @@ from src.memory.recall import (
     recall_similar_tasks,
     reset_memory,
 )
+from src.memory.image_embeddings import (
+    encode_image,
+    encode_text as encode_text_for_image,
+    get_clip_device,
+)
+from src.memory.image_search import (
+    add_image_to_memory,
+    search_by_text,
+    search_by_image,
+)
 
 __all__ = [
+    # Text memory
     "encode_texts",
     "get_embedding_dim",
     "get_embedding_device",
@@ -35,4 +47,11 @@ __all__ = [
     "save_task_result",
     "recall_similar_tasks",
     "reset_memory",
+    # Image memory (cross-modal)
+    "encode_image",
+    "encode_text_for_image",
+    "get_clip_device",
+    "add_image_to_memory",
+    "search_by_text",
+    "search_by_image",
 ]
