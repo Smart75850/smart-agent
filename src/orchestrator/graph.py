@@ -269,10 +269,13 @@ def compile_graph():
 
     Checkpointer 选择（按 settings.LANGGRAPH_CHECKPOINT_DB）：
       - ":memory:" 或空 → InMemorySaver（默认，重启即丢失）
-      - 其他路径 → SqliteSaver（持久化到 SQLite，进程重启可恢复）
+      - 其他路径 → AsyncSqliteSaver（持久化到 SQLite，进程重启可恢复）
 
     Settings 默认：`output/langgraph_checkpoint.db`（自动启用 SQLite）。
     设置 `LANGGRAPH_CHECKPOINT_DB=:memory:` 切回内存模式。
+
+    注：用 AsyncSqliteSaver 而非 SqliteSaver，因为 pipeline.py 用 ainvoke（async），
+        而 sync SqliteSaver 唔支持 async methods。
     """
     import atexit
     from pathlib import Path
@@ -285,21 +288,24 @@ def compile_graph():
         checkpointer = InMemorySaver()
         logger.info("LangGraph 编译完成 (InMemorySaver)")
     else:
-        # SQLite 持久化模式（SqliteSaver.from_conn_string() 返 context manager，
-        # 需要手动 __enter__() 取 saver 实例）
+        # SQLite 持久化模式
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         try:
-            from langgraph.checkpoint.sqlite import SqliteSaver
-            cm = SqliteSaver.from_conn_string(db_path)
+            # 优先用 AsyncSqliteSaver（支持 async ainvoke）
+            from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+            # AsyncSqliteSaver.from_conn_string() 返 context manager
+            cm = AsyncSqliteSaver.from_conn_string(db_path)
             checkpointer = cm.__enter__()
-            # 进程退出时 cleanup
             atexit.register(lambda: cm.__exit__(None, None, None))
-            logger.info(f"LangGraph 编译完成 (SqliteSaver: {db_path})")
+            logger.info(f"LangGraph 编译完成 (AsyncSqliteSaver: {db_path})")
         except ImportError:
             logger.warning(
-                "langgraph.checkpoint.sqlite 不可用，回退到 InMemorySaver。"
+                "langgraph.checkpoint.sqlite.aio 不可用，回退到 InMemorySaver。"
                 "需要装：pip install langgraph-checkpoint-sqlite"
             )
+            checkpointer = InMemorySaver()
+        except Exception as e:
+            logger.warning(f"AsyncSqliteSaver setup 失败: {e}，回退到 InMemorySaver")
             checkpointer = InMemorySaver()
 
     compiled = builder.compile(checkpointer=checkpointer)
