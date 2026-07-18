@@ -39,3 +39,5 @@ class PipelineState(TypedDict, total=False):
     visual_report: dict           # VisualReport asdict
     clone_report: dict            # CloneReport asdict (VideoCloneAgent)
     video_url: str                # 视频克隆用的 URL
+    # Cross-Agent Verifier 输出 (Phase E — 跨 agent 一致性审核)
+    cross_verification: dict       # {passed, consistency_score, issues, summary, needs_flag}

@@ -57,6 +57,49 @@ async def _search_account_one(state: PipelineState) -> dict:
     return {"search_results": {p: raw}}
 
 
+# ── Cross-Agent Verifier 节点 (Phase E) ─────────────────────
+
+async def _cross_verify_node(state: PipelineState) -> dict:
+    """7 Agent 输出之后嘅跨 agent 一致性审核。
+
+    源：高强文《大模型项目实战》第 12 章 AutoGen verifier 思路。
+    区别于 CriticAgent（per-agent quality gate），CrossVerifier 审核整体一致性。
+    """
+    from src.orchestrator.agents.cross_verifier import cross_verifier
+
+    # 收集 7 agent 嘅 output
+    agent_outputs = {}
+    for report_key in ("trend_report", "product_report", "video_report",
+                       "sentiment_report", "copy_report", "remix_report", "visual_report"):
+        if report_key in state and state[report_key]:
+            agent_outputs[report_key.replace("_report", "")] = state[report_key]
+
+    if not agent_outputs:
+        logger.info("CrossVerify: 无 agent 输出，跳过")
+        return {}
+
+    try:
+        result = await cross_verifier.verify(
+            agent_outputs,
+            original_query=state.get("keyword", ""),
+        )
+        verification = {
+            "passed": result.passed,
+            "consistency_score": result.consistency_score,
+            "issues": result.issues,
+            "summary": result.summary,
+            "needs_flag": result.needs_flag,
+        }
+        logger.info(
+            f"CrossVerify: score={result.consistency_score}, "
+            f"issues={len(result.issues)}, needs_flag={result.needs_flag}"
+        )
+        return {"cross_verification": verification}
+    except Exception as exc:
+        logger.warning(f"CrossVerify 失败，跳过: {exc}")
+        return {}
+
+
 # ── Agent 节点函数 ──────────────────────────────────────────
 
 _AGENT_FACTORY = {
@@ -157,6 +200,8 @@ def build_graph() -> StateGraph:
 
     # 同步点节点
     builder.add_node("_join_level1", _noop)
+    # Phase E: Cross-Agent Verifier
+    builder.add_node("cross_verify", _cross_verify_node)
 
     # ── 边 ──────────────────────────────────────────────────
 
@@ -206,7 +251,8 @@ def build_graph() -> StateGraph:
         path_map=["copy_writer", "content_remixer", "pic_tactic"],
     )
     for node in ("copy_writer", "content_remixer", "pic_tactic"):
-        builder.add_edge(node, "format_output")
+        builder.add_edge(node, "cross_verify")
+    builder.add_edge("cross_verify", "format_output")
 
     # Phase 1: 原有 llm_filter/llm_score 路径
     builder.add_edge("llm_filter", "llm_score")
@@ -219,11 +265,44 @@ def build_graph() -> StateGraph:
 
 
 def compile_graph():
-    """编译 graph，带 InMemorySaver checkpointer。"""
+    """编译 graph，带 checkpointer。
+
+    Checkpointer 选择（按 settings.LANGGRAPH_CHECKPOINT_DB）：
+      - ":memory:" 或空 → InMemorySaver（默认，重启即丢失）
+      - 其他路径 → SqliteSaver（持久化到 SQLite，进程重启可恢复）
+
+    Settings 默认：`output/langgraph_checkpoint.db`（自动启用 SQLite）。
+    设置 `LANGGRAPH_CHECKPOINT_DB=:memory:` 切回内存模式。
+    """
+    import atexit
+    from pathlib import Path
+    from config.settings import settings
+
     builder = build_graph()
-    checkpointer = InMemorySaver()
+    db_path = settings.LANGGRAPH_CHECKPOINT_DB or ":memory:"
+
+    if db_path in (":memory:", ""):
+        checkpointer = InMemorySaver()
+        logger.info("LangGraph 编译完成 (InMemorySaver)")
+    else:
+        # SQLite 持久化模式（SqliteSaver.from_conn_string() 返 context manager，
+        # 需要手动 __enter__() 取 saver 实例）
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        try:
+            from langgraph.checkpoint.sqlite import SqliteSaver
+            cm = SqliteSaver.from_conn_string(db_path)
+            checkpointer = cm.__enter__()
+            # 进程退出时 cleanup
+            atexit.register(lambda: cm.__exit__(None, None, None))
+            logger.info(f"LangGraph 编译完成 (SqliteSaver: {db_path})")
+        except ImportError:
+            logger.warning(
+                "langgraph.checkpoint.sqlite 不可用，回退到 InMemorySaver。"
+                "需要装：pip install langgraph-checkpoint-sqlite"
+            )
+            checkpointer = InMemorySaver()
+
     compiled = builder.compile(checkpointer=checkpointer)
-    logger.info("LangGraph 编译完成")
     return compiled
 
 

@@ -27,8 +27,12 @@ class BaseAgent:
         self._qwen_api_url = settings.QWEN_API_URL or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         self._qwen_model = settings.QWEN_MODEL or "qwen-vl-max"
 
-    async def _call_llm(self, prompt: str, temperature: float = 0.7, json_mode: bool = False, max_tokens: int = 2000) -> str:
-        """调用 DeepSeek LLM，返回原始响应文本。"""
+    async def _call_llm(self, prompt: str, temperature: float = 0.7, json_mode: bool = False, max_tokens: int = 4096) -> str:
+        """调用 DeepSeek LLM，返回原始响应文本。
+
+        max_tokens 默认 4096 因为 Qwen3.6 thinking mode 较长（800-2000 tokens），
+        低于 2048 会被 thinking 抢光 quota 导致 response 为空。
+        """
         body = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
