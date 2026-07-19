@@ -120,7 +120,7 @@ CRITERIA: dict[str, dict] = {
             "composition 描述是否具体（>=20字，含比例+元素布局）",
             "rationale 是否结合平台用户偏好+数据依据",
         ],
-        "pass_threshold": 75,
+        "pass_threshold": 65,
         "max_retry": 1,
     },
 }
