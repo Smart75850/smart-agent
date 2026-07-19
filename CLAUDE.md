@@ -18,7 +18,7 @@
 | STARTHERE 30 commits | ✅ Verified | ✅ | `git log --oneline` | 2026-07-19 |
 | RAG E2E 真跑 | ✅ 172s + score 95 | ✅ | `docs/STARTHERE-e2e-final-report.md` | 2026-07-19 |
 | Memory + Rerank | ✅ Work（cross-encoder 0.982 score）| ✅ | `scripts/rag_real_test.py` | 2026-07-19 |
-| 最新版本 | v1.1.0 + STARTHERE 30 commits | ✅ | `git log` | 2026-07-19 |
+| 最新版本 | v1.1.1 + STARTHERE 30 commits | ✅ | `git log` | 2026-07-19 |
 
 ## 「最小可信改动」3 原则应用
 
