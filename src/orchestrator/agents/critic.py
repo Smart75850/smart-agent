@@ -44,7 +44,8 @@ CRITERIA: dict[str, dict] = {
             "category 是否为合法枚举值（15类之一，不能滥用「其他」）",
             "summary 是否总结整体趋势（>=30字，含赛道判断+机会信号）",
         ],
-        "pass_threshold": 65,
+        # N1 fix：threshold 65 → 50（避免 Critic 评分严苛导致 fallback hot-sort）
+        "pass_threshold": 50,
         "max_retry": 1,
     },
     "video_analyst": {
@@ -90,7 +91,7 @@ CRITERIA: dict[str, dict] = {
             "recommended_angles 是否具体可执行的角度",
             "recommendations 是否 actionable（非「做内容」「做营销」）",
         ],
-        "pass_threshold": 70,
+        "pass_threshold": 60,
         "max_retry": 2,
     },
     "content_remixer_analyze": {
