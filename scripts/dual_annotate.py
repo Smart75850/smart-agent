@@ -84,10 +84,13 @@ def annotator_A_strict(query: str, stored_keywords: List[str]) -> Set[str]:
 
 
 def annotator_B_loose(query: str, stored_keywords: List[str]) -> Set[str]:
-    """Annotator B（宽松）：标任何 bidirectional substring match。
+    """Annotator B（宽松）：bidirectional substring match。
 
     Rule: query in stored_keyword OR stored_keyword in query
     宽松层（Layer 2 安全防线）→ 减少 false negative。
+
+    改进尝试：word-level fuzzy match（v3 反而恶化 intersection 覆盖率）
+    → 保持 v2 双向 substring 系最稳定 simple rule
     """
     q_lower = query.lower()
     relevant = set()

@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "description": "Q1+Q2: AI 模拟双盲 annotator v2 (8 机制协奏应用)",
+    "annotators": "AI 模拟（annotator A 严格 + annotator B 宽松）",
+    "agreement_method": "intersection (A∩B) + conservative adjudication",
+    "cohens_kappa": 0.629,
+    "stored_keywords_real": [
+      "AI Agent",
+      "AI Agent 2026",
+      "AI 工具实战",
+      "Python 教程",
+      "美妆视频"
+    ],
+    "8 机制协奏应用": "Ch3 Skills (description 三问) + Ch5 Hooks (PreToolUse quality gate + audit log) + Ch7 Headless (background 跑双盲) + Ch8 SDK 风格 (async + 4 道安全防线)",
+    "limitations": [
+      "AI 模拟 annotator ≠ 真正人类 annotator（按 CLAUDE.md Explicit Uncertainty 原则）",
+      "真正 human annotation 需要 domain expert + 多人验证",
+      "当前 ground truth 适合 internal consistency 验证，唔系 production RAG quality measure"
+    ]
+  },
+  "ground_truth": {
+    "AI Agent": [
+      "AI Agent"
+    ],
+    "AI 工具": [],
+    "AI Agent 框架": [],
+    "美妆": [],
+    "美妆教程": [],
+    "化妆视频": [],
+    "Python": [],
+    "编程教学": [],
+    "AI 创业": [],
+    "Agent 自动化": [],
+    "Python 编程": [],
+    "短视频运营": []
+  }
+}

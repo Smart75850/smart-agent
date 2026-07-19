@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.smart-agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/apple/workspace/smart-agent/start-with-qwen36.sh</string>
+        <string>main.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/apple/workspace/smart-agent</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/apple/workspace/smart-agent/logs/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/apple/workspace/smart-agent/logs/launchd.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/apple/workspace/smart-agent/.venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/apple</string>
+        <!-- Override .env (sandbox-protected) -->
+        <key>DEEPSEEK_API_KEY</key>
+        <string>dummy</string>
+        <key>DEEPSEEK_API_URL</key>
+        <string>http://127.0.0.1:11435/v1</string>
+        <key>DEEPSEEK_MODEL</key>
+        <string>qwen3.6</string>
+        <key>LLM_API_KEY</key>
+        <string>dummy</string>
+        <key>LLM_API_URL</key>
+        <string>http://127.0.0.1:11435/v1</string>
+        <key>LLM_MODEL</key>
+        <string>qwen3.6</string>
+        <key>QWEN_API_KEY</key>
+        <string>dummy</string>
+        <key>QWEN_API_URL</key>
+        <string>http://127.0.0.1:11435/v1</string>
+        <key>QWEN_MODEL</key>
+        <string>qwen3.6</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>Nice</key>
+    <integer>5</integer>
+</dict>
+</plist>
