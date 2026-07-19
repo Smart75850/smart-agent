@@ -19,7 +19,7 @@
 | Bug 修复 | 30+ 项 (STARTHERE 系列) | ✅ | git log | 2026-07-19 |
 | RAG Memory + Rerank | ✅ Work (BGE + cross-encoder) | ✅ | docs/STARTHERE-rag-implementation-report.md | 2026-07-19 |
 | E2E Real Pipeline | ✅ 172s 完成 + 10 entries + cross_verify 95 分 | ✅ | docs/STARTHERE-e2e-final-report.md | 2026-07-19 |
-| 最新版本 | v1.1.0 + STARTHERE 30 commits | ✅ | git log | 2026-07-19 |
+| 最新版本 | v1.1.1 + STARTHERE 30 commits + Qwen3.6 fix (2026-07-19) | ✅ | git log | 2026-07-19 |
 
 ### 新增：STARTHERE 16 章精华覆盖（2026-07-19）
 

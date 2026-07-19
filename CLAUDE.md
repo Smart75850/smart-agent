@@ -122,7 +122,11 @@ bash scripts/audit.sh
 | **HUMAN_ANNOTATION_GUIDE.md** | 真正 human annotation 流程 | 仍需 domain expert + 多人 |
 | **Sequential 7 agent 真跑** | 避免 MLX runner concurrent 撞 quota | sequential 比 parallel 慢 |
 
-**真正 fix 需 update .env**（CLAUDE.md 限制，唔擅改）：
+**真正 fix 1: update .env**（2026-07-19 09:00+ 已做）：
+
+（model alias 真正存在：qwen3.6:35b / qwen3.6:35b-mlx）
+
+
 ```bash
 # ~/workspace/smart-agent/.env 改为：
 LLM_API_URL=http://127.0.0.1:11435/v1   # Qwen proxy
