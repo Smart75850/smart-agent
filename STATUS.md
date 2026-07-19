@@ -9,15 +9,31 @@
 
 | Metric | Value | Verified | Source | Date |
 |---|---|---|---|---|
-| 全量测试 | 71/71 = 100% | ✅ | `pytest tests/` log | 2026-06-12 |
-| Smoke test | 5/5 PASS (0.02 秒) | ✅ | `pytest tests/test_smoke.py` | 2026-07-03 |
+| 全量测试 | 116/117 = 99.1% (1 known env fail deselect) | ✅ | `pytest tests/` | 2026-07-19 |
+| Smoke test | 5/5 PASS (0.02 秒) | ✅ | `pytest tests/test_smoke.py` | 2026-07-19 |
 | 平台数 | 7 | ✅ | `constant/platform.py` | 2026-06-12 |
 | Crawl 类型 | 6 | ✅ | `constant/platform.py` | 2026-06-12 |
 | HTTP 直连 (✅) | 3 平台 | ✅ | STATUS.md 实测表 | 2026-06-12 |
 | HTTP 直连 (⚠️ 需 CDP) | 4 平台 | ✅ | STATUS.md 实测表 | 2026-06-12 |
 | 真实场景实测 | 3/3 项 OK | ✅ | STATUS.md 真实用户场景表 | 2026-06-12 |
-| Bug 修复 | 4 项 | ✅ | STATUS.md Bug 修复段 | 2026-06-12 |
-| 最新版本 | v1.1.0 | ✅ | CHANGELOG.md | 2026-06-10 |
+| Bug 修复 | 30+ 项 (STARTHERE 系列) | ✅ | git log | 2026-07-19 |
+| RAG Memory + Rerank | ✅ Work (BGE + cross-encoder) | ✅ | docs/STARTHERE-rag-implementation-report.md | 2026-07-19 |
+| E2E Real Pipeline | ✅ 172s 完成 + 10 entries + cross_verify 95 分 | ✅ | docs/STARTHERE-e2e-final-report.md | 2026-07-19 |
+| 最新版本 | v1.1.0 + STARTHERE 30 commits | ✅ | git log | 2026-07-19 |
+
+### 新增：STARTHERE 16 章精华覆盖（2026-07-19）
+
+- ✅ CrossVerifier（per-agent quality gate + sentiment_reader fix）
+- ✅ AsyncSqliteSaver 真持久化（ThreadPoolExecutor 独立 thread 解决）
+- ✅ Memory + Recall + Rerank（Chroma + BGE + cross-encoder）
+- ✅ Skills 抽象 + AWEL 3 层（Operator + DSL + Workflow）
+- ✅ MetaReviewer（3 层 review 嘅最深层）
+- ✅ SeqSqliteSaver fix
+- ✅ OUTPUT IN CHINESE 统一
+- ✅ TrendScout pydantic graceful handling
+- ✅ Critic threshold 合理化（50-65）
+- ✅ RAG dual-annotate + Cohen's kappa（Substantial agreement 0.629）
+- ✅ 全部 push 到 GitHub main branch（30 commits 累计）
 
 ## 🔴 紅線（所有 AI Agent 必須遵守，違反即係大鑊）
 
