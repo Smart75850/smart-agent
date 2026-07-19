@@ -102,28 +102,45 @@ async def run_pipelines_and_save():
     return len(new_runs)
 
 
+def _is_relevant(retrieved_kw: str, expected_keywords: List[str]) -> bool:
+    """O2 fix: 双向 substring match 取代 exact match。
+
+    原因：stored keyword "AI Agent 2026" 同 query "AI Agent" 严格 match fail
+    → recall 偏低。双向 substring：expected in retrieved OR retrieved in expected。
+    例："AI Agent" in "AI Agent 2026" → True（query substring of expected）
+        "AI 工具" in "AI 工具实战" → True
+        "美妆视频" in "美妆" → False but "美妆" in "美妆视频" → True（reverse）
+    """
+    r_lower = retrieved_kw.lower()
+    for exp in expected_keywords:
+        e_lower = exp.lower()
+        if e_lower in r_lower or r_lower in e_lower:
+            return True
+    return False
+
+
 def precision_at_k(retrieved: List[Dict], expected: List[str], k: int) -> float:
-    """Precision@K = relevant_in_top_K / K"""
+    """Precision@K = relevant_in_top_K / K（substring match）"""
     if k == 0:
         return 0.0
-    top_k_kws = [r["metadata"].get("keyword", "") for r in retrieved[:k]]
-    relevant = sum(1 for kw in top_k_kws if kw in expected)
+    top_k = retrieved[:k]
+    relevant = sum(1 for r in top_k if _is_relevant(r["metadata"].get("keyword", ""), expected))
     return relevant / k
 
 
 def recall_at_k(retrieved: List[Dict], expected: List[str], k: int) -> float:
-    """Recall@K = relevant_in_top_K / total_relevant"""
+    """Recall@K = relevant_in_top_K / total_relevant（substring match）"""
     if not expected:
         return 0.0
-    top_k_kws = [r["metadata"].get("keyword", "") for r in retrieved[:k]]
-    relevant = sum(1 for kw in top_k_kws if kw in expected)
+    top_k = retrieved[:k]
+    relevant = sum(1 for r in top_k if _is_relevant(r["metadata"].get("keyword", ""), expected))
     return min(relevant / len(expected), 1.0)
 
 
 def mrr(retrieved: List[Dict], expected: List[str]) -> float:
-    """MRR = 1 / rank_of_first_relevant (0 if not found)"""
+    """MRR = 1 / rank_of_first_relevant（substring match，0 if not found）"""
     for i, r in enumerate(retrieved, 1):
-        if r["metadata"].get("keyword", "") in expected:
+        if _is_relevant(r["metadata"].get("keyword", ""), expected):
             return 1.0 / i
     return 0.0
 
