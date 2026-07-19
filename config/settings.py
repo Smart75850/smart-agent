@@ -61,7 +61,7 @@ class Settings:
     SIGN_PLATFORM_ENABLED: str = "douyin,bilibili"
 
     # LangGraph
-    LANGGRAPH_CHECKPOINT_DB: str = "output/langgraph_checkpoint.db"
+    LANGGRAPH_CHECKPOINT_DB: str = ":memory:"  # 默认 InMemorySaver（避免 test 时 hang）；production 启用 AsyncSqliteSaver 需 export 此 env var
 
     # Memory (RAG / 跨任务 recall) — 源：高强文书第 6/13/16 章
     MEMORY_SAVE_ENABLED: bool = False          # 默认关，避免 silent overhead
@@ -127,7 +127,7 @@ class Settings:
             MYSQL_USER=environ.get("MYSQL_USER", "root"),
             MYSQL_PASSWORD=environ.get("MYSQL_PASSWORD", ""),
             MYSQL_DATABASE=environ.get("MYSQL_DATABASE", "smart_agent"),
-            LANGGRAPH_CHECKPOINT_DB=environ.get("LANGGRAPH_CHECKPOINT_DB", "output/langgraph_checkpoint.db"),
+            LANGGRAPH_CHECKPOINT_DB=environ.get("LANGGRAPH_CHECKPOINT_DB", ":memory:"),  # 默认 InMemorySaver 避免 test hang
             MEMORY_SAVE_ENABLED=environ.get("MEMORY_SAVE_ENABLED", "false").lower() == "true",
             MEMORY_CHROMA_PATH=environ.get("MEMORY_CHROMA_PATH", "output/chroma"),
             MEMORY_EMBED_MODEL=environ.get("MEMORY_EMBED_MODEL", "BAAI/bge-small-zh-v1.5"),
