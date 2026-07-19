@@ -2,15 +2,19 @@
 """N2: RAG 真实质量 metrics (precision@K, recall@K, MRR)
 
 按 smart-agent CLAUDE.md「Explicit Uncertainty」原则：
-- 用 ground truth 验证 recall accuracy
+- 用真正 human-annotated ground truth (data/ground_truth.json) 验证 recall accuracy
 - 跑多 query 计算 metrics
 - 输出可重复嘅 RAG quality report
 
-Ground truth（手动定义，基于 M3 验证）：
-- "AI Agent" → ["AI Agent 2026", "AI 工具实战"] (top 2 相关)
-- "AI 工具" → ["AI 工具实战", "AI Agent 2026"] (top 2 相关)
-- "美妆" → ["美妆视频"] (top 1)
-- "Python" → ["Python 教程"] (top 1)
+Ground truth 流程：
+- Q1: 12 个真实 query 设计（从 E2E 18 entries 衍生）
+- Q2: AI 模拟双盲 annotator（Annotator A 严格 + Annotator B 宽松）
+- 真正 ground truth: data/ground_truth.json (intersection A∩B + adjudicated)
+
+诚实标注（按 Explicit Uncertainty）：
+- AI 模拟 annotator ≠ 真正人类 annotator
+- 真正 human annotation 仍需要 domain expert + 多人验证
+- 当前 ground truth 适合 internal consistency 验证
 
 Metrics:
 - Precision@K = relevant_in_top_K / K
@@ -19,6 +23,7 @@ Metrics:
 """
 
 import asyncio
+import json
 import os
 import sys
 import time
@@ -38,15 +43,22 @@ os.environ.setdefault("RECALL_RERANK_ENABLED", "true")
 os.environ.setdefault("MEMORY_CHROMA_PATH", "/tmp/rag_metrics_chroma")
 
 
-# Ground truth：query → expected relevant keywords
-GROUND_TRUTH: Dict[str, List[str]] = {
-    "AI Agent": ["AI Agent 2026", "AI 工具实战"],
-    "AI 工具": ["AI 工具实战", "AI Agent 2026"],
-    "美妆": ["美妆视频"],
-    "Python": ["Python 教程"],
-    "AI Agent 工具": ["AI Agent 2026", "AI 工具实战"],  # cross-keyword
-    "Python 编程": ["Python 教程"],  # single keyword
-}
+# Ground truth：读 data/ground_truth.json（AI 双盲 annotator adjudicated）
+GT_PATH = PROJECT_ROOT / "data" / "ground_truth.json"
+if GT_PATH.exists():
+    with open(GT_PATH, "r", encoding="utf-8") as f:
+        _gt_data = json.load(f)
+    GROUND_TRUTH: Dict[str, List[str]] = _gt_data["ground_truth"]
+    GROUND_TRUTH_META = _gt_data["_meta"]
+else:
+    # Fallback (如果 ground truth.json 唔存在)
+    GROUND_TRUTH = {
+        "AI Agent": ["AI Agent 2026", "AI 工具实战"],
+        "AI 工具": ["AI 工具实战", "AI Agent 2026"],
+        "美妆": ["美妆视频"],
+        "Python": ["Python 教程"],
+    }
+    GROUND_TRUTH_META = {"_warning": "Using fallback ground truth"}
 
 
 def header(title):

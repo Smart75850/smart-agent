@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "description": "Q1: 12 个 query + seed ground truth (待 AI 模拟 annotator 验证 + adjudicate)",
+    "source": "从 Smart Agent Pro E2E 18 entries stored memory 衍生",
+    "annotators_required": "真正 human annotators (2-3 个) + Cohen's kappa > 0.6",
+    "current_status": "seed (AI-simulated 验证中)",
+    "stored_keywords": [
+      "AI Agent (5 entries)",
+      "AI 工具实战 (1)",
+      "AI Agent 2026 (1)",
+      "美妆视频 (1)",
+      "Python 教程 (1)",
+      "video_clone:douyin:test_video (6, test entry)",
+      "e2e_real_pipeline_test (2, test entry)",
+      "e2e_real_pipeline_test_strict (1, test entry)"
+    ]
+  },
+  "ground_truth_seed": {
+    "AI Agent": ["AI Agent", "AI 工具实战", "AI Agent 2026"],
+    "AI 工具": ["AI 工具实战", "AI Agent"],
+    "AI Agent 框架": ["AI Agent", "AI 工具实战", "AI Agent 2026"],
+    "美妆": ["美妆视频"],
+    "美妆教程": ["美妆视频"],
+    "化妆视频": ["美妆视频"],
+    "Python": ["Python 教程"],
+    "编程教学": ["Python 教程"],
+    "AI 创业": ["AI Agent", "AI 工具实战", "AI Agent 2026"],
+    "Agent 自动化": ["AI Agent", "AI 工具实战", "AI Agent 2026"],
+    "Python 编程": ["Python 教程"],
+    "短视频运营": ["美妆视频"]
+  }
+}
