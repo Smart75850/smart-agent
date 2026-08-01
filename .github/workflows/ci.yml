@@ -75,10 +75,21 @@ jobs:
           python -m py_compile config/settings.py
           echo "Syntax OK"
 
-      # 全量测试 —— 71/71 必须受 CI 保护，否则任何提交都可能引入回归而 CI 照绿
+      # 基础测试 —— 82/82 必须受 CI 保护，否则任何提交都可能引入回归而 CI 照绿
+      # 排除需额外重依赖(chromadb/torch/sentence-transformers/open_clip) 或真实 LLM key 的
+      # memory/rerank/image-search/e2e 测试（本地配置好环境后手动跑）。
       - name: Run tests
         run: |
-          python -m pytest tests/ -q
+          python -m pytest tests/ -q \
+            --ignore=tests/test_memory.py \
+            --ignore=tests/test_rerank.py \
+            --ignore=tests/test_image_search.py \
+            --ignore=tests/test_memgpt_layers.py \
+            --ignore=tests/test_e2e_integration.py \
+            --ignore=tests/test_e2e_real_pipeline.py \
+            --ignore=tests/test_pipeline_7_agent_real.py \
+            --ignore=tests/test_awel_operators.py \
+            --ignore=tests/test_video_cloner_memory.py
 
       - name: CLI help
         run: |
