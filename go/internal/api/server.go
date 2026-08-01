@@ -59,12 +59,12 @@ func NewServer(cfg *config.Settings) *Server {
 }
 
 func (s *Server) Handler() http.Handler {
-	return corsMiddleware(s.mux)
+	return authMiddleware(corsMiddleware(s.mux))
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	addr := ":" + s.cfg.APIPort
-	log.Printf("[api] 服务启动: http://localhost%s", addr)
+	addr := s.cfg.APIHost + ":" + s.cfg.APIPort
+	log.Printf("[api] 服务启动: http://%s", addr)
 
 	srv := &http.Server{
 		Addr:    addr,
@@ -79,11 +79,46 @@ func (s *Server) Start(ctx context.Context) error {
 	return srv.ListenAndServe()
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+// authMiddleware — Bearer Token 鉴权，与 Python API 对齐。
+// 未设置 API_TOKEN 时（本机模式）全部放行。
+func authMiddleware(next http.Handler) http.Handler {
+	token := os.Getenv("API_TOKEN")
+	if token == "" {
+		return next
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		path := r.URL.Path
+		if path == "/" || path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") == "Bearer "+token {
+			next.ServeHTTP(w, r)
+			return
+		}
+		writeJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": "unauthorized", "message": "缺少或无效的 API Token",
+		})
+	})
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	// 收敛为明确 origins，避免 * + credentials 组合及任意站点跨源读取
+	allowedOrigins := []string{
+		"http://localhost:8000", "http://127.0.0.1:8000",
+		"http://localhost:8001", "http://127.0.0.1:8001",
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			for _, o := range allowedOrigins {
+				if origin == o {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			}
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -133,6 +168,8 @@ func (s *Server) handleWebUI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePlatforms(w http.ResponseWriter, r *http.Request) {
+	// 注意：Go 版独立编译，无法 import Python 的 constant/platform_registry.py，
+	// 平台列表如有增删，需同步更新主项目注册表与本处。
 	platforms := []map[string]any{
 		{"id": "bilibili", "name": "B站", "hot_type": "rank", "hot_label": "排行榜", "need_login": false, "types": []string{"search", "rank", "detail", "comment", "user"}},
 		{"id": "xiaohongshu", "name": "小紅書", "hot_type": "feed", "hot_label": "推薦熱門", "need_login": true, "types": []string{"search", "hot", "detail", "comment", "user"}},
@@ -146,5 +183,6 @@ func (s *Server) handlePlatforms(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"message": "WebSocket not available in Go server, use Python server for real-time logs"})
+	// 明确 501：Go 版不提供 WebSocket，实时日志请用 Python API（8000）
+	writeError(w, http.StatusNotImplemented, "WebSocket not available in Go server, use Python server (port 8000) for real-time logs")
 }

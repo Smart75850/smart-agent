@@ -6,13 +6,24 @@ services:
     container_name: smart-agent
     ports:
       - "8000:8000"
+    # 透传 .env（含 LLM 密钥 / API_TOKEN / LICENSE_SECRET），否则容器内拿不到密钥
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BROWSER_ENGINE=playwright
+      # 容器内必须绑 0.0.0.0，端口映射先访问得到（本机直接跑仍默认 127.0.0.1）
+      - API_HOST=0.0.0.0
     volumes:
       - ./output:/app/output
       - ./downloads:/app/downloads
       - ./logs:/app/logs
       - ./browser_data:/app/browser_data
       - ./config:/app/config
-    environment:
-      - PYTHONUNBUFFERED=1
-      - BROWSER_ENGINE=playwright
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     restart: unless-stopped

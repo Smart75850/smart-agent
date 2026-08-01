@@ -3,6 +3,7 @@ import json
 from typing import Optional
 
 from base.platform_base import PlatformAdapter
+from src.agents.base_adapter import JsonAdapterMixin
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
@@ -309,8 +310,12 @@ async def douyin_comment(video_id: str, count: int = 50) -> str:
                     break
                 cursor = page_num * 20
                 try:
+                    # video_id/cursor 用 JSON.stringify 生成 JS 字符串字面量防注入，
+                    # 再 encodeURIComponent 编码进 URL
                     more = await page.evaluate(f"""async () => {{
-                        const resp = await fetch("https://www.douyin.com/aweme/v1/web/comment/list/?device_platform=webapp&aid=6383&channel=channel_pc_web&aweme_id={video_id}&cursor={cursor}&count=20");
+                        const vid = {json.dumps(str(video_id))};
+                        const cur = {json.dumps(str(cursor))};
+                        const resp = await fetch("https://www.douyin.com/aweme/v1/web/comment/list/?device_platform=webapp&aid=6383&channel=channel_pc_web&aweme_id=" + encodeURIComponent(vid) + "&cursor=" + encodeURIComponent(cur) + "&count=20");
                         const data = await resp.json();
                         return (data.comments || []).map(c => ({{
                             user: (c.user || {{}}).nickname || '',
@@ -403,7 +408,7 @@ async def douyin_user_videos(user_id: str) -> str:
         return json.dumps([], ensure_ascii=False)
 
 
-class DouyinAdapter(PlatformAdapter):
+class DouyinAdapter(JsonAdapterMixin, PlatformAdapter):
     _SEARCH_URL = "https://www.douyin.com/search/{keyword}"
     _CARD_SELECTOR = "[class*='search-item'], [class*='video-card'], ul>li"
 
@@ -419,9 +424,9 @@ class DouyinAdapter(PlatformAdapter):
                      sort_type: int = 0, publish_time: int = 0,
                      search_channel: str = "") -> list[dict]:
         try:
-            data = json.loads(await douyin_search(keyword, count=limit or 40))
-            if data and len(data) > 0:
-                return data[:limit] if limit else data
+            data = self._unwrap(await douyin_search(keyword, count=limit or 40), limit)
+            if data:
+                return data
         except Exception as e:
             logger.warning(f"[Douyin] API search failed: {e}, trying adaptive fallback")
         return await self._adaptive_search(keyword, limit)
@@ -443,16 +448,13 @@ class DouyinAdapter(PlatformAdapter):
             return []
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await douyin_hot())
-        return data[:limit] if limit else data
+        return self._unwrap(await douyin_hot(), limit)
 
     async def detail(self, item_id: str, **kwargs) -> dict:
-        return json.loads(await douyin_detail(item_id))
+        return self._unwrap_dict(await douyin_detail(item_id))
 
     async def comment(self, item_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await douyin_comment(item_id, count=limit or 50))
-        return data[:limit] if limit else data
+        return self._unwrap(await douyin_comment(item_id, count=limit or 50), limit)
 
     async def user(self, user_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await douyin_user_videos(user_id))
-        return data[:limit] if limit else data
+        return self._unwrap(await douyin_user_videos(user_id), limit)

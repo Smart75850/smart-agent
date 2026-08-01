@@ -29,6 +29,8 @@ __version__ = "0.1.0"
 #  统一搜索接口
 # ============================================================
 
+# 注意：本文件属于独立发布包（smart-crawler），必须自包含，不能 import 主项目 constant/platform_registry。
+# 平台列表如有增删，需同步更新主项目 constant/platform_registry.py 与本处。
 PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
 
 async def search(platform: str, keyword: str, limit: int = 20, **kwargs):

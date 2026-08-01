@@ -1,7 +1,16 @@
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
+
+# 标识符净化：只允许字母/数字/下划线，防 SQL 标识符注入（表名/列名来自爬取数据的键）
+_IDENT_RE = re.compile(r"[^A-Za-z0-9_]")
+
+
+def _safe_ident(s: str) -> str:
+    cleaned = _IDENT_RE.sub("_", str(s))[:64] or "_"
+    return cleaned
 
 
 class SQLiteStore:
@@ -15,9 +24,9 @@ class SQLiteStore:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path))
         try:
-            table = platform.replace("-", "_").replace(".", "_")
+            table = _safe_ident(platform)
             if data:
-                cols = list(data[0].keys())
+                cols = list(dict.fromkeys(_safe_ident(c) for c in data[0].keys()))
                 col_defs = ", ".join(f'"{c}" TEXT' for c in cols)
                 conn.execute(f'CREATE TABLE IF NOT EXISTS "{table}" ({col_defs})')
                 col_names = ", ".join(f'"{c}"' for c in cols)

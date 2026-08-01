@@ -9,6 +9,7 @@ localhost:18920 HTTP 服务，接收 Chrome Extension POST 的 cookies，
 """
 
 import json
+import os
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -18,6 +19,15 @@ from src.utils.logger import logger
 PORT = 18920
 HOST = "127.0.0.1"
 OUTPUT_DIR = Path("browser_data")
+
+# 允许写入的平台白名单，防止路径穿越写任意文件
+_ALLOWED_PLATFORMS = {
+    "bilibili", "xiaohongshu", "douyin", "zhihu",
+    "kuaishou", "weibo", "tieba",
+}
+
+# 可选：配置 COOKIE_BRIDGE_TOKEN 后，Extension 同步需带相同 token
+_COOKIE_BRIDGE_TOKEN = os.environ.get("COOKIE_BRIDGE_TOKEN", "")
 
 # sameSite 映射：Chrome API 底线格式 → Playwright 大写格式
 _SAMESITE_MAP = {
@@ -82,6 +92,13 @@ class _CookieHandler(BaseHTTPRequestHandler):
             return
 
         try:
+            # 鉴权：配置了 token 时必须匹配
+            if _COOKIE_BRIDGE_TOKEN:
+                token = self.headers.get("X-API-Token", "")
+                if token != _COOKIE_BRIDGE_TOKEN:
+                    self._respond_json(401, {"ok": False, "error": "invalid token"})
+                    return
+
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             data = json.loads(body)
@@ -91,6 +108,11 @@ class _CookieHandler(BaseHTTPRequestHandler):
 
             if not platform:
                 self._respond_json(400, {"ok": False, "error": "缺少 platform"})
+                return
+
+            # 平台白名单校验，防路径穿越写任意文件
+            if platform not in _ALLOWED_PLATFORMS:
+                self._respond_json(400, {"ok": False, "error": f"唔支援嘅平台: {platform}"})
                 return
 
             cookies = _filter_valid_cookies(raw_cookies)

@@ -5,6 +5,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from api.auth import check_ws_token
+
 router = APIRouter()
 
 
@@ -21,13 +23,12 @@ class LogBroadcaster:
         self._clients.discard(ws)
 
     async def broadcast(self, data: dict):
-        dead = set()
-        for ws in self._clients:
+        # 先快照再遍历，避免 await 期间被其他协程 disconnect 修改集合导致 RuntimeError
+        for ws in list(self._clients):
             try:
                 await ws.send_json(data)
             except Exception:
-                dead.add(ws)
-        self._clients -= dead
+                self._clients.discard(ws)
 
     @property
     def connected_count(self) -> int:
@@ -59,6 +60,9 @@ class WebSocketLogHandler(logging.Handler):
                 self._main_loop = loop
             except RuntimeError:
                 return
+        # 事件循环已关闭时直接丢弃，避免投递永不执行的 coroutine 触发资源泄漏告警
+        if loop.is_closed():
+            return
         try:
             data = {
                 "time": datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
@@ -81,6 +85,10 @@ logging.getLogger().addHandler(_log_handler)
 
 @router.websocket("/api/ws")
 async def log_websocket(ws: WebSocket):
+    # 鉴权：配置了 API_TOKEN 时必须带 ?token=xxx，否则拒绝连接
+    if not check_ws_token(ws.query_params.get("token")):
+        await ws.close(code=4401)
+        return
     await ws.accept()
     _log_handler.capture_loop()
     broadcaster.add(ws)

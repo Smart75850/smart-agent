@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from base.platform_base import PlatformAdapter
+from src.agents.base_adapter import JsonAdapterMixin
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
@@ -214,7 +215,7 @@ async def weibo_user(user_id: str) -> str:
         return json.dumps([], ensure_ascii=False)
 
 
-class WeiboAdapter(PlatformAdapter):
+class WeiboAdapter(JsonAdapterMixin, PlatformAdapter):
     @property
     def name(self) -> str:
         return "weibo"
@@ -226,20 +227,16 @@ class WeiboAdapter(PlatformAdapter):
     async def search(self, keyword: str, limit: Optional[int] = None,
                      sort_type: int = 0, publish_time: int = 0,
                      search_channel: str = "") -> list[dict]:
-        data = json.loads(await weibo_search(keyword, count=limit or 40))
-        return data[:limit] if limit else data
+        return self._unwrap(await weibo_search(keyword, count=limit or 40), limit)
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await weibo_hot())
-        return data[:limit] if limit else data
+        return self._unwrap(await weibo_hot(), limit)
 
     async def detail(self, item_id: str, **kwargs) -> dict:
-        return json.loads(await weibo_detail(item_id))
+        return self._unwrap_dict(await weibo_detail(item_id))
 
     async def comment(self, item_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await weibo_comment(item_id))
-        return data[:limit] if limit else data
+        return self._unwrap(await weibo_comment(item_id), limit)
 
     async def user(self, user_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await weibo_user(user_id))
-        return data[:limit] if limit else data
+        return self._unwrap(await weibo_user(user_id), limit)

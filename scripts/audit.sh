@@ -22,10 +22,15 @@ echo ""
 # 1. 测试健康
 echo "📋 测试健康（Smoke Test）："
 if [ -f "tests/test_smoke.py" ]; then
-    if source .venv/bin/activate 2>/dev/null && python -m pytest tests/test_smoke.py -q 2>/dev/null; then
+    # 自动定位 venv 里的 Python（Windows: venv/Scripts，Mac/Linux: venv/bin）
+    PY=""
+    if [ -x "./venv/Scripts/python.exe" ]; then PY="./venv/Scripts/python.exe"
+    elif [ -x "./venv/bin/python" ]; then PY="./venv/bin/python"
+    else PY="python"; fi
+    if $PY -m pytest tests/test_smoke.py -q 2>/dev/null; then
         echo "  ✅ tests/test_smoke.py PASS"
     else
-        echo "  ⚠️  tests/test_smoke.py 跑失败或 .venv 未激活"
+        echo "  ⚠️  tests/test_smoke.py 跑失败（venv 未找到或测试报错）"
     fi
 else
     echo "  ❌ tests/test_smoke.py 不存在"

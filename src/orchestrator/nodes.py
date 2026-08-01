@@ -26,7 +26,8 @@ _ADAPTER_MAP = {
     "tieba":        ("src.agents.tieba_adapter",        "TiebaAdapter"),
 }
 
-_DEFAULT_PLATFORMS = list(_ADAPTER_MAP.keys())
+# 默认平台来源：平台注册表（单一权威），保持与 _ADAPTER_MAP 一致
+from constant.platform_registry import PLATFORM_ID_LIST as _DEFAULT_PLATFORMS
 
 # 🔵 修复: 复用 adapter instance，避免每次新建
 _adapter_cache: dict[str, Any] = {}

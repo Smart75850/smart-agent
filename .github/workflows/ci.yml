@@ -25,6 +25,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest
 
       - name: Install Playwright browsers
         run: |
@@ -73,6 +74,11 @@ jobs:
           python -m py_compile api/main.py
           python -m py_compile config/settings.py
           echo "Syntax OK"
+
+      # 全量测试 —— 71/71 必须受 CI 保护，否则任何提交都可能引入回归而 CI 照绿
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -q
 
       - name: CLI help
         run: |

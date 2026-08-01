@@ -213,4 +213,3 @@ class BaseAgent:
         )
 
         return json.loads(text)
-

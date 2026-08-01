@@ -4,6 +4,7 @@ import re
 from typing import Optional
 
 from base.platform_base import PlatformAdapter
+from src.agents.base_adapter import JsonAdapterMixin
 from src.utils.browser_service import browser
 from src.utils.logger import logger
 
@@ -606,7 +607,7 @@ async def xiaohongshu_user(user_id: str) -> str:
         return json.dumps([], ensure_ascii=False)
 
 
-class XiaohongshuAdapter(PlatformAdapter):
+class XiaohongshuAdapter(JsonAdapterMixin, PlatformAdapter):
     _SEARCH_URL = "https://www.xiaohongshu.com/search_result?keyword={keyword}"
     _CARD_SELECTOR = ".note-item, .feeds-page .note-item, [class*='note-item'], section.note-item"
 
@@ -622,9 +623,9 @@ class XiaohongshuAdapter(PlatformAdapter):
                      sort_type: int = 0, publish_time: int = 0,
                      search_channel: str = "") -> list[dict]:
         try:
-            data = json.loads(await xiaohongshu_search(keyword, count=limit or 40))
-            if data and len(data) > 0:
-                return data[:limit] if limit else data
+            data = self._unwrap(await xiaohongshu_search(keyword, count=limit or 40), limit)
+            if data:
+                return data
         except Exception as e:
             logger.warning(f"[Xiaohongshu] API search failed: {e}, trying adaptive fallback")
         return await self._adaptive_search(keyword, limit)
@@ -646,16 +647,13 @@ class XiaohongshuAdapter(PlatformAdapter):
             return []
 
     async def hot(self, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await xiaohongshu_hot())
-        return data[:limit] if limit else data
+        return self._unwrap(await xiaohongshu_hot(), limit)
 
     async def detail(self, item_id: str, xsec_token: str = "", **kwargs) -> dict:
-        return json.loads(await xiaohongshu_note_detail(item_id, xsec_token=xsec_token))
+        return self._unwrap_dict(await xiaohongshu_note_detail(item_id, xsec_token=xsec_token))
 
     async def comment(self, item_id: str, limit: Optional[int] = None, xsec_token: str = "", **kwargs) -> list[dict]:
-        data = json.loads(await xiaohongshu_comment(item_id, count=limit or 50, xsec_token=xsec_token))
-        return data[:limit] if limit else data
+        return self._unwrap(await xiaohongshu_comment(item_id, count=limit or 50, xsec_token=xsec_token), limit)
 
     async def user(self, user_id: str, limit: Optional[int] = None) -> list[dict]:
-        data = json.loads(await xiaohongshu_user(user_id))
-        return data[:limit] if limit else data
+        return self._unwrap(await xiaohongshu_user(user_id), limit)

@@ -1,6 +1,6 @@
 [project]
 name = "smart-agent"
-version = "0.3.0"
+version = "1.1.0"
 description = "Smart Agent Pro — AI-powered multi-platform content analysis with LangGraph + DeepSeek"
 requires-python = ">=3.11"
 authors = [{name = "Smart75850"}]
@@ -15,13 +15,21 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Internet :: WWW/HTTP",
 ]
+# 依赖与 requirements.txt 保持一致（requirements.txt 为精确安装清单）
 dependencies = [
-    "fastmcp>=0.5.0",
-    "playwright>=1.50.0",
-    "fastapi>=0.115.0",
-    "uvicorn>=0.34.0",
-    "openpyxl>=3.1.0",
-    "mysql-connector-python>=9.0.0",
+    "fastmcp>=0.5,<1.0",
+    "playwright>=1.50,<2.0",
+    "playwright-stealth>=0.0.3,<1.0",
+    "httpx>=0.27,<1.0",
+    "curl_cffi>=0.6,<1.0",
+    "camoufox>=0.1,<1.0",
+    "fastapi>=0.115,<1.0",
+    "uvicorn>=0.34,<1.0",
+    "pydantic>=2,<3.0",
+    "openpyxl>=3.1,<4.0",
+    "mysql-connector-python>=9.0,<10.0",
+    "langgraph>=0.4,<1.0",
+    "langchain-core>=0.3,<1.0",
 ]
 
 [project.urls]
@@ -34,9 +42,6 @@ pythonpath = ["."]
 
 [project.optional-dependencies]
 pro = [
-    "camoufox>=0.4.0",
-    "langgraph>=0.4.0",
     "openai>=1.60.0",
     "html2text>=2024.0.0",
-    "pydantic>=2.0.0",
 ]

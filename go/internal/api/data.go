@@ -5,12 +5,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 )
+
+// 平台名必须为合法标识符，防止路径穿越（../、%2F、反斜杠等一律拒绝）
+var platformNameRe = regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
 
 func (s *Server) handleDataPlatform(w http.ResponseWriter, r *http.Request) {
 	platform := r.PathValue("platform")
-	if platform == "" {
-		writeError(w, http.StatusBadRequest, "platform required")
+	if !platformNameRe.MatchString(platform) {
+		writeJSON(w, http.StatusOK, map[string]any{"platform": platform, "items": []any{}, "message": "no data"})
 		return
 	}
 

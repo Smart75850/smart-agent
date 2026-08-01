@@ -27,6 +27,9 @@ browser_data/
 .DS_Store
 Thumbs.db
 
+# 编译产物（Windows 二进制塞进 Linux 镜像无意义）
+*.exe
+
 # CI/CD
 .github/
 

@@ -8,14 +8,28 @@
 """
 import hashlib
 import hmac
+import os
 import sys
 from base64 import urlsafe_b64encode
+from pathlib import Path
 
-# 这个值必须跟 src/utils/usage_tracker.py 里的 _SIGNING_SECRET 完全一致
-_SIGNING_SECRET = "sm-agent-pro-2026-hmac-secret-v1-d7f3a8b2c1e4"
+# 自动加载项目根目录 .env（与 config/settings.py 保持一致）
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
+
+# 必须跟 src/utils/usage_tracker.py 的 _SIGNING_SECRET 一致 —— 只从环境变量读取
+_SIGNING_SECRET = os.environ.get("LICENSE_SECRET", "")
 
 
 def generate_license_key(username: str) -> str:
+    if not _SIGNING_SECRET:
+        print("错误：未设置 LICENSE_SECRET 环境变量，无法生成 license key。", file=sys.stderr)
+        print("请先在项目 .env 中配置 LICENSE_SECRET（可用如下命令生成随机密钥）：", file=sys.stderr)
+        print("  python -c \"import secrets; print(secrets.token_hex(32))\"", file=sys.stderr)
+        sys.exit(1)
     sig = hmac.new(
         _SIGNING_SECRET.encode("utf-8"),
         username.encode("utf-8"),

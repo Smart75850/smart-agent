@@ -1,7 +1,7 @@
 # Smart Agent — 多平台 AI 内容分析引擎
 
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()  
-[![License](https://img.shields.io/badge/License-MIT-green)]()  
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)]()
+[![License](https://img.shields.io/badge/License-MIT-green)]()
 [![Platform](https://img.shields.io/badge/Platform-7平台-orange)]()
 
 > ⚠️ 本项目仅供学习与学术研究使用，严禁用于商业用途。[详细免责声明](DISCLAIMER.md)
@@ -79,7 +79,7 @@ python main.py --platform douyin --keyword "AI工具"
 | **ContentRemixer** | 内容改写与破圈检测 | 跨平台信号、改写建议 |
 | **PicTactic** | 智能配图策略 | 封面/社交/趋势三类配图方案 |
 
-> 每个 Agent 内置 CriticAgent 自修正 — review-retry loop，输出质量把关。  
+> 每个 Agent 内置 CriticAgent 自修正 — review-retry loop，输出质量把关。
 > 无 API Key 时自动降级为模板模式，零成本可用。
 
 ### 编排与交付
@@ -151,7 +151,7 @@ src/
 ├── utils/           # 浏览器 / 反爬 / 日志 / Cookie / Session 管理
 └── store/           # 6 种存储后端
 
-go/                  # Go 高性能版本（6.7MB 二进制）
+go/                  # Go 高性能版本（9.4MB 二进制，端口 8001）
 api/                 # WebUI 仪表板
 ```
 

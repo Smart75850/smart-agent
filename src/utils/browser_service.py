@@ -310,6 +310,10 @@ class BrowserService:
         await self._cleanup()
 
     async def _cleanup(self):
+        # 先取消 watchdog，否则关闭后 15 秒会被自动重启（等于没关）
+        wd = getattr(self, "_watchdog_task", None)
+        if wd is not None and not wd.done():
+            wd.cancel()
         # persistent_context 时 _browser 同 _context 系同一个对象，只能 close 一次
         is_persistent = self._browser is self._context and self._browser is not None
         try:

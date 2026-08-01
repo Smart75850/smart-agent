@@ -11,7 +11,8 @@ router = APIRouter()
 
 _tasks: dict[str, dict] = {}
 
-_DEFAULT_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
+# 默认平台来源：平台注册表（单一权威）
+from constant.platform_registry import PLATFORM_ID_LIST as _DEFAULT_PLATFORMS
 
 
 class PipelineRequest(BaseModel):
@@ -30,8 +31,8 @@ class PipelineRequest(BaseModel):
 async def start_pipeline(req: PipelineRequest):
     task_id = str(uuid.uuid4())
     _tasks[task_id] = {"status": "running", "result": None, "error": None}
-    # 直接 await 而非 create_task，避免事件循环冲突导致 HTTP 搜索失败
-    await _run_pipeline_task(task_id, req)
+    # 立即返回 task_id，后台跑完整分析；持有 task 引用防止被 GC（与 crawl 端点一致）
+    _tasks[task_id]["task"] = asyncio.create_task(_run_pipeline_task(task_id, req))
     return {"task_id": task_id}
 
 

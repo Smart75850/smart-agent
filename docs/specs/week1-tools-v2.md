@@ -1,8 +1,8 @@
 # Smart Agent v2 - Week 1 Implementation Spec
 
-> Executor: Claude Code CLI  
-> Brain LLM: DeepSeek V4 Pro  
-> Protocol: Anthropic MCP Standard  
+> Executor: Claude Code CLI
+> Brain LLM: DeepSeek V4 Pro
+> Protocol: Anthropic MCP Standard
 
 ## Scope
 
@@ -93,6 +93,6 @@ If actual imports differ, adapt accordingly.
 
 ## Instructions
 
-Read this spec. Implement files 1-5. 
+Read this spec. Implement files 1-5.
 Inspect base/ imports before writing handlers.
 Run pytest. Fix failures. Report back.

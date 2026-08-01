@@ -12,14 +12,19 @@ from base64 import urlsafe_b64encode, urlsafe_b64decode
 from pathlib import Path
 from datetime import datetime
 
+# 自动加载项目根目录 .env（保证 LICENSE_SECRET / USAGE_FILE 可读，不依赖 import 顺序）
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+except ImportError:
+    pass
+
 USAGE_FILE = os.environ.get("USAGE_FILE", "/app/config/usage.json")
 
-# HMAC 签名密钥 —— 只有持有此密钥才能生成有效 license key
+# HMAC 签名密钥 —— 只从环境变量 LICENSE_SECRET 读取，禁止硬编码默认值
 # 换密钥后所有旧 key 失效，生成新 key 用 generate_license_key()
-_SIGNING_SECRET = os.environ.get(
-    "LICENSE_SECRET",
-    "sm-agent-pro-2026-hmac-secret-v1-d7f3a8b2c1e4"
-)
+# 未设置 LICENSE_SECRET 时，license key 生成/验证全部禁用（已激活的 Pro 不受影响）
+_SIGNING_SECRET = os.environ.get("LICENSE_SECRET", "")
 
 DEFAULT_CONFIG = {
     "license": "trial",
@@ -139,6 +144,11 @@ def generate_license_key(username: str) -> str:
         generate_license_key("zhangsan")
         # → 'emhhbmdzYW46SGVsbG8gV29ybGQ='
     """
+    if not _SIGNING_SECRET:
+        raise RuntimeError(
+            "未设置 LICENSE_SECRET 环境变量，无法生成 license key。"
+            "请先在 .env 中配置 LICENSE_SECRET。"
+        )
     sig = _sign_hmac(username)
     payload = f"{username}:{sig}"
     return urlsafe_b64encode(payload.encode("utf-8")).rstrip(b"=").decode("ascii")
@@ -150,6 +160,9 @@ def verify_license_key(key: str) -> tuple[bool, str]:
     Returns:
         (valid: bool, username: str) — 无效时 username 为空字符串。
     """
+    if not _SIGNING_SECRET:
+        # 未配置签名密钥 → 拒绝一切激活，防止使用公开仓库里的默认密钥伪造
+        return False, ""
     if not key or ":" not in key:
         return False, ""
 

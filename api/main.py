@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import webbrowser
 from pathlib import Path
@@ -14,13 +15,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from config.settings import settings
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: auto-open browser + start session guardian
     async def _open():
         await asyncio.sleep(1.5)
-        webbrowser.open("http://localhost:8000")
+        if settings.AUTO_OPEN_BROWSER:
+            webbrowser.open("http://localhost:8000")
     asyncio.create_task(_open())
 
     # 启动会话守护（15分钟自动巡检+收割）
@@ -30,12 +34,18 @@ async def lifespan(app: FastAPI):
     # Shutdown: nothing to clean up yet
 
 
-app = FastAPI(title="Smart Agent API", version="0.1.0", docs_url="/docs", lifespan=lifespan)
+app = FastAPI(title="Smart Agent API", version="1.1.0", docs_url="/docs", lifespan=lifespan)
+
+# CORS 收敛为明确 origins（默认仅本机 WebUI），关闭 credentials 防跨源窃取
+_CORS_ORIGINS = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:8000,http://127.0.0.1:8000",
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[o.strip() for o in _CORS_ORIGINS if o.strip()],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -48,9 +58,12 @@ from api.routers.pipeline import router as pipeline_router
 from api.routers.usage import router as usage_router
 from api.routers.clone import router as clone_router
 from api.middleware import UsageMiddleware
+from api.auth import AuthMiddleware
 
 # 使用额度中间件（试用版限 50 次）
 app.add_middleware(UsageMiddleware)
+# 鉴权中间件（最后 add = 最外层，先执行）
+app.add_middleware(AuthMiddleware)
 
 app.include_router(platforms_router)
 app.include_router(crawl_router)
@@ -59,6 +72,12 @@ app.include_router(ws_router)
 app.include_router(pipeline_router)
 app.include_router(usage_router)
 app.include_router(clone_router)
+
+# ── 健康检查（Docker healthcheck 用）───────────────────────
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 
 # ── Session 守护 ─────────────────────────────────────────────
 from src.utils.session_manager import get_health_status, start_session_guardian, harvest_all
@@ -127,4 +146,6 @@ async def serve_webui():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=False)
+    # 默认只绑本机 127.0.0.1；如需局域网/公网访问，设 API_TOKEN 后再用 API_HOST=0.0.0.0 显式开放
+    host = os.environ.get("API_HOST", "127.0.0.1")
+    uvicorn.run("api.main:app", host=host, port=8000, reload=False)

@@ -2,12 +2,10 @@
 # 用法: .\deploy-docker.ps1              # 构建 + 启动
 #       .\deploy-docker.ps1 --BuildOnly  # 仅构建
 #       .\deploy-docker.ps1 --Rebuild    # 强制重建（--no-cache）
-#       .\deploy-docker.ps1 --WithMySQL  # 构建 + 启动 + MySQL
 
 param(
     [switch]$BuildOnly,
-    [switch]$Rebuild,
-    [switch]$WithMySQL
+    [switch]$Rebuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,7 +68,7 @@ if ($Rebuild) {
     $buildArgs += "--no-cache"
     Write-Host "  (强制重建 --no-cache)" -ForegroundColor Yellow
 }
-$buildArgs += "app"
+$buildArgs += "smart-agent"
 
 $buildStart = Get-Date
 docker @buildArgs
@@ -100,9 +98,6 @@ docker compose down 2>$null
 Write-Host "  已清理旧容器" -ForegroundColor Gray
 
 $upArgs = @("compose", "up", "-d")
-if ($WithMySQL) {
-    $upArgs += "--profile", "mysql"
-}
 
 docker @upArgs
 if ($LASTEXITCODE -ne 0) {
@@ -128,17 +123,11 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  WebUI:  http://localhost:8000" -ForegroundColor Cyan
 Write-Host "  API:    http://localhost:8000/api/config" -ForegroundColor Cyan
-if ($WithMySQL) {
-    Write-Host "  MySQL:  localhost:3307 (容器内 3306)" -ForegroundColor Gray
-}
 Write-Host ""
 Write-Host "  常用命令：" -ForegroundColor White
-Write-Host "    查看日志:  docker compose logs -f app" -ForegroundColor Gray
+Write-Host "    查看日志:  docker compose logs -f smart-agent" -ForegroundColor Gray
 Write-Host "    停止服务:  docker compose down" -ForegroundColor Gray
-Write-Host "    重启服务:  docker compose restart app" -ForegroundColor Gray
-if ($WithMySQL) {
-    Write-Host "    进 MySQL:  docker compose exec mysql mysql -u root -p" -ForegroundColor Gray
-}
+Write-Host "    重启服务:  docker compose restart smart-agent" -ForegroundColor Gray
 Write-Host ""
 
 pause

@@ -474,7 +474,13 @@ class VideoCloneAgent(BaseAgent):
                 resolved_url,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            try:
+                _, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                # 超时必须 kill 进程，否则 yt-dlp 仍持有文件句柄在后台写文件
+                proc.kill()
+                await proc.wait()
+                raise TimeoutError("yt-dlp 下载超时 (120s)")
             if proc.returncode == 0 and os.path.getsize(filepath) > 10000:
                 logger.info(f"yt-dlp 下载成功: {os.path.getsize(filepath)} bytes")
                 dur = await self._get_duration(filepath)

@@ -162,7 +162,13 @@ class StealthFetcher:
         :param proxy: 代理 URL
         :param extra_headers: 額外 headers
         """
-        from scrapling.fetchers import StealthyFetcher as ScraplingStealthy
+        try:
+            from scrapling.fetchers import StealthyFetcher as ScraplingStealthy
+        except ImportError:
+            # scrapling 未安装 → 明确降级，避免 raw ImportError
+            logger.error("[StealthFetcher] scrapling 未安装，无法使用 stealth 浏览器模式。"
+                         "请 pip install scrapling 或用 mode='light'")
+            return cls._error_dict(url, "scrapling 未安装，stealth 模式不可用")
 
         _timeout = timeout or cls.default_timeout
         _headless = headless if headless is not None else cls.headless
@@ -174,11 +180,13 @@ class StealthFetcher:
             if cdp_url.startswith("http://"):
                 import urllib.request, json
                 try:
-                    cdp_info = json.loads(urllib.request.urlopen(
-                        f"{cdp_url}/json/version").read())
+                    # 带超时并正确关闭响应，避免 CDP 端口无响应时永久挂起
+                    with urllib.request.urlopen(f"{cdp_url}/json/version", timeout=3) as r:
+                        cdp_info = json.loads(r.read())
                     cdp_url = cdp_info["webSocketDebuggerUrl"]
-                except Exception:
-                    pass  # 保持原 URL，可能本身就係 ws://
+                except Exception as e:
+                    logger.warning(f"[StealthFetcher] CDP 版本探测失败: {e}")
+                    return cls._error_dict(url, f"CDP 连接失败: {e}")
 
         kwargs: dict = {
             "headless": _headless, "timeout": _timeout,

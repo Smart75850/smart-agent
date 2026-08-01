@@ -162,8 +162,11 @@ class LightFetcher:
                 raw = resp.text if hasattr(resp, 'text') else resp.content.decode('utf-8', errors='replace')
                 text = cls._extract_text(raw, content_type)
 
+                # 4xx/5xx 错误页不算成功，交由上层决定升级或报错
+                ok = 200 <= status_code < 400
+
                 return {
-                    "ok": True,
+                    "ok": ok,
                     "url": str(resp.url),
                     "content": text,
                     "raw": raw,

@@ -30,9 +30,9 @@ try {
 
 # ── 2. 创建虚拟环境 ─────────────────────────────────
 Write-Host "[2/6] 虚拟环境 ..." -ForegroundColor Yellow
-$venvPath = Join-Path $projectRoot ".venv"
+$venvPath = Join-Path $projectRoot "venv"
 if (-not (Test-Path $venvPath)) {
-    python -m venv .venv
+    python -m venv venv
     Write-Host "  虚拟环境已创建" -ForegroundColor Green
 } else {
     Write-Host "  虚拟环境已存在，跳过" -ForegroundColor Green

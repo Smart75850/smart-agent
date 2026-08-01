@@ -47,6 +47,9 @@ class Settings:
     DOWNLOAD_MAX_CONCURRENT: int = 3
     DOWNLOAD_MAX_FILE_MB: int = 500
 
+    # 抓取器
+    HTTP3_ENABLED: bool = False      # LightFetcher 是否启用 HTTP/3
+
     # ── SignSrv 签名服务 ──
     SIGN_SRV_ENABLED: bool = True
     SIGN_SRV_PORT: int = 18501
@@ -106,6 +109,11 @@ class Settings:
     MYSQL_PASSWORD: str = ""
     MYSQL_DATABASE: str = "smart_agent"
 
+    # ── 安全 ──
+    API_TOKEN: str = ""              # API 鉴权 Bearer Token；留空 = 本机模式（仅绑 127.0.0.1）
+    LICENSE_SECRET: str = ""         # Pro license 签名密钥；必须设置才能生成/验证 license key
+    AUTO_OPEN_BROWSER: bool = True   # 启动时是否自动打开 WebUI 浏览器
+
     @classmethod
     def from_env(cls) -> "Settings":
         """從環境變數讀取設定，override 預設值。"""
@@ -122,6 +130,7 @@ class Settings:
             DOWNLOAD_DIR=environ.get("DOWNLOAD_DIR", "downloads"),
             DOWNLOAD_MAX_CONCURRENT=int(environ.get("DOWNLOAD_MAX_CONCURRENT", "3")),
             DOWNLOAD_MAX_FILE_MB=int(environ.get("DOWNLOAD_MAX_FILE_MB", "500")),
+            HTTP3_ENABLED=environ.get("HTTP3_ENABLED", "false").lower() == "true",
             MYSQL_HOST=environ.get("MYSQL_HOST", "localhost"),
             MYSQL_PORT=int(environ.get("MYSQL_PORT", "3306")),
             MYSQL_USER=environ.get("MYSQL_USER", "root"),
@@ -153,6 +162,9 @@ class Settings:
             QWEN_API_URL=environ.get("QWEN_API_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
             QWEN_MODEL=environ.get("QWEN_MODEL", "qwen-vl-max"),
             CANVA_API_KEY=environ.get("CANVA_API_KEY", ""),
+            API_TOKEN=environ.get("API_TOKEN", ""),
+            LICENSE_SECRET=environ.get("LICENSE_SECRET", ""),
+            AUTO_OPEN_BROWSER=environ.get("AUTO_OPEN_BROWSER", "true").lower() == "true",
             CAMOUFOX_HEADLESS=environ.get("CAMOUFOX_HEADLESS", "false").lower() == "true",
             CAMOUFOX_HUMANIZE=environ.get("CAMOUFOX_HUMANIZE", "true").lower() != "false",
             CAMOUFOX_BLOCK_WEBRTC=environ.get("CAMOUFOX_BLOCK_WEBRTC", "true").lower() != "false",

@@ -39,8 +39,8 @@ _ADAPTERS = {
     "tieba": TiebaAdapter(),
 }
 
-# all 模式：跑晒所有平台指定 type
-_ALL_PLATFORMS = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
+# all 模式：跑晒所有平台指定 type（来源：平台注册表，单一权威）
+from constant.platform_registry import PLATFORM_ID_LIST as _ALL_PLATFORMS
 _ALL_SEARCH  = _ALL_PLATFORMS
 _ALL_HOT     = _ALL_PLATFORMS
 _ALL_DETAIL  = _ALL_PLATFORMS
@@ -54,7 +54,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--platform", default="bilibili",
-        choices=["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba", "all"],
+        choices=[*_ALL_PLATFORMS, "all"],
         help="目標平台（預設 bilibili）",
     )
     parser.add_argument(
@@ -253,7 +253,7 @@ async def main():
 
     # ── list-platforms ────────────────────────────────────
     if args.list_platforms:
-        platforms = ["bilibili", "xiaohongshu", "douyin", "zhihu", "kuaishou", "weibo", "tieba"]
+        platforms = list(_ALL_PLATFORMS)
         print("支援平台:")
         for p in platforms:
             print(f"  {p}")

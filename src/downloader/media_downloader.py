@@ -485,16 +485,12 @@ class MediaDownloader:
 
             except Exception as e:
                 if attempt < 2:
+                    logger.warning(f"下载重试 {attempt + 1}/3: {url[:80]} — {e}")
                     await asyncio.sleep(2 ** attempt)
                     continue
                 result.status = "failed"
                 result.error = str(e)[:100]
+                logger.warning(f"下载失败: {url[:80]} — {e}")
                 return result
-                logger.info(f"下载完成: {fp.name} ({result.size_bytes} bytes)")
-
-            except Exception as exc:
-                result.status = "failed"
-                result.error = str(exc)
-                logger.warning(f"下载失败: {url[:80]} — {exc}")
 
         return result

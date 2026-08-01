@@ -1,6 +1,15 @@
 """MySQL 储存后端 — 自动建表 + 类型推断 + 去重。"""
 import json
+import re
 from datetime import datetime, timezone
+
+# 标识符净化：只允许字母/数字/下划线，防 SQL 标识符注入（表名/列名来自爬取数据的键）
+_IDENT_RE = re.compile(r"[^A-Za-z0-9_]")
+
+
+def _safe_ident(s: str) -> str:
+    cleaned = _IDENT_RE.sub("_", str(s))[:64] or "_"
+    return cleaned
 
 
 def _infer_mysql_type(key: str, sample_value) -> str:
@@ -45,9 +54,9 @@ class MySQLStore:
             database=self._database,
         )
         try:
-            table = platform.replace("-", "_").replace(".", "_")
+            table = _safe_ident(platform)
 
-            cols = list(data[0].keys())
+            cols = list(dict.fromkeys(_safe_ident(c) for c in data[0].keys()))
             col_defs = [f"`id` BIGINT AUTO_INCREMENT PRIMARY KEY"]
             col_defs.append("`_created_at` DATETIME NOT NULL")
             for c in cols:
