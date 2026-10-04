@@ -94,6 +94,13 @@ async def crawl_search(req: CrawlRequest):
     adapter = _get_adapter(req.platform)
     if adapter is None:
         return {"items": [], "error": f"unknown platform: {req.platform}"}
+    # 搜索前确保浏览器已连接（CDP 断开时自动重连，防「浏览器未启动」/搜索 0 条）
+    try:
+        if not browser.is_connected():
+            logger.warning("[sidecar] 搜索前浏览器未连接，自动重启浏览器服务...")
+            await browser.restart()
+    except Exception as exc:
+        logger.warning(f"[sidecar] 浏览器自检失败: {exc}")
     try:
         raw = await _retry(lambda: adapter.search(req.keyword, limit=req.limit))
         items = [_normalize(it, req.platform) for it in (raw if isinstance(raw, list) else [])]

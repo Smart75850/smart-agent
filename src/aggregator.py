@@ -46,6 +46,12 @@ def _normalize(item: dict, platform: str) -> dict:
         if target not in out:
             out[target] = ""
 
+    # 保留平台详情访问必需字段（小红书 note_id + xsec_token，缺佢抓唔到全文）
+    for keep in ("note_id", "xsec_token"):
+        v = item.get(keep)
+        if v:
+            out[keep] = str(v)
+
     # 中文数字转整数 (plays/likes/comments/duration 字段)
     for num_field in ("plays", "likes", "comments"):
         raw = out.get(num_field, "")
