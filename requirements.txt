@@ -11,4 +11,6 @@ openpyxl>=3.1,<4.0
 mysql-connector-python>=9.0,<10.0
 langgraph>=0.4,<1.0
 langchain-core>=0.3,<1.0
-scrapling>=0.1.0
+# 锁到 <0.5：官方称 0.5 是 major update（可能破坏性变更），不自动跳
+# 0.4.15 起 MCP server 有破坏性变更，但本项目未接入 Scrapling 的 MCP，不受影响
+scrapling>=0.4.15,<0.5
