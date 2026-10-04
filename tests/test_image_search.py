@@ -39,6 +39,11 @@ def temp_image_store():
 
 def test_image_embeddings_clip():
     """Test 1: CLIP encode image + text（同一空间）。"""
+    # 与 temp_image_store fixture 保持一致的守卫：本测试不接收 fixture，
+    # 若不自行检查，换机器时会抛出难懂的 FileNotFoundError
+    if not os.path.exists(SAMPLE_IMG):
+        pytest.skip(f"样本图片不存在: {SAMPLE_IMG}")
+
     from src.memory.image_embeddings import encode_image, encode_text, get_clip_device
 
     img_emb = encode_image(SAMPLE_IMG)

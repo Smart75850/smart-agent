@@ -62,7 +62,13 @@ class BaseAgent:
                 },
                 json=body,
             )
+            # 与 _call_qwen_vl 对齐的错误处理：不加这两行的话，
+            # 任何后端异常（502 / 模型不存在）都会伪装成 KeyError: 'choices'，
+            # 极难定位（2026-10-05 排查耗时最久的一环）
+            resp.raise_for_status()
             data = resp.json()
+            if "choices" not in data:
+                raise RuntimeError(f"LLM API 错误: {data}")
             return data["choices"][0]["message"]["content"]
 
     async def _call_qwen_vl(

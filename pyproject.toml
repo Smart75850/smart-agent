@@ -39,6 +39,10 @@ Issues = "https://github.com/Smart75850/smart-agent/issues"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# auto 模式：自动接管未打 @pytest.mark.asyncio 的 async 测试
+# 背景：tests/test_pipeline_7_agent_real.py 的 7 个 async 用例未打 marker，
+#       strict 模式下会落到 pytest 核心兜底钩子直接 fail（2026-10-05 修复）
+asyncio_mode = "auto"
 
 [project.optional-dependencies]
 pro = [

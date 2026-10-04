@@ -10,7 +10,12 @@ build/
 venv/
 .venv/
 env/
+
+# Secrets — 覆盖所有 .env 变体（.env.backup-* 等），但保留模板
+# ⚠️ 原来的 ".env" 只精确匹配该文件名，覆盖不到 .env.backup-YYYYMMDD
 .env
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -45,6 +50,12 @@ Thumbs.db
 
 # Test output
 phase1_test_results.json
+
+# Runtime output
+json/
+
+# Local-only（文档声明仅本地保留）
+knowledge-star/
 
 # Temp diagnostic scripts
 diag_*.py
