@@ -153,16 +153,16 @@ class CopyWriter(BaseAgent):
         products: list,
         video_breakdowns: list,
     ) -> CopyReport:
-        context_parts = [f"核心關鍵詞: {keyword or '爆款內容'}"]
+        context_parts = [f"核心关键词: {keyword or '爆款内容'}"]
         if trend_items:
             titles = [it.get("title", it.title if hasattr(it, 'title') else "")[:40] for it in trend_items[:5]]
-            context_parts.append(f"爆款趨勢: {', '.join(titles)}")
+            context_parts.append(f"爆款趋势: {', '.join(titles)}")
         if products:
             names = [p.get("name", p.name if hasattr(p, 'name') else "")[:30] for p in products[:5]]
-            context_parts.append(f"選品: {', '.join(names)}")
+            context_parts.append(f"选品: {', '.join(names)}")
         if video_breakdowns:
             hooks = [v.get("hook_type", v.hook_type if hasattr(v, 'hook_type') else "")[:20] for v in video_breakdowns[:3]]
-            context_parts.append(f"爆款鉤子: {', '.join(hooks)}")
+            context_parts.append(f"爆款钩子: {', '.join(hooks)}")
 
         good_examples_text = "\n".join(
             f"  ✅ [{ex['variant']}] {ex.get('target_platform','')} | {ex.get('topic','')}\n     钩子: {ex['hook']}\n     文案: {ex['output'][:100]}\n     传播机制: {ex['why_it_works']}"
@@ -181,7 +181,7 @@ class CopyWriter(BaseAgent):
 1. headline: 20字内纯标题 | short: 50-80字 | medium: 80-150字 | long: 150-300字
 2. 每个变体必须明确 target_platform，必须不同（禁止所有变体同一平台），不可用"通用"
 3. 平台特征必须体现：
-   抖音=快节奏口語+强情绪+数字+悬念驱动
+   抖音=快节奏口语+强情绪+数字+悬念驱动
    小红书=精致真实+emoji丰富+种草感+收藏驱动
    B站=深度+幽默+圈层共鸣+完播驱动
    知乎=理性分析+方法论+亲身经历+赞同驱动
@@ -238,7 +238,7 @@ class CopyWriter(BaseAgent):
                 summary=output.summary,
             )
         except Exception as exc:
-            logger.warning(f"CopyWriter LLM 失敗: {exc}")
+            logger.warning(f"CopyWriter LLM 失败: {exc}")
             return self._fallback(keyword, trend_items, products, video_breakdowns)
 
     def _fallback(
@@ -265,7 +265,7 @@ class CopyWriter(BaseAgent):
             hook_hint = "、".join(hooks) if hooks else ""
 
         topic = product_hint or trend_hint or keyword or "爆款内容"
-        hook_ref = f"（爆款鉤子: {hook_hint}）" if hook_hint else ""
+        hook_ref = f"（爆款钩子: {hook_hint}）" if hook_hint else ""
 
         variants = [
             CopyVariant(

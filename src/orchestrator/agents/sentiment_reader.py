@@ -147,54 +147,54 @@ class SentimentReader(BaseAgent):
                     continue
             return result
         except Exception as exc:
-            logger.debug(f"SentimentReader 評論拉取跳過: {exc}")
+            logger.debug(f"SentimentReader 评论拉取跳过: {exc}")
             return {}
 
     # ── Few-Shot 示例庫（6 好 + 2 壞）──────────────────────
     _FEWSHOT_GOOD = [
-        {"comment_count": "多（>50條）", "sentiment": "mixed",
+        {"comment_count": "多（>50条）", "sentiment": "mixed",
          "positive_pct": 45, "neutral_pct": 25, "negative_pct": 30,
-         "confidence": "high", "monetization_signals": "評論區8人問購買渠道，3人已下單並曬單，2人抱怨發貨慢",
-         "insights": "正面集中於產品性價比（'這個價位很值''比XX品牌便宜一半'），負面集中於發貨速度（'等了10天'），核心矛盾在供應鏈而非產品力",
-         "reaction": "購買意願強烈但物流體驗影響復購口碑"},
-        {"comment_count": "多（>50條）", "sentiment": "positive",
+         "confidence": "high", "monetization_signals": "评论区8人问购买渠道，3人已下单并晒单，2人抱怨发货慢",
+         "insights": "正面集中于产品性价比（'这个价位很值''比XX品牌便宜一半'），负面集中于发货速度（'等了10天'），核心矛盾在供应链而非产品力",
+         "reaction": "购买意愿强烈但物流体验影响复购口碑"},
+        {"comment_count": "多（>50条）", "sentiment": "positive",
          "positive_pct": 78, "neutral_pct": 15, "negative_pct": 7,
-         "confidence": "high", "monetization_signals": "評論區5人表示'已買''好用'，多人@朋友來看，2人問鏈接",
-         "insights": "壓倒性好評集中在'效果明顯''性價比高'，tag朋友行為說明社交傳播力強；7%負評為個別品控問題",
-         "reaction": "壓倒性好評+自發社交傳播，適合加大投放"},
-        {"comment_count": "少（<10條）", "sentiment": "positive",
+         "confidence": "high", "monetization_signals": "评论区5人表示'已买''好用'，多人@朋友来看，2人问链接",
+         "insights": "压倒性好评集中在'效果明显''性价比高'，tag朋友行为说明社交传播力强；7%负评为个别品控问题",
+         "reaction": "压倒性好评+自发社交传播，适合加大投放"},
+        {"comment_count": "少（<10条）", "sentiment": "positive",
          "positive_pct": 80, "neutral_pct": 20, "negative_pct": 0,
-         "confidence": "low", "monetization_signals": "評論量太少（僅5條），無法判斷真實購買意願",
-         "insights": "雖正面比例高但樣本極少（僅5條評論），統計無意義；播放高但評論低說明內容可能缺乏討論點或互動引導不足",
-         "reaction": "受眾被動消費無參與感，需在內容中加入討論引導"},
-        {"comment_count": "多（>50條）", "sentiment": "negative",
+         "confidence": "low", "monetization_signals": "评论量太少（仅5条），无法判断真实购买意愿",
+         "insights": "虽正面比例高但样本极少（仅5条评论），统计无意义；播放高但评论低说明内容可能缺乏讨论点或互动引导不足",
+         "reaction": "受众被动消费无参与感，需在内容中加入讨论引导"},
+        {"comment_count": "多（>50条）", "sentiment": "negative",
          "positive_pct": 12, "neutral_pct": 18, "negative_pct": 70,
-         "confidence": "high", "monetization_signals": "無人表達購買意願，多人勸退，5人表示'後悔買了'",
-         "insights": "負評集中在產品質量差+售後無回應，內容引發負面口碑傳播；對品牌方是危機信號，對競品是切入機會",
-         "reaction": "負評風暴，品牌需危機公關；競品可藉機推出對比內容"},
-        {"comment_count": "零評論", "sentiment": "unknown",
+         "confidence": "high", "monetization_signals": "无人表达购买意愿，多人劝退，5人表示'后悔买了'",
+         "insights": "负评集中在产品质量差+售后无回应，内容引发负面口碑传播；对品牌方是危机信号，对竞品是切入机会",
+         "reaction": "负评风暴，品牌需危机公关；竞品可借机推出对比内容"},
+        {"comment_count": "零评论", "sentiment": "unknown",
          "positive_pct": 0, "neutral_pct": 0, "negative_pct": 0,
-         "confidence": "low", "monetization_signals": "無評論數據",
-         "insights": "無任何評論，無法進行情緒分析。可能原因：內容新發佈、評論區關閉、或內容缺乏互動性",
-         "reaction": "無受眾反應數據，無法判斷"},
-        {"comment_count": "中（10-50條）", "sentiment": "mixed",
+         "confidence": "low", "monetization_signals": "无评论数据",
+         "insights": "无任何评论，无法进行情绪分析。可能原因：内容新发布、评论区关闭、或内容缺乏互动性",
+         "reaction": "无受众反应数据，无法判断"},
+        {"comment_count": "中（10-50条）", "sentiment": "mixed",
          "positive_pct": 55, "neutral_pct": 20, "negative_pct": 25,
-         "confidence": "medium", "monetization_signals": "評論區3人問'多少錢''在哪買'，1人表示價格超出預算",
-         "insights": "正面多為認可內容質量（'講得好詳細'），負面集中於價格敏感性；購買意願存在但價格是主要障礙",
-         "reaction": "內容質量獲認可，價格定位需優化以轉化潛在買家"},
+         "confidence": "medium", "monetization_signals": "评论区3人问'多少钱''在哪买'，1人表示价格超出预算",
+         "insights": "正面多为认可内容质量（'讲得好详细'），负面集中于价格敏感性；购买意愿存在但价格是主要障碍",
+         "reaction": "内容质量获认可，价格定位需优化以转化潜在买家"},
     ]
 
     _FEWSHOT_BAD = [
-        {"comment_count": "少（<10條）", "sentiment": "positive",
+        {"comment_count": "少（<10条）", "sentiment": "positive",
          "positive_pct": 80, "neutral_pct": 20, "negative_pct": 0,
-         "confidence": "high", "monetization_signals": "正面情緒高，適合帶貨",
-         "insights": "❌ 錯誤1：5條評論就給high confidence——評論<10時必須low",
-         "reaction": "教訓：樣本量決定置信度，不能為了好看而虛標high"},
-        {"comment_count": "中（10-50條）", "sentiment": "positive",
+         "confidence": "high", "monetization_signals": "正面情绪高，适合带货",
+         "insights": "❌ 错误1：5条评论就给high confidence——评论<10时必须low",
+         "reaction": "教训：样本量决定置信度，不能为了好看而虚标high"},
+        {"comment_count": "中（10-50条）", "sentiment": "positive",
          "positive_pct": 60, "neutral_pct": 30, "negative_pct": 10,
          "confidence": "medium", "monetization_signals": "未提及",
-         "insights": "❌ 錯誤2：分析完全忽略評論區的購買意願信號（'在哪買''多少錢'），只看了情緒沒看消費意圖",
-         "reaction": "教訓：monetization_signals 欄位必須掃描購買關鍵詞，無信號也要明確標註「無明顯購買信號」"},
+         "insights": "❌ 错误2：分析完全忽略评论区的购买意愿信号（'在哪买''多少钱'），只看了情绪没看消费意图",
+         "reaction": "教训：monetization_signals 字段必须扫描购买关键词，无信号也要明确标注「无明显购买信号」"},
     ]
 
     async def _llm_generate(
@@ -202,18 +202,18 @@ class SentimentReader(BaseAgent):
     ) -> SentimentReport:
         """DeepSeek LLM 分析評論情緒（v2 增強 prompt）。"""
         items_text = "\n".join(
-            f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')}"
-            + (f" | 評論:{comments_data.get(it.get('platform_id','') or it.get('bvid',''), [])[:5]}"
+            f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 赞:{it.get('likes','0')}"
+            + (f" | 评论:{comments_data.get(it.get('platform_id','') or it.get('bvid',''), [])[:5]}"
                if comments_data.get(it.get('platform_id','') or it.get('bvid','')) else "")
             for i, it in enumerate(items[:10])
         )
 
         good_examples_text = "\n".join(
-            f"  ✅ 評論量: {ex['comment_count']} | 情緒: {ex['sentiment']} | 置信度: {ex['confidence']}\n     P:{ex['positive_pct']}% N:{ex['neutral_pct']}% Neg:{ex['negative_pct']}%\n     購買信號: {ex['monetization_signals']}\n     洞察: {ex['insights']}\n     受眾反應: {ex['reaction']}"
+            f"  ✅ 评论量: {ex['comment_count']} | 情绪: {ex['sentiment']} | 置信度: {ex['confidence']}\n     P:{ex['positive_pct']}% N:{ex['neutral_pct']}% Neg:{ex['negative_pct']}%\n     购买信号: {ex['monetization_signals']}\n     洞察: {ex['insights']}\n     受众反应: {ex['reaction']}"
             for ex in self._FEWSHOT_GOOD
         )
         bad_examples_text = "\n".join(
-            f"  ❌ 評論量: {ex['comment_count']} | 情緒: {ex['sentiment']} | 置信度: {ex['confidence']}\n     洞察: {ex['insights']}\n     受眾反應: {ex['reaction']}"
+            f"  ❌ 评论量: {ex['comment_count']} | 情绪: {ex['sentiment']} | 置信度: {ex['confidence']}\n     洞察: {ex['insights']}\n     受众反应: {ex['reaction']}"
             for ex in self._FEWSHOT_BAD
         )
 
@@ -243,26 +243,26 @@ ESCALATE: 零评论时 → 全部百分比=0，sentiment=unknown，confidence=lo
 ## 正例
 {good_examples_text}
 
-## 負例
+## 负例
 {bad_examples_text}
 </examples>
 
 <task>
-分析以下內容的受眾情緒反應：
+分析以下内容的受众情绪反应：
 {items_text}
 </task>
 
 <output_format>
-返回純 JSON：
+返回纯 JSON：
 {{"overall_sentiment": "positive/neutral/negative/mixed",
- "summary": "整體結論（30字以上）",
- "items": [{{"index": 數字,
+ "summary": "整体结论（30字以上）",
+ "items": [{{"index": 数字,
    "sentiment": "positive/neutral/negative/mixed",
    "positive_pct": 0-100, "neutral_pct": 0-100, "negative_pct": 0-100,
-   "key_insights": "引用具體評論的洞察（30字以上，零評論時說明原因）",
-   "audience_reaction": "受眾反應摘要（20字以上）",
+   "key_insights": "引用具体评论的洞察（30字以上，零评论时说明原因）",
+   "audience_reaction": "受众反应摘要（20字以上）",
    "confidence": "high/medium/low",
-   "monetization_signals": "購買信號描述（30字以上，含信號類型+數量，無則標註原因）"}}]}}
+   "monetization_signals": "购买信号描述（30字以上，含信号类型+数量，无则标注原因）"}}]}}
 </output_format>"""
 
         try:
@@ -293,7 +293,7 @@ ESCALATE: 零评论时 → 全部百分比=0，sentiment=unknown，confidence=lo
                 summary=output.summary,
             )
         except Exception as exc:
-            logger.warning(f"SentimentReader LLM 失敗: {exc}")
+            logger.warning(f"SentimentReader LLM 失败: {exc}")
             return self._fallback(items, platform, comments_data)
 
     def _fallback(self, items: list, platform: str, comments_data: dict = None) -> SentimentReport:
@@ -309,5 +309,5 @@ ESCALATE: 零评论时 → 全部百分比=0，sentiment=unknown，confidence=lo
             platform=platform,
             total_analyzed=len(items_out),
             items=items_out,
-            summary="LLM 不可用，降級模式",
+            summary="LLM 不可用，降级模式",
         )

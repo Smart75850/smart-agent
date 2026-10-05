@@ -73,7 +73,7 @@ class ProductMiner(BaseAgent):
     ) -> ProductReport:
         """主入口：分析內容列表中的商品信號。"""
         if not items:
-            return ProductReport(keyword=keyword, total_products=0, summary="無輸入數據")
+            return ProductReport(keyword=keyword, total_products=0, summary="无输入数据")
 
         if not self._api_key:
             return self._fallback(items, keyword)
@@ -107,41 +107,41 @@ class ProductMiner(BaseAgent):
 
     # ── Few-Shot 示例庫 ──────────────────────────────────────
     _FEWSHOT_GOOD = [
-        {"signal_type": "direct", "name": "XX品牌筋膜槍",
+        {"signal_type": "direct", "name": "XX品牌筋膜枪",
          "monetization_potential": 88,
-         "analysis": "內容直接展示+對比測評3款筋膜槍，明確提及品牌型號+價格區間，評論區多人問購買渠道；信號強度高，競爭分析：頭部品牌佔位但中腰部仍有空間",
-         "advantage": "專業測評背書+精準健身人群+價格帶200-500元利潤空間可觀"},
-        {"signal_type": "direct", "name": "小學生AI學習機",
+         "analysis": "内容直接展示+对比测评3款筋膜枪，明确提及品牌型号+价格区间，评论区多人问购买渠道；信号强度高，竞争分析：头部品牌占位但中腰部仍有空间",
+         "advantage": "专业测评背书+精准健身人群+价格带200-500元利润空间可观"},
+        {"signal_type": "direct", "name": "小学生AI学习机",
          "monetization_potential": 92,
-         "analysis": "內容展示孩子使用學習機的前後成績對比，明確產品功能+使用場景；家長人群付費意願強，教育硬件賽道增長快，目前頭部品牌少",
-         "advantage": "教育剛需+高客單價+復購率高（多科目/多年級），藍海信號"},
-        {"signal_type": "indirect", "name": "居家辦公桌面收納",
+         "analysis": "内容展示孩子使用学习机的前后成绩对比，明确产品功能+使用场景；家长人群付费意愿强，教育硬件赛道增长快，目前头部品牌少",
+         "advantage": "教育刚需+高客单价+复购率高（多科目/多年级），蓝海信号"},
+        {"signal_type": "indirect", "name": "居家办公桌面收纳",
          "monetization_potential": 75,
-         "analysis": "內容未直接推銷商品但展示收納前後對比，評論區大量問'在哪買''求鏈接'；indirect signal 強度中等，變現路徑為帶貨或自有品牌",
-         "advantage": "需求驗證成本低+內容即素材+SKU豐富可組合銷售"},
-        {"signal_type": "direct", "name": "平價藍牙耳機（¥59）",
+         "analysis": "内容未直接推销商品但展示收纳前后对比，评论区大量问'在哪买''求链接'；indirect signal 强度中等，变现路径为带货或自有品牌",
+         "advantage": "需求验证成本低+内容即素材+SKU丰富可组合销售"},
+        {"signal_type": "direct", "name": "平价蓝牙耳机（¥59）",
          "monetization_potential": 65,
-         "analysis": "低價位+高銷量模式，內容強調性價比對比千元耳機，但賽道擁擠（華強北+品牌降價），利潤空間薄需走量",
-         "advantage": "走量模式，需差異化賣點（如電競低延遲/超長續航）才能突圍"},
-        {"signal_type": "indirect", "name": "寵物自動餵食器",
+         "analysis": "低价位+高销量模式，内容强调性价比对比千元耳机，但赛道拥挤（华强北+品牌降价），利润空间薄需走量",
+         "advantage": "走量模式，需差异化卖点（如电竞低延迟/超长续航）才能突围"},
+        {"signal_type": "indirect", "name": "宠物自动喂食器",
          "monetization_potential": 82,
-         "analysis": "內容主題為'出差3天寵物怎麼辦'，間接展示自動餵食器解決方案，評論區養寵人群活躍+多種餵食器討論；寵物經濟賽道持續增長",
-         "advantage": "場景化需求明確+情感驅動消費+客單價100-500元"},
-        {"signal_type": "no_signal", "name": "（無商品信號）",
+         "analysis": "内容主题为'出差3天宠物怎么办'，间接展示自动喂食器解决方案，评论区养宠人群活跃+多种喂食器讨论；宠物经济赛道持续增长",
+         "advantage": "场景化需求明确+情感驱动消费+客单价100-500元"},
+        {"signal_type": "no_signal", "name": "（无商品信号）",
          "monetization_potential": 10,
-         "analysis": "純娛樂內容（搞笑段子），無任何商品/服務線索，無受眾消費意圖信號，不建議強行提取商品",
-         "advantage": "誠實標註無信號比強行關聯商品更有價值"},
+         "analysis": "纯娱乐内容（搞笑段子），无任何商品/服务线索，无受众消费意图信号，不建议强行提取商品",
+         "advantage": "诚实标注无信号比强行关联商品更有价值"},
     ]
 
     _FEWSHOT_BAD = [
-        {"signal_type": "no_signal", "name": "（錯誤示範）",
+        {"signal_type": "no_signal", "name": "（错误示范）",
          "monetization_potential": 70,
-         "analysis": "❌ 錯誤示範：從搞笑段子中'提取'出零食商品並給70分變現潛力——純屬臆測。內容無任何商品信號時應誠實標註，不應為了輸出而輸出",
-         "advantage": "教訓：無商品信號時 monetization_potential 應 <20"},
-        {"signal_type": "direct", "name": "（錯誤示範）",
+         "analysis": "❌ 错误示范：从搞笑段子中'提取'出零食商品并给70分变现潜力——纯属臆测。内容无任何商品信号时应诚实标注，不应为了输出而输出",
+         "advantage": "教训：无商品信号时 monetization_potential 应 <20"},
+        {"signal_type": "direct", "name": "（错误示范）",
          "monetization_potential": 95,
-         "analysis": "❌ 錯誤示範：看到品牌名就給95分，無視該品類頭部壟斷+價格透明+利潤極薄的事實（如手機），變現潛力評估需考慮品類競爭格局",
-         "advantage": "教訓：品牌露出 ≠ 高變現潛力，需分析品類競爭+利潤空間"},
+         "analysis": "❌ 错误示范：看到品牌名就给95分，无视该品类头部垄断+价格透明+利润极薄的事实（如手机），变现潜力评估需考虑品类竞争格局",
+         "advantage": "教训：品牌露出 ≠ 高变现潜力，需分析品类竞争+利润空间"},
     ]
 
     async def _llm_generate(self, items: list, keyword: str) -> ProductReport:
@@ -152,11 +152,11 @@ class ProductMiner(BaseAgent):
         )
 
         good_examples_text = "\n".join(
-            f"  ✅ 信號: {ex['signal_type']} | 商品: {ex['name']} | 潛力分: {ex['monetization_potential']}\n     分析: {ex['analysis']}\n     優勢: {ex['advantage']}"
+            f"  ✅ 信号: {ex['signal_type']} | 商品: {ex['name']} | 潜力分: {ex['monetization_potential']}\n     分析: {ex['analysis']}\n     优势: {ex['advantage']}"
             for ex in self._FEWSHOT_GOOD
         )
         bad_examples_text = "\n".join(
-            f"  ❌ 信號: {ex['signal_type']} | 商品: {ex['name']} | 潛力分: {ex['monetization_potential']}\n     分析: {ex['analysis']}\n     教訓: {ex['advantage']}"
+            f"  ❌ 信号: {ex['signal_type']} | 商品: {ex['name']} | 潜力分: {ex['monetization_potential']}\n     分析: {ex['analysis']}\n     教训: {ex['advantage']}"
             for ex in self._FEWSHOT_BAD
         )
 
@@ -186,7 +186,7 @@ ESCALATE: 无商品信号时 → 返回空products，summary标注「此批内�
 ## 正例
 {good_examples_text}
 
-## 負例
+## 负例
 {bad_examples_text}
 </examples>
 
@@ -195,14 +195,14 @@ ESCALATE: 无商品信号时 → 返回空products，summary标注「此批内�
 </task>
 
 <output_format>
-返回純JSON：
-{{"summary": "選品趨勢（40字以上）",
- "products": [{{"name": "商品名", "category": "品類",
-   "price_hint": "¥區間", "target_audience": "人群畫像",
-   "competitive_advantage": "具體優勢（20字以上）",
+返回纯JSON：
+{{"summary": "选品趋势（40字以上）",
+ "products": [{{"name": "商品名", "category": "品类",
+   "price_hint": "¥区间", "target_audience": "人群画像",
+   "competitive_advantage": "具体优势（20字以上）",
    "monetization_potential": 0-100,
    "signal_type": "direct/indirect/no_signal",
-   "source_index": 數字}}]}}
+   "source_index": 数字}}]}}
 </output_format>"""
 
         try:
@@ -234,7 +234,7 @@ ESCALATE: 无商品信号时 → 返回空products，summary标注「此批内�
             )
 
         except Exception as exc:
-            logger.warning(f"ProductMiner LLM 失敗: {exc}")
+            logger.warning(f"ProductMiner LLM 失败: {exc}")
             return self._fallback(items, keyword)
 
     def _fallback(self, items: list, keyword: str) -> ProductReport:
@@ -256,5 +256,5 @@ ESCALATE: 无商品信号时 → 返回空products，summary标注「此批内�
             keyword=keyword,
             total_products=len(products),
             items=products,
-            summary="LLM 不可用，降級為標題提取",
+            summary="LLM 不可用，降级为标题提取",
         )

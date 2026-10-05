@@ -24,7 +24,7 @@ from src.utils.logger import logger
 
 class VideoBreakdownOutput(BaseModel):
     index: int = Field(description="内容在输入列表中的索引")
-    hook_type: Literal["數字衝擊", "疑問懸念", "情感共鳴", "反直覺", "權威背書", "前後對比", "教程實用", "故事敍事", "無法判斷"] = Field(description="钩子类型")
+    hook_type: Literal["数字冲击", "疑问悬念", "情感共鸣", "反直觉", "权威背书", "前后对比", "教程实用", "故事叙事", "无法判断"] = Field(description="钩子类型")
     hook_effectiveness: int = Field(ge=0, le=100, description="钩子效果评分")
     pacing: str = Field(min_length=5, description="节奏分析，含节奏变化点")
     structure_template: str = Field(description="结构模板，含阶段数命名+各阶段说明")
@@ -96,54 +96,54 @@ class VideoAnalyst(BaseAgent):
 
     # ── Few-Shot 示例庫（8 種鉤子類型各一例） ──────────────
     _FEWSHOT_GOOD = [
-        {"hook_type": "數字衝擊", "title": "3個信號告訴你房價要跌了",
-         "analysis": "數字開場（3個信號）建立預期+負面情緒觸發（房價跌），前3秒用新聞截圖增加可信度，節奏為快剪+數據圖表穿插，轉化點在結尾引導關注",
-         "learnings": "數字+負面情緒的組合適用於財經/民生類內容"},
-        {"hook_type": "疑問懸念", "title": "為什麼你做的番茄炒蛋永遠不如餐廳好吃？",
-         "analysis": "直接提問瞄準日常痛點，前3秒展示餐廳級vs家庭版對比畫面製造認知差距，節奏為慢→快→慢（展示問題→揭示原因→總結），轉化點在中段揭示秘密食材時引導收藏",
-         "learnings": "提問式開頭適合實用技能類，需在3秒內展示「認知差距」"},
-        {"hook_type": "情感共鳴", "title": "30歲裸辭創業一年後，我終於理解了這三件事",
-         "analysis": "年齡+人生轉折點引發同齡人共鳴，開頭用emo情緒鏡頭建立真實感，節奏先抑後揚（低谷→轉折→成長），轉化點在結尾金句引導評論互動",
-         "learnings": "情感類需要真實細節支撐（具體數字/場景），避免空泛雞湯"},
-        {"hook_type": "反直覺", "title": "每天喝可樂反而瘦了10斤？醫生說出真相",
-         "analysis": "違反常識的命題製造好奇心缺口，開頭直接展示體重對比數據，節奏: 拋反直覺→科學解釋→限制條件（防誤導），轉化點用'但不是所有可樂都行'引導完播",
-         "learnings": "反直覺必須有權威背書（醫生/研究），避免淪為標題黨"},
-        {"hook_type": "權威背書", "title": "華為前HR總監：面試時這3句話打死不能說",
-         "analysis": "大廠title建立權威感，開頭直接亮身份+警告語氣製造危機感，節奏為場景還原（錯誤示範）→正確做法對比，轉化點每條規則後引導收藏'以防面試踩坑'",
-         "learnings": "權威型內容需具體身份（非模糊'專家說'），場景化更有代入感"},
-        {"hook_type": "前後對比", "title": "改造10平米出租屋，房東看到後直接免了一個月房租",
-         "analysis": "改造前後強烈視覺衝擊是核心鉤子，開頭0.5秒展示改造後驚艷效果再回溯過程，節奏為快放改造過程+關鍵步驟慢放詳解，轉化點在結尾展示總花費引導問'值不值'",
-         "learnings": "前後對比的關鍵在於反差幅度，差距越大傳播力越強"},
-        {"hook_type": "教程實用", "title": "PPT做的丑？記住這4個快捷鍵，效率提升10倍",
-         "analysis": "精準人群+具體痛點（PPT醜/慢），開頭展示用快捷鍵前後的效率對比，節奏: 每個快捷鍵一個獨立段落（5秒演示+文字標註），轉化點用'第4個最實用'引導完播",
-         "learnings": "教程類必須在開頭展示結果，讓用戶知道'學了能得到什麼'"},
-        {"hook_type": "故事敍事", "title": "我在義烏擺攤一個月，發現了一個沒人做的暴利生意",
-         "analysis": "第一人稱故事+地點標籤（義烏）+利益承諾（暴利），開頭用地攤實拍建立真實感，節奏為時間線敍事（第一週摸索→第二週發現→第三週放大），轉化點用'下期講具體怎麼做'引導關注",
-         "learnings": "故事類需要時間線+具體地點+真實細節，避免'我朋友說'式二手敘述"},
+        {"hook_type": "数字冲击", "title": "3个信号告诉你房价要跌了",
+         "analysis": "数字开场（3个信号）建立预期+负面情绪触发（房价跌），前3秒用新闻截图增加可信度，节奏为快剪+数据图表穿插，转化点在结尾引导关注",
+         "learnings": "数字+负面情绪的组合适用于财经/民生类内容"},
+        {"hook_type": "疑问悬念", "title": "为什么你做的番茄炒蛋永远不如餐厅好吃？",
+         "analysis": "直接提问瞄准日常痛点，前3秒展示餐厅级vs家庭版对比画面制造认知差距，节奏为慢→快→慢（展示问题→揭示原因→总结），转化点在中段揭示秘密食材时引导收藏",
+         "learnings": "提问式开头适合实用技能类，需在3秒内展示「认知差距」"},
+        {"hook_type": "情感共鸣", "title": "30岁裸辞创业一年后，我终于理解了这三件事",
+         "analysis": "年龄+人生转折点引发同龄人共鸣，开头用emo情绪镜头建立真实感，节奏先抑后扬（低谷→转折→成长），转化点在结尾金句引导评论互动",
+         "learnings": "情感类需要真实细节支撑（具体数字/场景），避免空泛鸡汤"},
+        {"hook_type": "反直觉", "title": "每天喝可乐反而瘦了10斤？医生说出真相",
+         "analysis": "违反常识的命题制造好奇心缺口，开头直接展示体重对比数据，节奏: 抛反直觉→科学解释→限制条件（防误导），转化点用'但不是所有可乐都行'引导完播",
+         "learnings": "反直觉必须有权威背书（医生/研究），避免沦为标题党"},
+        {"hook_type": "权威背书", "title": "华为前HR总监：面试时这3句话打死不能说",
+         "analysis": "大厂title建立权威感，开头直接亮身份+警告语气制造危机感，节奏为场景还原（错误示范）→正确做法对比，转化点每条规则后引导收藏'以防面试踩坑'",
+         "learnings": "权威型内容需具体身份（非模糊'专家说'），场景化更有代入感"},
+        {"hook_type": "前后对比", "title": "改造10平米出租屋，房东看到后直接免了一个月房租",
+         "analysis": "改造前后强烈视觉冲击是核心钩子，开头0.5秒展示改造后惊艳效果再回溯过程，节奏为快放改造过程+关键步骤慢放详解，转化点在结尾展示总花费引导问'值不值'",
+         "learnings": "前后对比的关键在于反差幅度，差距越大传播力越强"},
+        {"hook_type": "教程实用", "title": "PPT做的丑？记住这4个快捷键，效率提升10倍",
+         "analysis": "精准人群+具体痛点（PPT丑/慢），开头展示用快捷键前后的效率对比，节奏: 每个快捷键一个独立段落（5秒演示+文字标注），转化点用'第4个最实用'引导完播",
+         "learnings": "教程类必须在开头展示结果，让用户知道'学了能得到什么'"},
+        {"hook_type": "故事叙事", "title": "我在义乌摆摊一个月，发现了一个没人做的暴利生意",
+         "analysis": "第一人称故事+地点标签（义乌）+利益承诺（暴利），开头用地摊实拍建立真实感，节奏为时间线叙事（第一周摸索→第二周发现→第三周放大），转化点用'下期讲具体怎么做'引导关注",
+         "learnings": "故事类需要时间线+具体地点+真实细节，避免'我朋友说'式二手叙述"},
     ]
 
     _FEWSHOT_BAD = [
-        {"hook_type": "無法判斷", "title": "日常vlog週末在家的一天",
-         "analysis": "❌ 錯誤示範：無明確鉤子類型、開頭平淡無衝突、節奏拖沓無起伏、無轉化點設計，分析應坦承'此內容無明顯爆款結構'而非牽強附會",
-         "learnings": "平庸內容應誠實標註 confidence=low，不應強行解讀"},
-        {"hook_type": "數字衝擊", "title": "10個小技巧",
-         "analysis": "❌ 錯誤示範：雖有數字但無具體價值承諾（什麼小技巧？對誰有用？），鉤子效果極弱，分析過度誇大為'數字衝擊型鉤子'是錯誤的——真正的數字衝擊需要數字+具體結果",
-         "learnings": "不是有數字就是數字衝擊型，必須數字+價值承諾同時成立"},
+        {"hook_type": "无法判断", "title": "日常vlog周末在家的一天",
+         "analysis": "❌ 错误示范：无明确钩子类型、开头平淡无冲突、节奏拖沓无起伏、无转化点设计，分析应坦承'此内容无明显爆款结构'而非牵强附会",
+         "learnings": "平庸内容应诚实标注 confidence=low，不应强行解读"},
+        {"hook_type": "数字冲击", "title": "10个小技巧",
+         "analysis": "❌ 错误示范：虽有数字但无具体价值承诺（什么小技巧？对谁有用？），钩子效果极弱，分析过度夸大为'数字冲击型钩子'是错误的——真正的数字冲击需要数字+具体结果",
+         "learnings": "不是有数字就是数字冲击型，必须数字+价值承诺同时成立"},
     ]
 
     async def _llm_generate(self, items: list, platform: str) -> VideoReport:
         """DeepSeek LLM 拆解爆款視頻結構（v2 增強 prompt）。"""
         items_text = "\n".join(
-            f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')}"
+            f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 赞:{it.get('likes','0')}"
             for i, it in enumerate(items[:10])
         )
 
         good_examples_text = "\n".join(
-            f"  ✅ 鉤子類型: {ex['hook_type']}\n     標題: {ex['title']}\n     分析: {ex['analysis']}\n     可複製: {ex['learnings']}"
+            f"  ✅ 钩子类型: {ex['hook_type']}\n     标题: {ex['title']}\n     分析: {ex['analysis']}\n     可复制: {ex['learnings']}"
             for ex in self._FEWSHOT_GOOD
         )
         bad_examples_text = "\n".join(
-            f"  ❌ 鉤子類型: {ex['hook_type']}\n     標題: {ex['title']}\n     分析: {ex['analysis']}\n     教訓: {ex['learnings']}"
+            f"  ❌ 钩子类型: {ex['hook_type']}\n     标题: {ex['title']}\n     分析: {ex['analysis']}\n     教训: {ex['learnings']}"
             for ex in self._FEWSHOT_BAD
         )
 
@@ -159,7 +159,7 @@ ESCALATE: 仅标题无其他数据时 → confidence=low, hook_effectiveness≤4
 
 <quality_standards>
 专业级输出必须满足：
-1. hook_type 从9个精确枚举值中选择（数字衝擊|疑問懸念|情感共鳴|反直覺|權威背書|前後對比|教程實用|故事敍事|無法判斷），不可自创同义词
+1. hook_type 从9个精确枚举值中选择（数字冲击|疑问悬念|情感共鸣|反直觉|权威背书|前后对比|教程实用|故事叙事|无法判断），不可自创同义词
 2. structure_template 用「模式名+N段式」格式，含各阶段说明，如「问题-解决 3段式（痛点→方案→验证）」
 3. learnings 必须含具体操作步骤（「开头用数字+反直觉组合，数字不超过3个」不是「用好的标题」）
 4. pacing 描述节奏变化点（「快剪→慢放→加速」不是「节奏好」）
@@ -179,21 +179,21 @@ ESCALATE: 仅标题无其他数据时 → confidence=low, hook_effectiveness≤4
 </edge_cases>
 
 <task>
-分析以下內容的視頻結構：
+分析以下内容的视频结构：
 {items_text}
 </task>
 
 <output_format>
-返回純JSON：
-{{"summary": "整體結構規律（40字以上）",
- "breakdowns": [{{"index": 數字,
-   "hook_type": "枚舉值之一",
+返回纯JSON：
+{{"summary": "整体结构规律（40字以上）",
+ "breakdowns": [{{"index": 数字,
+   "hook_type": "枚举值之一",
    "hook_effectiveness": 0-100,
-   "pacing": "節奏分析（20字以上）",
-   "structure_template": "結構模板（含階段數+各階段說明）",
-   "conversion_point": "轉化點",
-   "viral_mechanism": "爆款機制（20字以上）",
-   "learnings": "可複製要點（20字以上）",
+   "pacing": "节奏分析（20字以上）",
+   "structure_template": "结构模板（含阶段数+各阶段说明）",
+   "conversion_point": "转化点",
+   "viral_mechanism": "爆款机制（20字以上）",
+   "learnings": "可复制要点（20字以上）",
    "confidence": "medium/low"}}]}}
 </output_format>"""
 
@@ -224,7 +224,7 @@ ESCALATE: 仅标题无其他数据时 → confidence=low, hook_effectiveness≤4
                 summary=output.summary,
             )
         except Exception as exc:
-            logger.warning(f"VideoAnalyst LLM 失敗: {exc}")
+            logger.warning(f"VideoAnalyst LLM 失败: {exc}")
             return self._fallback(items, platform)
 
     def _fallback(self, items: list, platform: str) -> VideoReport:
@@ -240,5 +240,5 @@ ESCALATE: 仅标题无其他数据时 → confidence=low, hook_effectiveness≤4
             platform=platform,
             total_analyzed=len(breakdowns),
             items=breakdowns,
-            summary="LLM 不可用，降級模式",
+            summary="LLM 不可用，降级模式",
         )

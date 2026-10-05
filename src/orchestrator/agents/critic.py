@@ -106,7 +106,7 @@ CRITERIA: dict[str, dict] = {
     },
     "content_remixer_rewrite": {
         "checks": [
-            "改寫是否体现平台差异（非仅加emoji）",
+            "改写是否体现平台差异（非仅加emoji）",
             "changes_summary 是否含语言/节奏/信息密度/情绪四个维度",
             "rewritten 内容长度是否合理（>=30字）",
         ],
@@ -302,7 +302,7 @@ class CriticAgent(BaseAgent):
                 if why and len(why) < 20:
                     issues.append(f"variant[{idx}] why_it_works 过短（{len(why)}字，需>=20）")
                     score -= 8
-                if hook and any(g in hook for g in ["钩子", "吸引", "有趣", "好看", "鈎子"]):
+                if hook and any(g in hook for g in ["钩子", "吸引", "有趣", "好看", "钩子"]):
                     issues.append(f"variant[{idx}] hook 描述太通用（'{hook[:20]}'），需具体手法")
                     score -= 10
                 if text and len(text) > 20 and not re.search(r'\d+', text):
@@ -310,9 +310,9 @@ class CriticAgent(BaseAgent):
                     score -= 5
 
         elif agent == "video_analyst":
-            unknown_hooks = sum(1 for it in items if isinstance(it, dict) and it.get("hook_type") == "無法判斷")
+            unknown_hooks = sum(1 for it in items if isinstance(it, dict) and it.get("hook_type") == "无法判断")
             if unknown_hooks > len(items) * 0.4:
-                issues.append(f"hook_type「無法判斷」过多 ({unknown_hooks}/{len(items)})")
+                issues.append(f"hook_type「无法判断」过多 ({unknown_hooks}/{len(items)})")
                 score -= 20
 
         elif agent == "sentiment_reader":

@@ -167,60 +167,60 @@ class PicTactic(BaseAgent):
 
     # ── Few-Shot 示例庫（5 good + 2 bad） ──────────────────
     _FEWSHOT_GOOD = [
-        {"mode": "cover", "platform": "douyin", "topic": "藍牙耳機評測",
-         "output": {"summary": "抖音封面核心是高視覺衝擊力+大字標題，暖色系+中心構圖是點擊率最高的組合",
+        {"mode": "cover", "platform": "douyin", "topic": "蓝牙耳机评测",
+         "output": {"summary": "抖音封面核心是高视觉冲击力+大字标题，暖色系+中心构图是点击率最高的组合",
                     "tactic": {"scene": "cover", "target_platform": "douyin",
-                               "style": "商業攝影風，高對比度高飽和，產品置於視覺中心",
-                               "color_palette": "暖橙色主調搭配深灰背景，高飽和暖色衝擊",
-                               "composition": "9:16豎版，產品居中佔畫面60%，頂部1/3留給大號標題文字，底部1/5留給價格/CTA標籤",
+                               "style": "商业摄影风，高对比度高饱和，产品置于视觉中心",
+                               "color_palette": "暖橙色主调搭配深灰背景，高饱和暖色冲击",
+                               "composition": "9:16竖版，产品居中占画面60%，顶部1/3留给大号标题文字，底部1/5留给价格/CTA标签",
                                "prompt": "professional product photography, wireless earbuds centered, warm orange and dark grey color scheme, dramatic studio lighting, 9:16 aspect ratio, high contrast, commercial advertising style, sharp details, 8k quality",
-                               "rationale": "抖音用戶0.5秒決定是否停留，暖色+中心構圖+大字標題的組合經A/B測試點擊率最高"}}},
-        {"mode": "cover", "platform": "bilibili", "topic": "歷史知識科普",
-         "output": {"summary": "B站封面偏好信息密度高+設計感強，左主體右文字的經典佈局配合科技感色調",
+                               "rationale": "抖音用户0.5秒决定是否停留，暖色+中心构图+大字标题的组合经A/B测试点击率最高"}}},
+        {"mode": "cover", "platform": "bilibili", "topic": "历史知识科普",
+         "output": {"summary": "B站封面偏好信息密度高+设计感强，左主体右文字的经典布局配合科技感色调",
                     "tactic": {"scene": "cover", "target_platform": "bilibili",
-                               "style": "3D渲染+平面設計混合，電影感色調，信息圖表元素",
-                               "color_palette": "深藍紫主調配金色點綴，科技感冷色",
-                               "composition": "16:9橫版，左側3/5為視覺主體（3D歷史場景），右側2/5為大字標題+副標題，底部進度條裝飾",
+                               "style": "3D渲染+平面设计混合，电影感色调，信息图表元素",
+                               "color_palette": "深蓝紫主调配金色点缀，科技感冷色",
+                               "composition": "16:9横版，左侧3/5为视觉主体（3D历史场景），右侧2/5为大字标题+副标题，底部进度条装饰",
                                "prompt": "cinematic thumbnail, 3D rendered ancient chinese historical scene, deep blue and gold color palette, dramatic lighting with volumetric fog, 16:9 aspect ratio, left space for text overlay, octane render quality, mysterious atmosphere",
-                               "rationale": "B站用戶對電影感封面點擊率最高，左圖右文的經典佈局確保文字可讀性"}}},
-        {"mode": "social", "platform": "", "topic": "平價護膚品",
-         "output": {"summary": "多平台差異化策略：小紅書走精緻平舖+柔和色調，抖音走高對比+大字報風，B站走專業感+信息圖表",
+                               "rationale": "B站用户对电影感封面点击率最高，左图右文的经典布局确保文字可读性"}}},
+        {"mode": "social", "platform": "", "topic": "平价护肤品",
+         "output": {"summary": "多平台差异化策略：小红书走精致平铺+柔和色调，抖音走高对比+大字报风，B站走专业感+信息图表",
                     "tactic": {"scene": "social_post", "target_platform": "xiaohongshu",
-                               "style": "精緻平面設計，柔和光影，平鋪拍攝風格",
-                               "color_palette": "奶油白主調配玫瑰粉點綴，柔和粉彩色系",
-                               "composition": "3:4豎版，網格佈局展示3-5款產品，留白充足（30%+），品牌logo右下角，整體氛圍溫馨精緻",
+                               "style": "精致平面设计，柔和光影，平铺拍摄风格",
+                               "color_palette": "奶油白主调配玫瑰粉点缀，柔和粉彩色系",
+                               "composition": "3:4竖版，网格布局展示3-5款产品，留白充足（30%+），品牌logo右下角，整体氛围温馨精致",
                                "prompt": "aesthetic flat lay photography, skincare products arranged on marble surface, cream white and rose pink color palette, soft natural window lighting, 3:4 aspect ratio, clean minimalist composition, xiaohongshu lifestyle style, high-end catalog quality",
-                               "rationale": "小紅書用戶對'精緻感'有強烈偏好，平價產品用高端視覺包裝能打破'便宜=low'的認知"}}},
-        {"mode": "social", "platform": "", "topic": "職場效率工具",
-         "output": {"summary": "工具類內容配圖應突出'效率感'和'專業感'，不同平台需調整專業度 vs 親和力的平衡",
+                               "rationale": "小红书用户对'精致感'有强烈偏好，平价产品用高端视觉包装能打破'便宜=low'的认知"}}},
+        {"mode": "social", "platform": "", "topic": "职场效率工具",
+         "output": {"summary": "工具类内容配图应突出'效率感'和'专业感'，不同平台需调整专业度 vs 亲和力的平衡",
                     "tactic": {"scene": "thumbnail", "target_platform": "zhihu",
-                               "style": "極簡信息圖表風，理性藍灰色調，大量留白",
-                               "color_palette": "理性藍灰主調配白色背景，少量橙色作為CTA強調色",
-                               "composition": "16:9橫版，左文右圖（65:35比例），文字使用無襯線字體，數據用圖表/圖標輔助展示",
+                               "style": "极简信息图表风，理性蓝灰色调，大量留白",
+                               "color_palette": "理性蓝灰主调配白色背景，少量橙色作为CTA强调色",
+                               "composition": "16:9横版，左文右图（65:35比例），文字使用无衬线字体，数据用图表/图标辅助展示",
                                "prompt": "minimalist infographic design, productivity and efficiency concept, clean blue-grey and white color scheme, geometric icons and simple charts, 16:9 aspect ratio, professional knowledge-sharing aesthetic, plenty of negative space, vector art style",
-                               "rationale": "知乎用戶對'知識感'設計有天然信任，極簡風格降低視覺噪音讓信息本身成為主角"}}},
-        {"mode": "trend", "platform": "", "topic": "2025視覺趨勢",
-         "output": {"summary": "2025年社交媒體視覺趨勢呈現'兩極化'：超現實3D和紀實原生態並行，品牌需同時佈局兩端",
-                    "visual_trend": "2025年社交媒體視覺三大趨勢：1) AI超現實主義（Midjourney/Flux生成的超現實畫面成為主流）2) 紀實原生態（手機直出、無濾鏡、生活感）3) 新中式美學（傳統元素用現代設計語言重構）",
+                               "rationale": "知乎用户对'知识感'设计有天然信任，极简风格降低视觉噪音让信息本身成为主角"}}},
+        {"mode": "trend", "platform": "", "topic": "2025视觉趋势",
+         "output": {"summary": "2025年社交媒体视觉趋势呈现'两极化'：超现实3D和纪实原生态并行，品牌需同时布局两端",
+                    "visual_trend": "2025年社交媒体视觉三大趋势：1) AI超现实主义（Midjourney/Flux生成的超现实画面成为主流）2) 纪实原生态（手机直出、无滤镜、生活感）3) 新中式美学（传统元素用现代设计语言重构）",
                     "tactic": {"scene": "trend", "target_platform": "通用",
-                               "style": "AI超現實主義 — 真實與虛構的邊界模糊，夢幻光影+不合理比例+高精細度",
-                               "color_palette": "無固定配色，趨勢是'大膽實驗'：霓虹色+自然色並置、單色調+高飽和點綴",
-                               "composition": "非對稱構圖成為主流，打破傳統網格系統，隨機性+留白並存",
+                               "style": "AI超现实主义 — 真实与虚构的边界模糊，梦幻光影+不合理比例+高精细度",
+                               "color_palette": "无固定配色，趋势是'大胆实验'：霓虹色+自然色并置、单色调+高饱和点缀",
+                               "composition": "非对称构图成为主流，打破传统网格系统，随机性+留白并存",
                                "prompt": "surrealist digital art, dreamlike atmosphere, unexpected scale relationships, neon accent colors against muted natural tones, asymmetrical composition, hyperdetailed, trending on artstation, 2025 aesthetic, AI-generated fine art style",
-                               "rationale": "AI工具的普及讓超現實視覺的創作成本歸零，預計2025年將出現大量此類內容"}}},
+                               "rationale": "AI工具的普及让超现实视觉的创作成本归零，预计2025年将出现大量此类内容"}}},
     ]
 
     _FEWSHOT_BAD = [
         {"mode": "cover", "platform": "douyin",
-         "output": {"style": "好看的風格", "color_palette": "#FF6B35 #FFD700",
+         "output": {"style": "好看的风格", "color_palette": "#FF6B35 #FFD700",
                     "prompt": "a nice picture of earphone, good quality, beautiful colors",
-                    "rationale": "這樣做比較好看"},
-         "why_bad": "❌ 錯誤示範：color_palette 使用 HEX 色號（LLM 會隨機編造不存在的顏色搭配）、prompt 過於簡單（無風格關鍵詞/構圖/畫質描述）、rationale 無平台數據支撐"},
+                    "rationale": "这样做比较好看"},
+         "why_bad": "❌ 错误示范：color_palette 使用 HEX 色号（LLM 会随机编造不存在的颜色搭配）、prompt 过于简单（无风格关键词/构图/画质描述）、rationale 无平台数据支撑"},
         {"mode": "social", "platform": "",
-         "output": {"summary": "不同平台用不同顏色就行",
+         "output": {"summary": "不同平台用不同颜色就行",
                     "tactic": {"target_platform": "all", "style": "好看就行", "prompt": "beautiful social media post",
-                               "rationale": "大家都喜歡好看的"}},
-         "why_bad": "❌ 錯誤示範：無平台差異化（'all'不是策略）、prompt 空泛無法生成可用圖片、無構圖/比例/風格具體描述"},
+                               "rationale": "大家都喜欢好看的"}},
+         "why_bad": "❌ 错误示范：无平台差异化（'all'不是策略）、prompt 空泛无法生成可用图片、无构图/比例/风格具体描述"},
     ]
 
     async def _llm_generate(
@@ -284,30 +284,30 @@ BOUNDARY: 不生成文案（CopyWriter）、不分析数据（ContentRemixer）�
 
 <mode>{mode}</mode>
 
-## ⚠️ color_palette 重要規範
-**禁止使用 HEX 色號（如 #FF6B35）！** 因為 LLM 無法準確理解顏色數值，會隨機編造。必須改用色彩形容詞描述，例如：
-- ✅ 正確：「暖橙色主調搭配深灰背景，高飽和暖色衝擊」
-- ✅ 正確：「奶油白主調配玫瑰粉點綴，柔和粉彩色系」
-- ✅ 正確：「深藍紫主調配金色點綴，科技感冷色」
-- ❌ 錯誤：「#FF6B35 #FFD700 #00CEC9」（無意義的數字組合）
+## ⚠️ color_palette 重要规范
+**禁止使用 HEX 色号（如 #FF6B35）！** 因为 LLM 无法准确理解颜色数值，会随机编造。必须改用色彩形容词描述，例如：
+- ✅ 正确：「暖橙色主调搭配深灰背景，高饱和暖色冲击」
+- ✅ 正确：「奶油白主调配玫瑰粉点缀，柔和粉彩色系」
+- ✅ 正确：「深蓝紫主调配金色点缀，科技感冷色」
+- ❌ 错误：「#FF6B35 #FFD700 #00CEC9」（无意义的数字组合）
 
-## AI Prompt 規範
-- 必須使用 **英文**（Midjourney/SD 對英文理解最佳）
-- 必須包含：主體描述 + 風格關鍵詞 + 構圖比例 + 光影描述 + 畫質關鍵詞
-- 推薦後綴關鍵詞：8k quality, professional, high detail, trending on artstation
+## AI Prompt 规范
+- 必须使用 **英文**（Midjourney/SD 对英文理解最佳）
+- 必须包含：主体描述 + 风格关键词 + 构图比例 + 光影描述 + 画质关键词
+- 推荐后缀关键词：8k quality, professional, high detail, trending on artstation
 
-## Few-Shot 正例（{mode} 模式專屬）
+## Few-Shot 正例（{mode} 模式专属）
 {good_examples_text}
 
-## Few-Shot 負例（避免以下錯誤）
+## Few-Shot 负例（避免以下错误）
 {bad_examples_text}
 
-## 邊界情況處理
-- 無趨勢/選品數據：基於主題和平台獨立設計，標註「獨立創作模式」
-- cover 模式未指定平台：預設為 douyin（因抖音封面需求最通用）
-- trend 模式：至少引用 2 個具體的設計趨勢來源或案例
+## 边界情况处理
+- 无趋势/选品数据：基于主题和平台独立设计，标注「独立创作模式」
+- cover 模式未指定平台：预设为 douyin（因抖音封面需求最通用）
+- trend 模式：至少引用 2 个具体的设计趋势来源或案例
 
-## 背景數據
+## 背景数据
 {chr(10).join(context_parts)}"""
 
         try:

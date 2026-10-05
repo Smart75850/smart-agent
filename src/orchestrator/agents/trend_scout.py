@@ -1,10 +1,10 @@
 from __future__ import annotations
-"""Trend Scout Agent — 爆款趨勢分析。
+"""Trend Scout Agent — 爆款趋势分析。
 
 Flow:
-  1. 採集目標平台 hot/search 數據
-  2. DeepSeek V4 Flash 分析爆款規律
-  3. 輸出爆款候選列表 (viral_score + trend_reason)
+  1. 采集目标平台 hot/search 数据
+  2. DeepSeek V4 Flash 分析爆款规律
+  3. 输出爆款候选列表 (viral_score + trend_reason)
 
 用法:
   scout = TrendScout()
@@ -27,27 +27,32 @@ from src.utils.logger import logger
 # ── 分类别名映射（LLM 常见变体 → 标准枚举值）─────────────
 
 _CATEGORY_ALIASES: dict[str, str] = {
-    # 简体/异体 → 标准繁体
-    "美妆": "美妝", "财经": "財經", "游戏": "遊戲", "娱乐": "娛樂",
-    "旅游": "旅遊", "母婴": "母嬰", "宠物": "寵物", "健康": "健康/醫療",
-    "医疗": "健康/醫療", "健身运动": "健身",
+    # 常见变体 → 标准简体枚举值
+    "财经": "财经", "游戏": "游戏", "娱乐": "娱乐",
+    "旅游": "旅游", "母婴": "母婴", "宠物": "宠物", "健康": "健康/医疗",
+    "医疗": "健康/医疗", "健身运动": "健身",
+    # 繁体输入兼容：prompt 与枚举值已统一为简体（2026-10-06），
+    # 但 LLM 偶尔仍可能输出繁体，故保留一层映射兜底
+    "美妝": "美妆", "財經": "财经", "遊戲": "游戏", "娛樂": "娱乐",
+    "旅遊": "旅游", "母嬰": "母婴", "寵物": "宠物", "醫療": "健康/医疗",
+    "數碼": "科技/AI", "學習": "教育", "游戲": "游戏",
     # 科技/数码相关
-    "數碼": "科技/AI", "数码": "科技/AI", "科技": "科技/AI",
+    "数码": "科技/AI", "科技": "科技/AI",
     "AI": "科技/AI", "人工智能": "科技/AI", "AI工具": "科技/AI",
     # 教育相关
     "学习": "教育", "考试": "教育",
     # 家居相关
     "房产": "家居", "装修": "家居", "房地产": "家居",
     # 财经相关
-    "金融": "財經", "投资": "財經", "理财": "財經",
+    "金融": "财经", "投资": "财经", "理财": "财经",
     # 其他常见输出
-    "搞笑": "娛樂", "综艺": "娛樂", "明星": "娛樂",
+    "搞笑": "娱乐", "综艺": "娱乐", "明星": "娱乐",
     "汽车": "其他", "职场": "其他",
 }
 
 _CATEGORY_VALUES = frozenset([
-    "科技/AI", "美妝", "美食", "穿搭", "家居", "健身", "教育",
-    "財經", "遊戲", "娛樂", "旅遊", "母嬰", "寵物", "健康/醫療", "其他",
+    "科技/AI", "美妆", "美食", "穿搭", "家居", "健身", "教育",
+    "财经", "游戏", "娱乐", "旅游", "母婴", "宠物", "健康/医疗", "其他",
 ])
 
 
@@ -133,12 +138,12 @@ class TrendScout(BaseAgent):
         if items is None:
             items = await self._collect(platform, keyword, limit)
         if not items:
-            logger.warning(f"TrendScout: [{platform}] 無數據，跳過分析")
+            logger.warning(f"TrendScout: [{platform}] 无数据，跳过分析")
             return TrendReport(platform=platform, keyword=keyword, total_candidates=0)
 
         report = await self._llm_generate(platform, keyword, items)
         logger.info(
-            f"TrendScout: [{platform}] {report.total_candidates} 個爆款候選"
+            f"TrendScout: [{platform}] {report.total_candidates} 个爆款候选"
         )
         return report
 
@@ -182,18 +187,18 @@ class TrendScout(BaseAgent):
     # ── Few-Shot 示例庫 ──────────────────────────────────────
     _FEWSHOT_GOOD = [
         # L2 fix：few-shot 从 5+2 缩到 2+1（节省 ~400 tokens 装 actual JSON output）
-        {"title": "我用AI做了一個能自動回覆客服的機器人，成本只花了50塊", "plays": "85万", "likes": "4.2万",
+        {"title": "我用AI做了一个能自动回复客服的机器人，成本只花了50块", "plays": "85万", "likes": "4.2万",
          "viral_score": 92, "category": "科技/AI",
-         "trend_reason": "AI工具實操+極低成本+個人即商用，互動比4.9%遠超均值，藍海信號明確"},
-        {"title": "小個子女生這樣穿顯高10cm！5套通勤穿搭公式", "plays": "120万", "likes": "6.8万",
+         "trend_reason": "AI工具实操+极低成本+个人即商用，互动比4.9%远超均值，蓝海信号明确"},
+        {"title": "小个子女生这样穿显高10cm！5套通勤穿搭公式", "plays": "120万", "likes": "6.8万",
          "viral_score": 85, "category": "穿搭",
-         "trend_reason": "精準人群+數字衝擊+公式化教程，互動比5.7%"},
+         "trend_reason": "精准人群+数字冲击+公式化教程，互动比5.7%"},
     ]
 
     _FEWSHOT_BAD = [
-        {"title": "今天的天氣真好呀陽光明媚", "plays": "1.2万", "likes": "200",
+        {"title": "今天的天气真好呀阳光明媚", "plays": "1.2万", "likes": "200",
          "viral_score": 8, "category": "其他",
-         "trend_reason": "❌ 純個人生活記錄、無爆款元素、互動比僅1.7%"},
+         "trend_reason": "❌ 纯个人生活记录、无爆款元素、互动比仅1.7%"},
     ]
 
     async def _llm_generate(
@@ -201,12 +206,12 @@ class TrendScout(BaseAgent):
     ) -> TrendReport:
         """DeepSeek LLM 分析爆款趨勢（v2 增強 prompt）。"""
         if not self._api_key:
-            logger.info("LLM 未配置，使用純熱度排序")
+            logger.info("LLM 未配置，使用纯热度排序")
             return self._fallback(platform, keyword, items)
 
         # M2 fix：减少 max items from 15 → 5（避免 LLM 截断导致 validation fail）
         items_text = "\n".join(
-            f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 讚:{it.get('likes','0')} | 作者:{it.get('author','')}"
+            f"{i}. {it.get('title','')} | 播放:{it.get('plays','0')} | 赞:{it.get('likes','0')} | 作者:{it.get('author','')}"
             for i, it in enumerate(items[:5])
         )
 
@@ -219,7 +224,7 @@ class TrendScout(BaseAgent):
             for ex in self._FEWSHOT_BAD
         )
 
-        context = f"平台: {platform}" + (f", 關鍵詞: {keyword}" if keyword else " (熱榜)")
+        context = f"平台: {platform}" + (f", 关键词: {keyword}" if keyword else " (热榜)")
         prompt = f"""<role>
 你是爆款趋势分析师（Trend Scout）。你的唯一职责：Analyze 社交媒体内容列表，Score 每条内容的爆款潜力，Classify 赛道分类，Extract 可复制的爆款机制。
 </role>
@@ -297,7 +302,7 @@ ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以
             )
 
         except Exception as exc:
-            logger.warning(f"TrendScout LLM 失敗，降級為熱度排序: {exc}")
+            logger.warning(f"TrendScout LLM 失败，降级为热度排序: {exc}")
             return self._fallback(platform, keyword, items)
 
     def _fallback(self, platform: str, keyword: str, items: list[dict]) -> TrendReport:
@@ -326,7 +331,7 @@ ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以
                 title=it.get("title", ""),
                 platform=platform,
                 viral_score=50,
-                trend_reason="(降級模式: 純熱度排序)",
+                trend_reason="(降级模式: 纯热度排序)",
                 category="",
                 engagement={"plays": it.get("plays", "0"), "likes": it.get("likes", "0")},
                 raw=it,
@@ -338,5 +343,5 @@ ESCALATE: 数据全部为0时 → 返回空分析并标注原因；连续3条以
             keyword=keyword or "hot",
             total_candidates=len(trend_items),
             items=trend_items,
-            summary="LLM 不可用，降級為熱度排序",
+            summary="LLM 不可用，降级为热度排序",
         )
