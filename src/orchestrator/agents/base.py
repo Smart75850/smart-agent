@@ -27,6 +27,21 @@ class BaseAgent:
         self._qwen_api_url = settings.QWEN_API_URL or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         self._qwen_model = settings.QWEN_MODEL or "qwen-vl-max"
 
+    @staticmethod
+    def _inject_chinese_invariant(prompt: str) -> str:
+        """按 invariant #14 强制简体中文输出：往 prompt 头部注入语言要求。
+
+        两条 LLM 调用路径（_call_llm / _call_qwen_vl）共用此方法。
+        此前只覆盖 _call_llm，多模态路径的输出语言完全不受控（2026-10-06 补）。
+
+        settings.CHINESE_OUTPUT_INVARIANT = False 可关闭。
+        """
+        if not getattr(settings, "CHINESE_OUTPUT_INVARIANT", True):
+            return prompt
+        if "OUTPUT IN CHINESE" in prompt or "OUTPUT IN ENGLISH" in prompt:
+            return prompt
+        return f"OUTPUT IN CHINESE（简体中文）\n\n{prompt}"
+
     async def _call_llm(self, prompt: str, temperature: float = 0.7, json_mode: bool = False, max_tokens: int = 4096) -> str:
         """调用 DeepSeek LLM，返回原始响应文本。
 
@@ -37,12 +52,7 @@ class BaseAgent:
         - 自动 inject `OUTPUT IN CHINESE` 到 prompt 头部（如果未存在）
         - settings.CHINESE_OUTPUT_INVARIANT = False 可关闭
         """
-        from config.settings import settings
-
-        # OUTPUT IN CHINESE invariant（章 4 Camel/BabyAGI 启发）
-        if getattr(settings, "CHINESE_OUTPUT_INVARIANT", True):
-            if "OUTPUT IN CHINESE" not in prompt and "OUTPUT IN ENGLISH" not in prompt:
-                prompt = f"OUTPUT IN CHINESE（简体中文）\n\n{prompt}"
+        prompt = self._inject_chinese_invariant(prompt)
 
         body = {
             "model": self._model,
@@ -80,12 +90,16 @@ class BaseAgent:
     ) -> str:
         """调用 QWEN-VL 多模态模型，发送图片+文本并返回响应。
 
+        与 _call_llm 对齐：同样注入简体中文要求（此前遗漏，导致多模态
+        路径输出语言不受控，2026-10-06 补）。
+
         Args:
             prompt: 文本提示
             images: 图片文件路径列表
             temperature: 采样温度
             max_tokens: 最大输出 token 数
         """
+        prompt = self._inject_chinese_invariant(prompt)
         content: list[dict] = [{"type": "text", "text": prompt}]
         for img_path in images:
             if not os.path.exists(img_path):
@@ -115,6 +129,9 @@ class BaseAgent:
                 },
                 json=body,
             )
+            # 与 _call_llm 对齐：先 raise_for_status，4xx/5xx 直接抛出带状态码的
+            # HTTPStatusError，而不是被后一行伪装成「QWEN-VL API 错误」
+            resp.raise_for_status()
             data = resp.json()
             if "choices" not in data:
                 raise RuntimeError(f"QWEN-VL API 错误: {data}")
